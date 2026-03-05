@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Data & uploads
+data/
+*.db
+
+# Environment (copy .env.default to .env and edit for your deployment)
+.env
+
+# Reference materials (local only)
+/reference
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage reports
+coverage/
