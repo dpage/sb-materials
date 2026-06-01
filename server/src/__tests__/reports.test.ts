@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import type Database from 'better-sqlite3';
 import type { Express } from 'express';
-import { createTestDb, createTestApp, loginAsAdmin, createTestCustomerAndSite } from './helpers';
+import { createTestDb, createTestApp, loginAsAdmin, loginAsRegularUser, createTestCustomerAndSite } from './helpers';
 
 describe('Report Routes', () => {
   let db: Database.Database;
@@ -421,6 +421,47 @@ describe('Report Routes', () => {
     it('should return 404 for non-existent report', async () => {
       const res = await request(app).delete('/api/reports/999').set('Cookie', cookie);
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('Access control and lifecycle', () => {
+    it('non-superuser only sees own/assigned reports; superuser sees all', async () => {
+      const db = createTestDb();
+      const app = createTestApp(db);
+      const adminCookie = await loginAsAdmin(app);
+      const { customerId, siteId } = createTestCustomerAndSite(db);
+
+      await request(app).post('/api/reports').set('Cookie', adminCookie).send({
+        report_type: 'loading_inspection', customer_id: customerId, site_id: siteId,
+        inspection_date: '2026-05-01', inspector_name: 'A',
+      });
+
+      const regularCookie = await loginAsRegularUser(app, db);
+      const regList = await request(app).get('/api/reports').set('Cookie', regularCookie);
+      expect(regList.body.data.length).toBe(0);
+
+      const adminList = await request(app).get('/api/reports').set('Cookie', adminCookie);
+      expect(adminList.body.total).toBeGreaterThanOrEqual(1);
+    });
+
+    it('submit marks completed; reopen returns to assigned', async () => {
+      const db = createTestDb();
+      const app = createTestApp(db);
+      const cookie = await loginAsAdmin(app);
+      const { customerId, siteId } = createTestCustomerAndSite(db);
+      const res = await request(app).post('/api/reports').set('Cookie', cookie).send({
+        report_type: 'loading_inspection', customer_id: customerId, site_id: siteId,
+        inspection_date: '2026-05-01', inspector_name: 'A', status: 'assigned',
+      });
+      const id = res.body.id;
+
+      const submit = await request(app).post(`/api/reports/${id}/submit`).set('Cookie', cookie).send({});
+      expect(submit.status).toBe(200);
+      expect((db.prepare('SELECT status, date_completed FROM reports WHERE id = ?').get(id) as any).status).toBe('completed');
+
+      const reopen = await request(app).post(`/api/reports/${id}/reopen`).set('Cookie', cookie).send({});
+      expect(reopen.status).toBe(200);
+      expect((db.prepare('SELECT status FROM reports WHERE id = ?').get(id) as any).status).toBe('assigned');
     });
   });
 });

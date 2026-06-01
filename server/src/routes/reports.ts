@@ -52,6 +52,15 @@ export function reportRoutes(db: Database.Database): Router {
       params.push(s, s, s, s);
     }
 
+    if (!req.session.isSuperuser) {
+      conditions.push('(r.created_by_id = ? OR r.assigned_to_id = ?)');
+      params.push(req.session.userId, req.session.userId);
+    }
+    if (req.query.assigned_to_me === 'true') {
+      conditions.push('r.assigned_to_id = ?');
+      params.push(req.session.userId);
+    }
+
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
 
     const allowedSorts = ['inspection_date', 'created_at', 'customer_name', 'report_type', 'status'];
@@ -346,6 +355,33 @@ export function reportRoutes(db: Database.Database): Router {
     }
 
     db.prepare('DELETE FROM reports WHERE id = ?').run(req.params.id);
+    res.json({ ok: true });
+  });
+
+  // Submit report (marks as completed)
+  router.post('/:id/submit', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const report = db.prepare('SELECT created_by_id, assigned_to_id FROM reports WHERE id = ?').get(id) as
+      | { created_by_id: number | null; assigned_to_id: number | null }
+      | undefined;
+    if (!report) return res.status(404).json({ error: 'Not found' });
+    const me = req.session.userId;
+    if (!req.session.isSuperuser && report.created_by_id !== me && report.assigned_to_id !== me) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    db.prepare("UPDATE reports SET status = 'completed', date_completed = date('now'), updated_at = datetime('now') WHERE id = ?").run(id);
+    res.json({ ok: true });
+  });
+
+  // Reopen report (returns to assigned)
+  router.post('/:id/reopen', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const report = db.prepare('SELECT created_by_id FROM reports WHERE id = ?').get(id) as { created_by_id: number | null } | undefined;
+    if (!report) return res.status(404).json({ error: 'Not found' });
+    if (!req.session.isSuperuser && report.created_by_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    db.prepare("UPDATE reports SET status = 'assigned', date_completed = NULL, updated_at = datetime('now') WHERE id = ?").run(id);
     res.json({ ok: true });
   });
 
