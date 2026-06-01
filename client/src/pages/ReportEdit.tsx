@@ -233,10 +233,13 @@ export function ReportEdit() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleSave = async (overrideStatus?: string) => {
+  const handleSave = async (
+    overrideStatus?: string,
+    opts?: { skipNavigate?: boolean },
+  ): Promise<number | null> => {
     if (!customerId || !siteId || !inspectionDate || !inspectorName) {
       setFormError('Please fill in all required fields (Customer, Site, Date, Inspector)');
-      return;
+      return null;
     }
     setFormError('');
 
@@ -324,19 +327,26 @@ export function ReportEdit() {
         await api.uploadSignature(reportId, blob);
       }
 
-      navigate('/');
+      if (!opts?.skipNavigate) {
+        navigate('/');
+      }
+      return reportId;
     } catch (err: any) {
       setFormError('Save failed: ' + (err.message || 'Unknown error'));
+      return null;
     } finally {
       setSaving(false);
     }
   };
 
   const handleSubmit = async () => {
-    await handleSave('assigned'); // persist current field values first
-    if (id) {
-      await api.submitReport(parseInt(id));
+    const savedId = await handleSave('assigned', { skipNavigate: true });
+    if (savedId == null) return; // save failed/validation — error already shown
+    try {
+      await api.submitReport(savedId);
       navigate('/');
+    } catch {
+      setFormError('Failed to submit report. Please try again.');
     }
   };
 

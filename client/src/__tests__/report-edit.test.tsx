@@ -855,6 +855,72 @@ describe('ReportEdit - Edit Report', () => {
     });
   });
 
+  it('Submit button saves then calls submitReport with the saved report id', async () => {
+    (api.getReport as any).mockResolvedValue({
+      id: 1,
+      report_type: 'loading_inspection',
+      customer_id: 1,
+      site_id: 1,
+      inspection_date: '2025-01-15',
+      inspector_name: 'Inspector',
+      status: 'assigned',
+      inspection_details: {},
+      unwanted_materials: [],
+      contaminants: [],
+      photos: [],
+    });
+
+    renderEdit();
+    await screen.findByText('Edit Report');
+
+    // The Submit button is visible only when isEdit && status === 'assigned'
+    const submitBtn = await screen.findByText('Submit');
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(api.updateReport).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ status: 'assigned' }),
+      );
+    });
+    await waitFor(() => {
+      expect(api.submitReport).toHaveBeenCalledWith(1);
+    });
+    // After successful submit, navigates home
+    await waitFor(() => {
+      expect(screen.getByText('Home')).toBeInTheDocument();
+    });
+  });
+
+  it('Submit does not call submitReport when save validation fails', async () => {
+    // Report with no customer — forces validation failure
+    (api.getReport as any).mockResolvedValue({
+      id: 1,
+      report_type: 'loading_inspection',
+      customer_id: '',
+      site_id: '',
+      inspection_date: '2025-01-15',
+      inspector_name: '',
+      status: 'assigned',
+      inspection_details: {},
+      unwanted_materials: [],
+      contaminants: [],
+      photos: [],
+    });
+
+    renderEdit();
+    await screen.findByText('Edit Report');
+
+    const submitBtn = await screen.findByText('Submit');
+    fireEvent.click(submitBtn);
+
+    // Give async handlers a chance to run
+    await waitFor(() => {
+      expect(screen.getByText(/Please fill in all required fields/i)).toBeInTheDocument();
+    });
+    expect(api.submitReport).not.toHaveBeenCalled();
+  });
+
   it('should handle completed report with date_completed', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 1,
