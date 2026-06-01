@@ -128,8 +128,8 @@ describe('API Client', () => {
   describe('lookups', () => {
     it('should get lookups with report type', async () => {
       const spy = mockFetch([{ id: 1, value: 'OCC' }]);
-      await api.getLookups('lookup_product_grades', 'inspection_fibre');
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('report_type=inspection_fibre'), expect.anything());
+      await api.getLookups('lookup_product_grades', 'loading_inspection');
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('report_type=loading_inspection'), expect.anything());
     });
 
     it('should get all lookups including inactive', async () => {
@@ -151,12 +151,12 @@ describe('API Client', () => {
   describe('reports', () => {
     it('should get reports with params', async () => {
       const spy = mockFetch({ data: [], total: 0, page: 1, limit: 25 });
-      await api.getReports({ page: '1', report_type: 'inspection_fibre' });
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('report_type=inspection_fibre'), expect.anything());
+      await api.getReports({ page: '1', report_type: 'loading_inspection' });
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('report_type=loading_inspection'), expect.anything());
     });
 
     it('should get single report', async () => {
-      mockFetch({ id: 1, report_type: 'inspection_fibre' });
+      mockFetch({ id: 1, report_type: 'loading_inspection' });
       const report = await api.getReport(1);
       expect(report.id).toBe(1);
     });
@@ -164,7 +164,7 @@ describe('API Client', () => {
     it('should create report', async () => {
       const spy = mockFetch({ id: 1 });
       await api.createReport({
-        report_type: 'inspection_fibre',
+        report_type: 'loading_inspection',
         customer_id: 1,
         site_id: 1,
         inspection_date: '2024-01-01',
