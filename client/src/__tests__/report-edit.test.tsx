@@ -228,6 +228,19 @@ describe('ReportEdit - New Report', () => {
     expect(plusBtns.length).toBeGreaterThanOrEqual(2); // customer and site
   });
 
+  it('loads on-behalf-of clients and shows the dropdown', async () => {
+    (api.getLookups as any).mockImplementation((table: string) =>
+      Promise.resolve(
+        table === 'lookup_clients'
+          ? [{ id: 9, value: 'VISY Recycling UK', is_active: 1 }]
+          : [{ id: 1, value: 'OCC', report_type: 'loading_inspection', is_active: 1 }],
+      ),
+    );
+    renderNew();
+    await screen.findByText('New Report');
+    expect(await screen.findByText('On Behalf Of')).toBeInTheDocument();
+  });
+
   it('should show date and time inputs', async () => {
     renderNew();
     await screen.findByText('New Report');

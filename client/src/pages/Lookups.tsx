@@ -9,6 +9,7 @@ const TABLES = [
   { key: 'lookup_storage_modes', label: 'Storage Modes', hasType: false },
   { key: 'lookup_unwanted_materials', label: 'Unwanted Materials', hasType: true },
   { key: 'lookup_contaminants', label: 'Contaminants', hasType: true },
+  { key: 'lookup_clients', label: 'Clients (On Behalf Of)', hasType: false },
 ];
 
 const REPORT_TYPES = [

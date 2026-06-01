@@ -69,6 +69,10 @@ export function ReportEdit() {
   // Form errors
   const [formError, setFormError] = useState('');
 
+  // On behalf of
+  const [onBehalfOf, setOnBehalfOf] = useState('');
+  const [clientOptions, setClientOptions] = useState<LookupValue[]>([]);
+
   // Lookups & references
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sites, setSites] = useState<CustomerSite[]>([]);
@@ -119,6 +123,11 @@ export function ReportEdit() {
     }
   }, [customerId, customers]);
 
+  // Load global lookups once on mount
+  useEffect(() => {
+    api.getLookups('lookup_clients').then(setClientOptions);
+  }, []);
+
   // Load lookups when report type changes
   useEffect(() => {
     if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
@@ -151,6 +160,7 @@ export function ReportEdit() {
         setOtherInfo(report.other_information || '');
         setDateCompleted(report.date_completed || '');
         setStatus(report.status);
+        setOnBehalfOf(report.on_behalf_of || '');
         if (report.inspection_details) setDetails(report.inspection_details);
         if (report.unwanted_materials) {
           const otherEntry = report.unwanted_materials.find((m) => m.material === 'Other');
@@ -213,6 +223,7 @@ export function ReportEdit() {
         other_information: otherInfo || null,
         date_completed: dateCompleted || null,
         status: overrideStatus || status,
+        on_behalf_of: onBehalfOf || null,
       };
 
       if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
@@ -485,6 +496,28 @@ export function ReportEdit() {
                 <option value="completed">Completed</option>
               </select>
             </div>
+            {isInspection && (
+              <div>
+                <label style={labelStyle}>On Behalf Of</label>
+                <div style={inputWithBtnRow}>
+                  <select
+                    value={onBehalfOf}
+                    onChange={(e) => setOnBehalfOf(e.target.value)}
+                    style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  >
+                    <option value="">Select client...</option>
+                    {clientOptions.map((c) => (
+                      <option key={c.id} value={c.value}>
+                        {c.value}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => setQuickAdd({ type: 'on_behalf_of' })} style={addBtnStyle}>
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </Section>
 
@@ -1138,6 +1171,17 @@ export function ReportEdit() {
           const result = await api.createSite(quickAdd!.customerId!, address);
           setSites((prev) => [...prev, result]);
           setSiteId(result.id);
+        }}
+        onClose={() => setQuickAdd(null)}
+      />
+      <QuickAddModal
+        open={quickAdd?.type === 'on_behalf_of'}
+        title="Add Client"
+        label="Company Name"
+        onSave={async (value) => {
+          const result = await api.createLookup('lookup_clients', { value });
+          setClientOptions((prev) => [...prev, result]);
+          setOnBehalfOf(result.value);
         }}
         onClose={() => setQuickAdd(null)}
       />
