@@ -349,6 +349,63 @@ describe('Report Routes', () => {
     });
   });
 
+  describe('New field persistence', () => {
+    it('creates a loading_inspection with new fields and reads them back', async () => {
+      const db = createTestDb();
+      const app = createTestApp(db);
+      const cookie = await loginAsAdmin(app);
+      const { customerId, siteId } = createTestCustomerAndSite(db);
+
+      const res = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'loading_inspection',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-05-01',
+          inspector_name: 'Insp',
+          on_behalf_of: 'VISY Recycling UK',
+          inspection_details: { product_grade: '95/5 OCC', rejected_bales: '2', packaging_thresholds: ['OCC 80%', 'PET 97.5%'] },
+          containers: [{ container_number: 'AAA1', number_of_bales: '32 Bales', weighbridge_ticket: '786371', weight: '19.04 Tonnes' }],
+        });
+      expect(res.status).toBe(200);
+
+      const created = db.prepare('SELECT * FROM reports WHERE id = ?').get(res.body.id) as any;
+      expect(created.on_behalf_of).toBe('VISY Recycling UK');
+      expect(created.created_by_id).toBeGreaterThan(0);
+
+      const full = await request(app).get(`/api/reports/${res.body.id}`).set('Cookie', cookie);
+      expect(full.body.inspection_details.rejected_bales).toBe('2');
+      expect(JSON.parse(full.body.inspection_details.packaging_thresholds)).toEqual(['OCC 80%', 'PET 97.5%']);
+      expect(full.body.containers[0].number_of_bales).toBe('32 Bales');
+      expect(full.body.containers[0].weight).toBe('19.04 Tonnes');
+    });
+
+    it('creates a quarterly_pern with bale_break fields', async () => {
+      const db = createTestDb();
+      const app = createTestApp(db);
+      const cookie = await loginAsAdmin(app);
+      const { customerId, siteId } = createTestCustomerAndSite(db);
+
+      const res = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'quarterly_pern',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-05-02',
+          inspector_name: 'Insp',
+          inspection_details: { bale_break: 1, bale_break_results: 'clean', packaging_thresholds: ['OCC 97.5%'] },
+        });
+      expect(res.status).toBe(200);
+      const full = await request(app).get(`/api/reports/${res.body.id}`).set('Cookie', cookie);
+      expect(full.body.inspection_details.bale_break).toBe(1);
+      expect(full.body.inspection_details.bale_break_results).toBe('clean');
+    });
+  });
+
   describe('DELETE /api/reports/:id', () => {
     it('should delete a report', async () => {
       const createRes = await request(app).post('/api/reports').set('Cookie', cookie).send(createFibreReport());

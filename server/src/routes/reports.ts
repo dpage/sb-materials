@@ -119,6 +119,8 @@ export function reportRoutes(db: Database.Database): Router {
       other_information,
       date_completed,
       status,
+      on_behalf_of,
+      assigned_to_id,
       inspection_details,
       unwanted_materials,
       contaminants,
@@ -136,8 +138,8 @@ export function reportRoutes(db: Database.Database): Router {
         .prepare(
           `INSERT INTO reports (report_type, customer_id, site_id, inspection_date, inspection_time,
          inspector_id, inspector_name, quality_score, inspection_passed, other_information,
-         date_completed, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         date_completed, status, on_behalf_of, assigned_to_id, created_by_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           report_type,
@@ -152,12 +154,17 @@ export function reportRoutes(db: Database.Database): Router {
           other_information,
           date_completed,
           status || 'draft',
+          on_behalf_of ?? null,
+          assigned_to_id ?? null,
+          req.session.userId,
         );
 
       const reportId = result.lastInsertRowid as number;
 
       // Save type-specific details
-      if (report_type.startsWith('inspection_') && inspection_details) {
+      const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
+      const isInspection = INSPECTION_TYPES.includes(report_type) || report_type.startsWith('inspection_');
+      if (isInspection && inspection_details) {
         saveInspectionDetails(db, reportId, inspection_details);
       }
       if (report_type === 'pern_audit' && pern_details) {
@@ -184,11 +191,11 @@ export function reportRoutes(db: Database.Database): Router {
       const containerIds: number[] = [];
       if (containers?.length) {
         const stmt = db.prepare(
-          'INSERT INTO report_containers (report_id, container_number, seal_number, weight_info, sort_order) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO report_containers (report_id, container_number, seal_number, weight_info, number_of_bales, weighbridge_ticket, weight, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         );
         for (let i = 0; i < containers.length; i++) {
           const c = containers[i];
-          const r = stmt.run(reportId, c.container_number, c.seal_number, c.weight_info, i);
+          const r = stmt.run(reportId, c.container_number, c.seal_number, c.weight_info, c.number_of_bales ?? null, c.weighbridge_ticket ?? null, c.weight ?? null, i);
           containerIds.push(r.lastInsertRowid as number);
         }
       }
@@ -214,6 +221,8 @@ export function reportRoutes(db: Database.Database): Router {
       other_information,
       date_completed,
       status,
+      on_behalf_of,
+      assigned_to_id,
       inspection_details,
       unwanted_materials,
       contaminants,
@@ -244,6 +253,8 @@ export function reportRoutes(db: Database.Database): Router {
          other_information = ?,
          date_completed = ?,
          status = COALESCE(?, status),
+         on_behalf_of = COALESCE(?, on_behalf_of),
+         assigned_to_id = ?,
          updated_at = datetime('now')
          WHERE id = ?`,
       ).run(
@@ -259,13 +270,17 @@ export function reportRoutes(db: Database.Database): Router {
         other_information ?? null,
         date_completed ?? null,
         status,
+        on_behalf_of ?? null,
+        assigned_to_id ?? null,
         reportId,
       );
 
       const rType = report_type || existing.report_type;
 
       // Replace inspection details
-      if (rType.startsWith('inspection_') && inspection_details) {
+      const INSPECTION_TYPES_PUT = ['loading_inspection', 'quarterly_pern'];
+      const isInspectionPut = INSPECTION_TYPES_PUT.includes(rType) || rType.startsWith('inspection_');
+      if (isInspectionPut && inspection_details) {
         db.prepare('DELETE FROM report_inspection_details WHERE report_id = ?').run(reportId);
         saveInspectionDetails(db, reportId, inspection_details);
       }
@@ -305,12 +320,12 @@ export function reportRoutes(db: Database.Database): Router {
         db.prepare('DELETE FROM report_containers WHERE report_id = ?').run(reportId);
         if (containers?.length) {
           const stmt = db.prepare(
-            'INSERT INTO report_containers (report_id, container_number, seal_number, weight_info, sort_order) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO report_containers (report_id, container_number, seal_number, weight_info, number_of_bales, weighbridge_ticket, weight, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
           );
           const newContainerIds: number[] = [];
           for (let i = 0; i < containers.length; i++) {
             const c = containers[i];
-            const r = stmt.run(reportId, c.container_number, c.seal_number, c.weight_info, i);
+            const r = stmt.run(reportId, c.container_number, c.seal_number, c.weight_info, c.number_of_bales ?? null, c.weighbridge_ticket ?? null, c.weight ?? null, i);
             newContainerIds.push(r.lastInsertRowid as number);
           }
           return newContainerIds;
@@ -348,8 +363,9 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
       stock_bale_count, mixed_paper_exceeds_34_5, occ_exceeds_80,
       plastic_exceeds_97_5, material_originates_uk, supplier_aware_pern,
       supplier_controls_volume, volume_consistency_notes, site_buys_prebaled,
-      prebaled_uk_assurance, site_aware_non_uk
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      prebaled_uk_assurance, site_aware_non_uk,
+      rejected_bales, bale_break, bale_break_results, packaging_thresholds
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     reportId,
     d.product_description ?? null,
@@ -372,6 +388,10 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
     d.site_buys_prebaled ?? null,
     d.prebaled_uk_assurance ?? null,
     d.site_aware_non_uk ?? null,
+    d.rejected_bales ?? null,
+    d.bale_break ?? null,
+    d.bale_break_results ?? null,
+    Array.isArray(d.packaging_thresholds) ? JSON.stringify(d.packaging_thresholds) : (d.packaging_thresholds ?? null),
   );
 }
 
