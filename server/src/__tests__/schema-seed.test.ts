@@ -75,6 +75,30 @@ describe('Seed Data', () => {
   });
 });
 
+describe('refined schema', () => {
+  function cols(db: Database.Database, table: string): string[] {
+    return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+  }
+
+  it('adds handoff + refined columns and lookup_clients', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    expect(cols(db, 'reports')).toEqual(
+      expect.arrayContaining(['on_behalf_of', 'assigned_to_id', 'created_by_id']),
+    );
+    expect(cols(db, 'report_inspection_details')).toEqual(
+      expect.arrayContaining(['rejected_bales', 'bale_break', 'bale_break_results', 'packaging_thresholds']),
+    );
+    expect(cols(db, 'report_containers')).toEqual(
+      expect.arrayContaining(['number_of_bales', 'weighbridge_ticket', 'weight']),
+    );
+    const lookupClients = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lookup_clients'").get();
+    expect(lookupClients).toBeDefined();
+  });
+});
+
 describe('Photo Migration', () => {
   it('should migrate flat photos to subdirectories', () => {
     const db = new Database(':memory:');

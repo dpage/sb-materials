@@ -205,6 +205,12 @@ export function createSchema(db: Database.Database): void {
       value TEXT NOT NULL,
       is_active INTEGER DEFAULT 1
     );
+
+    CREATE TABLE IF NOT EXISTS lookup_clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      value TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1
+    );
   `);
 
   // Migrations - add columns if they don't exist
@@ -228,6 +234,32 @@ export function createSchema(db: Database.Database): void {
   if (!pernCols.map((c) => c.name).includes('intro_letter')) {
     db.exec('ALTER TABLE report_pern_details ADD COLUMN intro_letter TEXT');
   }
+
+  const addColumns = (table: string, columns: { name: string; type: string }[]) => {
+    const existing = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+    for (const col of columns) {
+      if (!existing.includes(col.name)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.type}`);
+      }
+    }
+  };
+
+  addColumns('reports', [
+    { name: 'on_behalf_of', type: 'TEXT' },
+    { name: 'assigned_to_id', type: 'INTEGER' },
+    { name: 'created_by_id', type: 'INTEGER' },
+  ]);
+  addColumns('report_inspection_details', [
+    { name: 'rejected_bales', type: 'TEXT' },
+    { name: 'bale_break', type: 'INTEGER' },
+    { name: 'bale_break_results', type: 'TEXT' },
+    { name: 'packaging_thresholds', type: 'TEXT' },
+  ]);
+  addColumns('report_containers', [
+    { name: 'number_of_bales', type: 'TEXT' },
+    { name: 'weighbridge_ticket', type: 'TEXT' },
+    { name: 'weight', type: 'TEXT' },
+  ]);
 }
 
 /**
