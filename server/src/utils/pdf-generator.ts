@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { logger } from './logger';
+import { SB_LOGO_DATA_URL } from './logo';
+
+const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
 
 const printer = new PdfPrinter({
   Roboto: {
@@ -18,7 +21,9 @@ function formatReportType(type: string): string {
     inspection_fibre: 'Quality & Inspection Report - Fibre',
     inspection_plastics: 'Quality & Inspection Report - Plastics',
     inspection_metals: 'Quality & Inspection Report - Metals',
-    pern_audit: 'Packaging Regulations Supplier Declaration & Audit Form',
+    loading_inspection: 'Loading & Inspection',
+    quarterly_pern: 'Quarterly PERN Inspection',
+    pern_audit: 'PERN Audit',
   };
   return map[type] || type;
 }
@@ -111,7 +116,7 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
 
   if (report.report_type === 'pern_audit') {
     buildPernAudit(content, report, uploadsDir);
-  } else if (report.report_type.startsWith('inspection_')) {
+  } else if (INSPECTION_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_')) {
     buildInspectionReport(content, report, uploadsDir);
   }
 
@@ -123,12 +128,36 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
       subheader: { fontSize: 12, bold: true, color: '#2c3e50' },
     },
     defaultStyle: { fontSize: 10 },
-    pageMargins: [40, 40, 40, 40] as [number, number, number, number],
+    pageMargins: [40, 70, 40, 50] as [number, number, number, number],
+    header: () => ({
+      columns: [
+        { image: SB_LOGO_DATA_URL, width: 140, margin: [40, 15, 0, 0] as [number, number, number, number] },
+        {
+          stack: [
+            { text: 'Stewart Bassett, Director', fontSize: 9, alignment: 'right' as const },
+            { text: 'stewart@sbmaterials.co.uk · 07881 337457', fontSize: 8, alignment: 'right' as const, color: '#555' },
+          ],
+          margin: [0, 18, 40, 0] as [number, number, number, number],
+        },
+      ],
+    }),
     footer: (currentPage: number, pageCount: number) => ({
-      text: `S.B. Materials UK LTD - Page ${currentPage} of ${pageCount}`,
-      alignment: 'center' as const,
-      fontSize: 8,
-      margin: [0, 10, 0, 0] as [number, number, number, number],
+      stack: [
+        { text: 'NRW Waste Brokers registration CBDU027716', fontSize: 7, alignment: 'center' as const, color: '#555' },
+        {
+          text: 'SB Materials UK LTD · 1 Deva Way, Wrexham, Wales LL13 9EU · Registered in Wales & England No. 10896256',
+          fontSize: 7,
+          alignment: 'center' as const,
+          color: '#555',
+        },
+        {
+          text: `Page ${currentPage} of ${pageCount}`,
+          fontSize: 7,
+          alignment: 'center' as const,
+          margin: [0, 2, 0, 0] as [number, number, number, number],
+        },
+      ],
+      margin: [40, 6, 40, 0] as [number, number, number, number],
     }),
   };
 
@@ -147,6 +176,7 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
 function buildInspectionReport(content: Content[], report: any, uploadsDir: string) {
   const d = report.inspection_details || {};
   const isFibre = report.report_type === 'inspection_fibre';
+  const isQuarterlyPern = report.report_type === 'quarterly_pern';
 
   // Header fields
   const headerRows: TableCell[][] = [
@@ -154,10 +184,17 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     ...fieldRow('Status', (report.status || 'draft').charAt(0).toUpperCase() + (report.status || 'draft').slice(1)),
     ...fieldRow('Supplier Name', report.customer_name),
     ...fieldRow('Site Address', report.site_address),
+  ];
+
+  if (report.on_behalf_of) {
+    headerRows.push(...fieldRow('On Behalf Of', report.on_behalf_of));
+  }
+
+  headerRows.push(
     ...fieldRow('Date of Inspection', report.inspection_date),
     ...fieldRow('Time of Inspection', report.inspection_time || '-'),
     ...fieldRow('Inspector', report.inspector_name),
-  ];
+  );
 
   if (!isFibre) {
     headerRows.push(...fieldRow('Product Description', d.product_description));
@@ -178,6 +215,18 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
       ...fieldRow('Moisture Readings', d.moisture_readings),
       ...fieldRow('Radiation Reading', d.radiation_reading),
     );
+  }
+
+  headerRows.push(...fieldRow('Packaging Content', parseJsonField(d.packaging_thresholds)));
+  if (d.rejected_bales) {
+    headerRows.push(...fieldRow('Rejected Bales', d.rejected_bales));
+  }
+
+  if (isQuarterlyPern) {
+    headerRows.push(...fieldRow('Bale Break Performed', yesNo(d.bale_break)));
+    if (d.bale_break) {
+      headerRows.push(...fieldRow('Bale Break Results', d.bale_break_results));
+    }
   }
 
   content.push({
@@ -211,15 +260,6 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
   // Compliance
   content.push({ text: 'Compliance', style: 'subheader', margin: [0, 10, 0, 5] as [number, number, number, number] });
   const complianceRows: TableCell[][] = [];
-
-  if (isFibre) {
-    complianceRows.push(
-      ...fieldRow('Mixed Paper exceeds 34.5% packaging?', d.mixed_paper_exceeds_34_5),
-      ...fieldRow('OCC/Fruitbox exceeds 80% packaging?', d.occ_exceeds_80),
-    );
-  } else {
-    complianceRows.push(...fieldRow('Plastic exceeds 97.5% packaging?', d.plastic_exceeds_97_5));
-  }
 
   complianceRows.push(
     ...fieldRow('Material originates in UK?', d.material_originates_uk),
@@ -258,11 +298,20 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
         style: 'subheader',
         margin: [0, 10, 0, 5] as [number, number, number, number],
       });
+      const containerRows: TableCell[][] = [...fieldRow('Seal Number', container.seal_number)];
+      const hasSplitFields =
+        container.number_of_bales || container.weighbridge_ticket || container.weight;
+      if (hasSplitFields) {
+        containerRows.push(
+          ...fieldRow('Bales', container.number_of_bales),
+          ...fieldRow('Weighbridge Ticket', container.weighbridge_ticket),
+          ...fieldRow('Weight', container.weight),
+        );
+      } else {
+        containerRows.push(...fieldRow('Weight Info', container.weight_info));
+      }
       content.push({
-        table: {
-          widths: [180, '*'],
-          body: [...fieldRow('Seal Number', container.seal_number), ...fieldRow('Weight Info', container.weight_info)],
-        },
+        table: { widths: [180, '*'], body: containerRows },
         layout: 'lightHorizontalLines',
         margin: [0, 0, 0, 5] as [number, number, number, number],
       });
