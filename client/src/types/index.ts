@@ -32,7 +32,7 @@ export interface CustomerSite {
   is_active: number;
 }
 
-export type ReportType = 'inspection_fibre' | 'inspection_plastics' | 'inspection_metals' | 'pern_audit';
+export type ReportType = 'loading_inspection' | 'quarterly_pern' | 'pern_audit';
 
 export interface Report {
   id: number;
@@ -49,6 +49,9 @@ export interface Report {
   signature_path: string | null;
   date_completed: string | null;
   status: string;
+  on_behalf_of: string | null;
+  assigned_to_id: number | null;
+  created_by_id: number | null;
   created_at: string;
   updated_at: string;
   customer_name?: string;
@@ -84,6 +87,10 @@ export interface InspectionDetails {
   site_buys_prebaled: string | null;
   prebaled_uk_assurance: string | null;
   site_aware_non_uk: string | null;
+  rejected_bales: string | null;
+  bale_break: number | null;
+  bale_break_results: string | null;
+  packaging_thresholds: string[] | string | null;
 }
 
 export interface UnwantedMaterial {
@@ -104,6 +111,9 @@ export interface Container {
   container_number: string | null;
   seal_number: string | null;
   weight_info: string | null;
+  number_of_bales: string | null;
+  weighbridge_ticket: string | null;
+  weight: string | null;
   sort_order: number;
 }
 
@@ -177,22 +187,19 @@ export interface LookupValue {
 }
 
 export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
-  inspection_fibre: 'Quality & Inspection - Fibre',
-  inspection_plastics: 'Quality & Inspection - Plastics',
-  inspection_metals: 'Quality & Inspection - Metals',
+  loading_inspection: 'Loading & Inspection',
+  quarterly_pern: 'Quarterly PERN Inspection',
   pern_audit: 'PERN Audit',
 };
 
 export const TYPE_COLORS: Record<string, string> = {
-  inspection_fibre: '#2e86de',
-  inspection_plastics: '#e67e22',
-  inspection_metals: '#636e72',
+  loading_inspection: '#2e86de',
+  quarterly_pern: '#16a085',
   pern_audit: '#8e44ad',
 };
 
 export const TYPE_SHORT: Record<string, string> = {
-  inspection_fibre: 'Fibre',
-  inspection_plastics: 'Plastics',
-  inspection_metals: 'Metals',
+  loading_inspection: 'Loading',
+  quarterly_pern: 'Quarterly',
   pern_audit: 'PERN',
 };
