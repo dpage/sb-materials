@@ -10,6 +10,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { createSchema, migratePhotoSubdirs } from './db/schema';
 import { seedData } from './db/seed';
+import { migrateRefined } from './db/migrate-refined';
 import { csrfProtection } from './middleware/csrf';
 import { authRoutes } from './routes/auth';
 import { userRoutes } from './routes/users';
@@ -34,6 +35,7 @@ db.pragma('foreign_keys = ON');
 
 createSchema(db);
 seedData(db);
+migrateRefined(db);
 migratePhotoSubdirs(db, config.uploadsDir);
 
 // Initialize Express
