@@ -20,12 +20,13 @@ export function Reports() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  const [assignedToMe, setAssignedToMe] = useState(false);
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const limit = 25;
 
-  const activeFilterCount = [customerId, reportType, status, dateFrom, dateTo].filter(Boolean).length;
+  const activeFilterCount = [customerId, reportType, status, dateFrom, dateTo, assignedToMe ? 'yes' : ''].filter(Boolean).length;
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -37,13 +38,14 @@ export function Reports() {
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       if (search) params.search = search;
+      if (assignedToMe) params.assigned_to_me = 'true';
       const res = await api.getReports(params);
       setReports(res.data);
       setTotal(res.total);
     } finally {
       setLoading(false);
     }
-  }, [page, customerId, reportType, status, dateFrom, dateTo, search]);
+  }, [page, customerId, reportType, status, dateFrom, dateTo, search, assignedToMe]);
 
   useEffect(() => {
     fetchReports();
@@ -151,6 +153,7 @@ export function Reports() {
         }
         .status-completed { background: #d5f5e3; color: #27ae60; }
         .status-draft { background: #fef9e7; color: #f39c12; }
+        .status-assigned { background: #d6eaf8; color: #2980b9; }
 
         /* Action buttons */
         .action-btn {
@@ -292,6 +295,7 @@ export function Reports() {
             >
               <option value="">All</option>
               <option value="draft">Draft</option>
+              <option value="assigned">Assigned</option>
               <option value="completed">Completed</option>
             </select>
           </div>
@@ -316,6 +320,19 @@ export function Reports() {
                 setPage(1);
               }}
             />
+          </div>
+          <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', textTransform: 'none', fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={assignedToMe}
+                onChange={(e) => {
+                  setAssignedToMe(e.target.checked);
+                  setPage(1);
+                }}
+              />
+              Assigned to me
+            </label>
           </div>
         </div>
       )}
@@ -362,7 +379,7 @@ export function Reports() {
                     <td>{r.inspector_name}</td>
                     <td>
                       <span
-                        className={`status-badge ${r.status === 'completed' ? 'status-completed' : 'status-draft'}`}
+                        className={`status-badge ${r.status === 'completed' ? 'status-completed' : r.status === 'assigned' ? 'status-assigned' : 'status-draft'}`}
                       >
                         {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                       </span>
@@ -375,6 +392,22 @@ export function Reports() {
                         <a className="action-btn" href={api.downloadPdf(r.id)}>
                           PDF
                         </a>
+                        {r.status === 'assigned' && (
+                          <button
+                            className="action-btn"
+                            onClick={async () => { await api.submitReport(r.id); fetchReports(); }}
+                          >
+                            Submit
+                          </button>
+                        )}
+                        {r.status === 'completed' && (
+                          <button
+                            className="action-btn"
+                            onClick={async () => { await api.reopenReport(r.id); fetchReports(); }}
+                          >
+                            Reopen
+                          </button>
+                        )}
                         <button className="action-btn delete" onClick={() => setDeleteId(r.id)}>
                           Delete
                         </button>
@@ -417,7 +450,7 @@ export function Reports() {
                         {TYPE_SHORT[r.report_type] || r.report_type}
                       </span>
                       <span
-                        className={`status-badge ${r.status === 'completed' ? 'status-completed' : 'status-draft'}`}
+                        className={`status-badge ${r.status === 'completed' ? 'status-completed' : r.status === 'assigned' ? 'status-assigned' : 'status-draft'}`}
                       >
                         {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                       </span>
@@ -435,6 +468,22 @@ export function Reports() {
                   <a className="card-action-btn" href={api.downloadPdf(r.id)}>
                     PDF
                   </a>
+                  {r.status === 'assigned' && (
+                    <button
+                      className="card-action-btn"
+                      onClick={async () => { await api.submitReport(r.id); fetchReports(); }}
+                    >
+                      Submit
+                    </button>
+                  )}
+                  {r.status === 'completed' && (
+                    <button
+                      className="card-action-btn"
+                      onClick={async () => { await api.reopenReport(r.id); fetchReports(); }}
+                    >
+                      Reopen
+                    </button>
+                  )}
                   <button className="card-action-btn delete" onClick={() => setDeleteId(r.id)}>
                     Delete
                   </button>

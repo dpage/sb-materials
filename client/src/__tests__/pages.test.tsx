@@ -30,6 +30,8 @@ vi.mock('../api', () => ({
     createReport: vi.fn(),
     updateReport: vi.fn(),
     deleteReport: vi.fn(),
+    submitReport: vi.fn(),
+    reopenReport: vi.fn(),
     uploadPhotos: vi.fn(),
     uploadSignature: vi.fn(),
     updatePhoto: vi.fn(),
@@ -171,6 +173,8 @@ describe('Reports Page', () => {
       limit: 25,
     });
     (api.getCustomers as any).mockResolvedValue([{ id: 1, name: 'Test Customer' }]);
+    (api.submitReport as any).mockResolvedValue({ ok: true });
+    (api.reopenReport as any).mockResolvedValue({ ok: true });
   });
 
   it('should render reports list', async () => {
@@ -471,6 +475,184 @@ describe('Reports Page', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('15 Jan 2025').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('shows an Assigned to me filter in the filter panel', async () => {
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    fireEvent.click(await screen.findByText('Filters'));
+    expect(await screen.findByText('Assigned to me')).toBeInTheDocument();
+  });
+
+  it('should show Assigned status option in status filter', async () => {
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    fireEvent.click(await screen.findByText('Filters'));
+    const filterSelects = document.querySelectorAll('.filters-panel select');
+    const statusSelect = filterSelects[2] as HTMLSelectElement;
+    const options = Array.from(statusSelect.options).map((o) => o.value);
+    expect(options).toContain('assigned');
+  });
+
+  it('should show Assigned badge for assigned reports', async () => {
+    (api.getReports as any).mockResolvedValue({
+      data: [
+        {
+          id: 2,
+          report_type: 'loading_inspection',
+          customer_name: 'Assigned Customer',
+          inspection_date: '2025-01-15',
+          inspector_name: 'Inspector',
+          status: 'assigned',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 25,
+    });
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText('Assigned').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should show Submit button for assigned reports', async () => {
+    (api.getReports as any).mockResolvedValue({
+      data: [
+        {
+          id: 2,
+          report_type: 'loading_inspection',
+          customer_name: 'Assigned Customer',
+          inspection_date: '2025-01-15',
+          inspector_name: 'Inspector',
+          status: 'assigned',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 25,
+    });
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText('Submit').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should call submitReport when Submit clicked', async () => {
+    (api.getReports as any).mockResolvedValue({
+      data: [
+        {
+          id: 2,
+          report_type: 'loading_inspection',
+          customer_name: 'Assigned Customer',
+          inspection_date: '2025-01-15',
+          inspector_name: 'Inspector',
+          status: 'assigned',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 25,
+    });
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText('Submit').length).toBeGreaterThan(0);
+    });
+    fireEvent.click(screen.getAllByText('Submit')[0]);
+    await waitFor(() => {
+      expect(api.submitReport).toHaveBeenCalledWith(2);
+    });
+  });
+
+  it('should show Reopen button for completed reports', async () => {
+    (api.getReports as any).mockResolvedValue({
+      data: [
+        {
+          id: 3,
+          report_type: 'loading_inspection',
+          customer_name: 'Done Customer',
+          inspection_date: '2025-01-15',
+          inspector_name: 'Inspector',
+          status: 'completed',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 25,
+    });
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText('Reopen').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should call reopenReport when Reopen clicked', async () => {
+    (api.getReports as any).mockResolvedValue({
+      data: [
+        {
+          id: 3,
+          report_type: 'loading_inspection',
+          customer_name: 'Done Customer',
+          inspection_date: '2025-01-15',
+          inspector_name: 'Inspector',
+          status: 'completed',
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 25,
+    });
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText('Reopen').length).toBeGreaterThan(0);
+    });
+    fireEvent.click(screen.getAllByText('Reopen')[0]);
+    await waitFor(() => {
+      expect(api.reopenReport).toHaveBeenCalledWith(3);
+    });
+  });
+
+  it('should include assigned_to_me param when filter is checked', async () => {
+    render(
+      <TestWrapper>
+        <Reports />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(api.getReports).toHaveBeenCalled());
+    fireEvent.click(await screen.findByText('Filters'));
+    const checkbox = screen.getByRole('checkbox', { name: /assigned to me/i });
+    fireEvent.click(checkbox);
+    await waitFor(() => {
+      expect(api.getReports).toHaveBeenCalledWith(
+        expect.objectContaining({ assigned_to_me: 'true' }),
+      );
     });
   });
 });
