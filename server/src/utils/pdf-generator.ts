@@ -23,7 +23,7 @@ function formatReportType(type: string): string {
     inspection_metals: 'Quality & Inspection Report - Metals',
     loading_inspection: 'Loading & Inspection',
     quarterly_pern: 'Quarterly PERN Inspection',
-    pern_audit: 'PERN Audit',
+    pern_audit: 'Packaging Regulations Supplier Declaration & Audit Form',
   };
   return map[type] || type;
 }
