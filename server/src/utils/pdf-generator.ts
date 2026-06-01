@@ -18,9 +18,6 @@ const printer = new PdfPrinter({
 
 function formatReportType(type: string): string {
   const map: Record<string, string> = {
-    inspection_fibre: 'Quality & Inspection Report - Fibre',
-    inspection_plastics: 'Quality & Inspection Report - Plastics',
-    inspection_metals: 'Quality & Inspection Report - Metals',
     loading_inspection: 'Loading & Inspection',
     quarterly_pern: 'Quarterly PERN Inspection',
     pern_audit: 'Packaging Regulations Supplier Declaration & Audit Form',
@@ -175,7 +172,7 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
 
 function buildInspectionReport(content: Content[], report: any, uploadsDir: string) {
   const d = report.inspection_details || {};
-  const isFibre = report.report_type === 'inspection_fibre';
+  const isLoading = report.report_type === 'loading_inspection';
   const isQuarterlyPern = report.report_type === 'quarterly_pern';
 
   // Header fields
@@ -196,23 +193,16 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     ...fieldRow('Inspector', report.inspector_name),
   );
 
-  if (!isFibre) {
-    headerRows.push(...fieldRow('Product Description', d.product_description));
-  }
   headerRows.push(...fieldRow('Product Grade', d.product_grade));
-
-  if (isFibre) {
+  headerRows.push(...fieldRow('Mode of Storage', d.mode_of_storage));
+  headerRows.push(...fieldRow('Moisture Reading Low', d.moisture_reading_low));
+  headerRows.push(...fieldRow('Moisture Reading High', d.moisture_reading_high));
+  if (isLoading) {
     headerRows.push(
-      ...fieldRow('Mode of Storage', d.mode_of_storage),
-      ...fieldRow('Moisture Reading Low', d.moisture_reading_low),
-      ...fieldRow('Moisture Reading High', d.moisture_reading_high),
-      ...fieldRow('Stock & Bale Count', d.stock_bale_count),
-    );
-  } else {
-    headerRows.push(
+      ...fieldRow('Product Description', d.product_description),
       ...fieldRow('Loading Reference', d.loading_reference),
       ...fieldRow('Number of Containers', d.number_of_containers),
-      ...fieldRow('Moisture Readings', d.moisture_readings),
+      ...fieldRow('Stock & Bale Count', d.stock_bale_count),
       ...fieldRow('Radiation Reading', d.radiation_reading),
     );
   }
