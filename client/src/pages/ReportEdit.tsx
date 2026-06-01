@@ -20,6 +20,15 @@ import { REPORT_TYPE_LABELS } from '../types';
 
 const YES_NO = ['YES', 'NO'];
 const YES_NO_NA = ['YES', 'NO', 'N/A'];
+const PACKAGING_THRESHOLDS = [
+  'OCC exceeds 97.5%',
+  'OCC exceeds 80%',
+  'Fruitbox exceeds 97.5%',
+  'Mixed Paper exceeds 34.5%',
+  'HDPE exceeds 97.5%',
+  'PET exceeds 97.5%',
+  'Aluminium exceeds 97.5%',
+];
 
 export function ReportEdit() {
   const { id } = useParams();
@@ -161,7 +170,17 @@ export function ReportEdit() {
         setDateCompleted(report.date_completed || '');
         setStatus(report.status);
         setOnBehalfOf(report.on_behalf_of || '');
-        if (report.inspection_details) setDetails(report.inspection_details);
+        if (report.inspection_details) {
+          const det = { ...report.inspection_details };
+          if (typeof det.packaging_thresholds === 'string') {
+            try {
+              det.packaging_thresholds = JSON.parse(det.packaging_thresholds);
+            } catch {
+              det.packaging_thresholds = [];
+            }
+          }
+          setDetails(det);
+        }
         if (report.unwanted_materials) {
           const otherEntry = report.unwanted_materials.find((m) => m.material === 'Other');
           if (otherEntry?.notes) setUnwantedOther(otherEntry.notes);
@@ -313,6 +332,14 @@ export function ReportEdit() {
       const exists = prev.find((c) => c.contaminant === contaminant);
       if (exists) return prev.filter((c) => c.contaminant !== contaminant);
       return [...prev, { contaminant, notes: null }];
+    });
+  };
+
+  const togglePackaging = (value: string) => {
+    setDetails((d) => {
+      const current = Array.isArray(d.packaging_thresholds) ? d.packaging_thresholds : [];
+      const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+      return { ...d, packaging_thresholds: next };
     });
   };
 
@@ -567,7 +594,7 @@ export function ReportEdit() {
                     ))}
                   </select>
                 </div>
-                {isLoading && (
+                {isInspection && (
                   <div>
                     <label style={labelStyle}>Mode of Storage</label>
                     <select
@@ -612,6 +639,16 @@ export function ReportEdit() {
                     <input
                       value={details.stock_bale_count || ''}
                       onChange={(e) => setDetails((d) => ({ ...d, stock_bale_count: e.target.value || null }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                )}
+                {isLoading && (
+                  <div>
+                    <label style={labelStyle}>Rejected Bales</label>
+                    <input
+                      value={details.rejected_bales || ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, rejected_bales: e.target.value || null }))}
                       style={inputStyle}
                     />
                   </div>
@@ -741,36 +778,6 @@ export function ReportEdit() {
             {/* Compliance Questions */}
             <Section title="Compliance">
               <div style={formGrid}>
-                {isLoading && (
-                  <>
-                    <div>
-                      <label style={labelStyle}>Mixed Paper exceeds 34.5% packaging?</label>
-                      <RadioGroup
-                        options={YES_NO_NA}
-                        value={details.mixed_paper_exceeds_34_5 || ''}
-                        onChange={(v) => setDetails((d) => ({ ...d, mixed_paper_exceeds_34_5: v }))}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>OCC/Fruitbox exceeds 80% packaging?</label>
-                      <RadioGroup
-                        options={YES_NO_NA}
-                        value={details.occ_exceeds_80 || ''}
-                        onChange={(v) => setDetails((d) => ({ ...d, occ_exceeds_80: v }))}
-                      />
-                    </div>
-                  </>
-                )}
-                {isQuarterly && (
-                  <div>
-                    <label style={labelStyle}>Plastic exceeds 97.5% packaging?</label>
-                    <RadioGroup
-                      options={YES_NO_NA}
-                      value={details.plastic_exceeds_97_5 || ''}
-                      onChange={(v) => setDetails((d) => ({ ...d, plastic_exceeds_97_5: v }))}
-                    />
-                  </div>
-                )}
                 <div>
                   <label style={labelStyle}>Does material originate in UK?</label>
                   <RadioGroup
@@ -829,6 +836,88 @@ export function ReportEdit() {
                 </div>
               </div>
             </Section>
+
+            {isLoading && (
+              <Section title="Packaging Content">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {PACKAGING_THRESHOLDS.map((t) => {
+                    const checked =
+                      Array.isArray(details.packaging_thresholds) && details.packaging_thresholds.includes(t);
+                    return (
+                      <label
+                        key={t}
+                        style={{
+                          ...checkboxLabel,
+                          background: checked ? '#ebf5fb' : '#f8f9fa',
+                          borderColor: checked ? '#2980b9' : '#dde',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!checked}
+                          onChange={() => togglePackaging(t)}
+                          style={{ marginRight: 6 }}
+                        />
+                        {t}
+                      </label>
+                    );
+                  })}
+                </div>
+              </Section>
+            )}
+
+            {isQuarterly && (
+              <Section title="Bale Break">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <input
+                    type="checkbox"
+                    aria-label="Bale break performed?"
+                    checked={details.bale_break === 1}
+                    onChange={(e) => setDetails((d) => ({ ...d, bale_break: e.target.checked ? 1 : 0 }))}
+                  />
+                  Bale break performed?
+                </label>
+                {details.bale_break === 1 && (
+                  <>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={labelStyle}>Bale Break Results</label>
+                      <textarea
+                        value={details.bale_break_results || ''}
+                        onChange={(e) =>
+                          setDetails((d) => ({ ...d, bale_break_results: e.target.value || null }))
+                        }
+                        style={{ ...inputStyle, minHeight: 60 }}
+                      />
+                    </div>
+                    <label style={labelStyle}>Packaging Content</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {PACKAGING_THRESHOLDS.map((t) => {
+                        const checked =
+                          Array.isArray(details.packaging_thresholds) && details.packaging_thresholds.includes(t);
+                        return (
+                          <label
+                            key={t}
+                            style={{
+                              ...checkboxLabel,
+                              background: checked ? '#ebf5fb' : '#f8f9fa',
+                              borderColor: checked ? '#2980b9' : '#dde',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!checked}
+                              onChange={() => togglePackaging(t)}
+                              style={{ marginRight: 6 }}
+                            />
+                            {t}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </Section>
+            )}
 
             {/* Quality Score */}
             <Section title="Quality & Result">

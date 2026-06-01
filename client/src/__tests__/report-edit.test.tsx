@@ -385,11 +385,23 @@ describe('ReportEdit - New Report', () => {
     expect(screen.getByText(/Does material originate in UK/)).toBeInTheDocument();
   });
 
-  it('should show fibre compliance questions', async () => {
+  it('should show fibre packaging content checkboxes', async () => {
     renderNew();
     await screen.findByText('New Report');
-    expect(screen.getByText(/Mixed Paper exceeds 34.5/)).toBeInTheDocument();
-    expect(screen.getByText(/OCC\/Fruitbox exceeds 80/)).toBeInTheDocument();
+    expect(await screen.findByText('Packaging Content')).toBeInTheDocument();
+    expect(screen.getByText('Mixed Paper exceeds 34.5%')).toBeInTheDocument();
+    expect(screen.getByText('OCC exceeds 80%')).toBeInTheDocument();
+  });
+
+  it('Quarterly PERN reveals bale-break fields when toggled on', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
+    const toggle = await screen.findByLabelText('Bale break performed?');
+    expect(screen.queryByText('Bale Break Results')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(await screen.findByText('Bale Break Results')).toBeInTheDocument();
+    expect(screen.getByText('OCC exceeds 97.5%')).toBeInTheDocument();
   });
 
   it('should save as draft', async () => {
