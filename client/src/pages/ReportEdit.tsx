@@ -395,6 +395,23 @@ export function ReportEdit() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>;
 
+  const packagingCheckboxes = (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {PACKAGING_THRESHOLDS.map((t) => {
+        const checked = Array.isArray(details.packaging_thresholds) && details.packaging_thresholds.includes(t);
+        return (
+          <label
+            key={t}
+            style={{ ...checkboxLabel, background: checked ? '#ebf5fb' : '#f8f9fa', borderColor: checked ? '#2980b9' : '#dde' }}
+          >
+            <input type="checkbox" checked={!!checked} onChange={() => togglePackaging(t)} style={{ marginRight: 6 }} />
+            {t}
+          </label>
+        );
+      })}
+    </div>
+  );
+
   const isLoading = reportType === 'loading_inspection';
   const isQuarterly = reportType === 'quarterly_pern';
   const isInspection = isLoading || isQuarterly;
@@ -839,30 +856,7 @@ export function ReportEdit() {
 
             {isLoading && (
               <Section title="Packaging Content">
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {PACKAGING_THRESHOLDS.map((t) => {
-                    const checked =
-                      Array.isArray(details.packaging_thresholds) && details.packaging_thresholds.includes(t);
-                    return (
-                      <label
-                        key={t}
-                        style={{
-                          ...checkboxLabel,
-                          background: checked ? '#ebf5fb' : '#f8f9fa',
-                          borderColor: checked ? '#2980b9' : '#dde',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!checked}
-                          onChange={() => togglePackaging(t)}
-                          style={{ marginRight: 6 }}
-                        />
-                        {t}
-                      </label>
-                    );
-                  })}
-                </div>
+                {packagingCheckboxes}
               </Section>
             )}
 
@@ -890,30 +884,7 @@ export function ReportEdit() {
                       />
                     </div>
                     <label style={labelStyle}>Packaging Content</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {PACKAGING_THRESHOLDS.map((t) => {
-                        const checked =
-                          Array.isArray(details.packaging_thresholds) && details.packaging_thresholds.includes(t);
-                        return (
-                          <label
-                            key={t}
-                            style={{
-                              ...checkboxLabel,
-                              background: checked ? '#ebf5fb' : '#f8f9fa',
-                              borderColor: checked ? '#2980b9' : '#dde',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!!checked}
-                              onChange={() => togglePackaging(t)}
-                              style={{ marginRight: 6 }}
-                            />
-                            {t}
-                          </label>
-                        );
-                      })}
-                    </div>
+                    {packagingCheckboxes}
                   </>
                 )}
               </Section>
