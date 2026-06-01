@@ -117,6 +117,20 @@ describe('Lookup Routes', () => {
       const res = await request(app).post('/api/lookups/invalid_table').set('Cookie', cookie).send({ value: 'Test' });
       expect(res.status).toBe(400);
     });
+
+    it('lists and creates lookup_clients without report_type', async () => {
+      const db = createTestDb();
+      const app = createTestApp(db);
+      const cookie = await loginAsAdmin(app);
+
+      const created = await request(app).post('/api/lookups/lookup_clients').set('Cookie', cookie).send({ value: 'New Co' });
+      expect(created.status).toBe(200);
+      expect(created.body.value).toBe('New Co');
+
+      const list = await request(app).get('/api/lookups/lookup_clients').set('Cookie', cookie);
+      expect(list.status).toBe(200);
+      expect(list.body.map((r: any) => r.value)).toContain('New Co');
+    });
   });
 
   describe('PUT /api/lookups/:table/:id', () => {

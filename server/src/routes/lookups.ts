@@ -8,7 +8,11 @@ const LOOKUP_TABLES = [
   'lookup_storage_modes',
   'lookup_unwanted_materials',
   'lookup_contaminants',
+  'lookup_clients',
 ] as const;
+
+// Tables that have no report_type column (global/shared lookups)
+const GLOBAL_TABLES = ['lookup_storage_modes', 'lookup_clients'];
 
 type LookupTable = (typeof LOOKUP_TABLES)[number];
 
@@ -36,7 +40,7 @@ export function lookupRoutes(db: Database.Database): Router {
     const conditions: string[] = [];
     const params: any[] = [];
 
-    if (reportType && table !== 'lookup_storage_modes') {
+    if (reportType && !GLOBAL_TABLES.includes(table)) {
       conditions.push('report_type = ?');
       params.push(reportType);
     }
@@ -66,7 +70,7 @@ export function lookupRoutes(db: Database.Database): Router {
       return;
     }
 
-    if (table === 'lookup_storage_modes') {
+    if (GLOBAL_TABLES.includes(table)) {
       const result = db.prepare(`INSERT INTO ${table} (value) VALUES (?)`).run(value);
       res.json({ id: result.lastInsertRowid, value });
     } else {
