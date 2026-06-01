@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 
+export const INSPECTION_REPORT_TYPES = ['loading_inspection', 'quarterly_pern'];
+
 export function loadReportWithDetails(db: Database.Database, reportId: number): any | null {
   const report = db
     .prepare(
@@ -13,8 +15,7 @@ export function loadReportWithDetails(db: Database.Database, reportId: number): 
 
   if (!report) return null;
 
-  const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
-  const isInspection = INSPECTION_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_');
+  const isInspection = INSPECTION_REPORT_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_');
   if (isInspection) {
     report.inspection_details = db.prepare('SELECT * FROM report_inspection_details WHERE report_id = ?').get(reportId);
     report.unwanted_materials = db.prepare('SELECT * FROM report_unwanted_materials WHERE report_id = ?').all(reportId);

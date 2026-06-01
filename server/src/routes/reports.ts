@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth } from '../middleware/auth';
-import { loadReportWithDetails } from '../utils/report-loader';
+import { loadReportWithDetails, INSPECTION_REPORT_TYPES } from '../utils/report-loader';
 
 export function reportRoutes(db: Database.Database): Router {
   const router = Router();
@@ -162,8 +162,7 @@ export function reportRoutes(db: Database.Database): Router {
       const reportId = result.lastInsertRowid as number;
 
       // Save type-specific details
-      const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
-      const isInspection = INSPECTION_TYPES.includes(report_type) || report_type.startsWith('inspection_');
+      const isInspection = INSPECTION_REPORT_TYPES.includes(report_type) || report_type.startsWith('inspection_');
       if (isInspection && inspection_details) {
         saveInspectionDetails(db, reportId, inspection_details);
       }
@@ -278,8 +277,7 @@ export function reportRoutes(db: Database.Database): Router {
       const rType = report_type || existing.report_type;
 
       // Replace inspection details
-      const INSPECTION_TYPES_PUT = ['loading_inspection', 'quarterly_pern'];
-      const isInspectionPut = INSPECTION_TYPES_PUT.includes(rType) || rType.startsWith('inspection_');
+      const isInspectionPut = INSPECTION_REPORT_TYPES.includes(rType) || rType.startsWith('inspection_');
       if (isInspectionPut && inspection_details) {
         db.prepare('DELETE FROM report_inspection_details WHERE report_id = ?').run(reportId);
         saveInspectionDetails(db, reportId, inspection_details);
