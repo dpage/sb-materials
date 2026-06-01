@@ -49,6 +49,10 @@ export function ReportEdit() {
   const [dateCompleted, setDateCompleted] = useState('');
   const [status, setStatus] = useState('draft');
 
+  // Assignment
+  const [assignedToId, setAssignedToId] = useState<number | ''>('');
+  const [users, setUsers] = useState<{ id: number; display_name: string; is_active: number }[]>([]);
+
   // Inspection details
   const [details, setDetails] = useState<Partial<InspectionDetails>>({});
   const nextTempId = useRef(-1);
@@ -111,6 +115,13 @@ export function ReportEdit() {
     api.getCustomers().then(setCustomers);
   }, []);
 
+  // Load assignable users (superuser only)
+  useEffect(() => {
+    if (user?.isSuperuser) {
+      api.getUsers().then(setUsers).catch(() => setUsers([]));
+    }
+  }, [user]);
+
   // Load sites when customer changes, and auto-populate PERN contact info
   useEffect(() => {
     if (customerId) {
@@ -169,6 +180,7 @@ export function ReportEdit() {
         setOtherInfo(report.other_information || '');
         setDateCompleted(report.date_completed || '');
         setStatus(report.status);
+        setAssignedToId(report.assigned_to_id ?? '');
         setOnBehalfOf(report.on_behalf_of || '');
         if (report.inspection_details) {
           const det = { ...report.inspection_details };
@@ -243,6 +255,7 @@ export function ReportEdit() {
         date_completed: dateCompleted || null,
         status: overrideStatus || status,
         on_behalf_of: onBehalfOf || null,
+        assigned_to_id: assignedToId === '' ? null : assignedToId,
       };
 
       if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
@@ -316,6 +329,14 @@ export function ReportEdit() {
       setFormError('Save failed: ' + (err.message || 'Unknown error'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    await handleSave('assigned'); // persist current field values first
+    if (id) {
+      await api.submitReport(parseInt(id));
+      navigate('/');
     }
   };
 
@@ -549,6 +570,25 @@ export function ReportEdit() {
                 <option value="completed">Completed</option>
               </select>
             </div>
+            {user?.isSuperuser && (
+              <div>
+                <label style={labelStyle}>Assign To</label>
+                <select
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(parseInt(e.target.value) || '')}
+                  style={inputStyle}
+                >
+                  <option value="">Unassigned (I'll complete it)</option>
+                  {users
+                    .filter((u) => u.is_active)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.display_name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
             {isInspection && (
               <div>
                 <label style={labelStyle}>On Behalf Of</label>
@@ -1222,6 +1262,23 @@ export function ReportEdit() {
           >
             Save as Draft
           </button>
+          {assignedToId !== '' && (
+            <button
+              onClick={() => {
+                setStatus('assigned');
+                handleSave('assigned');
+              }}
+              disabled={saving}
+              style={{ ...primaryBtnStyle, background: '#8e44ad' }}
+            >
+              Save &amp; Assign
+            </button>
+          )}
+          {isEdit && status === 'assigned' && (
+            <button onClick={handleSubmit} disabled={saving} style={{ ...primaryBtnStyle, background: '#27ae60' }}>
+              {saving ? 'Submitting...' : 'Submit'}
+            </button>
+          )}
           <button
             onClick={() => {
               setStatus('completed');

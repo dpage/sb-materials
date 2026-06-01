@@ -24,6 +24,8 @@ vi.mock('../api', () => ({
     getSites: vi.fn(),
     getLookups: vi.fn(),
     getReport: vi.fn(),
+    getUsers: vi.fn(),
+    submitReport: vi.fn(),
     createReport: vi.fn(),
     updateReport: vi.fn(),
     createCustomer: vi.fn(),
@@ -97,6 +99,8 @@ beforeEach(() => {
   (api.updateReport as any).mockResolvedValue({ ok: true, containerIds: [] });
   (api.uploadPhotos as any).mockResolvedValue([]);
   (api.uploadSignature as any).mockResolvedValue({});
+  (api.getUsers as any).mockResolvedValue([]);
+  (api.submitReport as any).mockResolvedValue({ ok: true });
 });
 
 describe('ReportEdit - New Report', () => {
@@ -488,6 +492,14 @@ describe('ReportEdit - New Report', () => {
     await screen.findByText('New Report');
     fireEvent.click(screen.getByText('Back to Reports'));
     expect(screen.getByText('Home')).toBeInTheDocument();
+  });
+
+  it('superuser can load users and assign an inspector', async () => {
+    (api.getUsers as any).mockResolvedValue([{ id: 2, display_name: 'Inspector Bob', is_active: 1 }]);
+    renderNew();
+    await screen.findByText('New Report');
+    expect(await screen.findByText('Assign To')).toBeInTheDocument();
+    expect(await screen.findByText('Inspector Bob')).toBeInTheDocument();
   });
 
   it('renders an Other/Notes box under Unwanted Materials', async () => {
