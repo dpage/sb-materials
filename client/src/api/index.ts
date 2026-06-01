@@ -151,6 +151,8 @@ export const api = {
   updateReport: (id: number, data: Partial<ReportData>) =>
     request<{ ok: boolean; containerIds?: number[] }>(`/reports/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteReport: (id: number) => request(`/reports/${id}`, { method: 'DELETE' }),
+  submitReport: (id: number) => request<{ ok: boolean }>(`/reports/${id}/submit`, { method: 'POST', body: '{}' }),
+  reopenReport: (id: number) => request<{ ok: boolean }>(`/reports/${id}/reopen`, { method: 'POST', body: '{}' }),
 
   // Photos
   uploadPhotos: async (reportId: number, files: File[], labels?: string[], containerIds?: (number | null)[]) => {

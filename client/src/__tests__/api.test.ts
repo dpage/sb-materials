@@ -184,6 +184,24 @@ describe('API Client', () => {
       await api.deleteReport(1);
       expect(spy).toHaveBeenCalledWith('/api/reports/1', expect.objectContaining({ method: 'DELETE' }));
     });
+
+    it('submitReport posts to the submit endpoint', async () => {
+      const spy = mockFetch({ ok: true });
+      await api.submitReport(5);
+      expect(spy).toHaveBeenCalledWith(
+        '/api/reports/5/submit',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+    });
+
+    it('reopenReport posts to the reopen endpoint', async () => {
+      const spy = mockFetch({ ok: true });
+      await api.reopenReport(3);
+      expect(spy).toHaveBeenCalledWith(
+        '/api/reports/3/reopen',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+    });
   });
 
   describe('photos', () => {
