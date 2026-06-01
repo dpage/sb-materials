@@ -27,3 +27,6 @@ Thumbs.db
 
 # Coverage reports
 coverage/
+
+.claude/plans/
+.claude/specs/
