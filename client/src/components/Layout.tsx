@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import { useHelp } from './HelpContext';
+import logoUrl from '../assets/sb-logo.png';
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -59,8 +60,8 @@ export function Layout() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <NavLink to="/" style={{ color: '#fff', textDecoration: 'none', fontWeight: 700, fontSize: 18 }}>
-            SB Materials
+          <NavLink to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img src={logoUrl} alt="SB Materials" style={{ height: 32, width: 'auto' }} />
           </NavLink>
 
           {/* Desktop nav */}

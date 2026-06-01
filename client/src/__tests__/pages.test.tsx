@@ -1608,6 +1608,21 @@ describe('HelpPanel', () => {
 });
 
 describe('Layout', () => {
+  it('renders the SB Materials logo image in the header', async () => {
+    render(
+      <TestWrapper>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<div>Content</div>} />
+          </Route>
+        </Routes>
+      </TestWrapper>,
+    );
+
+    const img = await screen.findByAltText('SB Materials');
+    expect(img).toBeInTheDocument();
+  });
+
   it('should render navigation links', () => {
     render(
       <TestWrapper>
@@ -1619,7 +1634,7 @@ describe('Layout', () => {
       </TestWrapper>,
     );
 
-    expect(screen.getByText('SB Materials')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'SB Materials' })).toBeInTheDocument();
     expect(screen.getAllByText('Reports').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Customers').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Lookups').length).toBeGreaterThan(0);
