@@ -715,6 +715,15 @@ describe('ReportEdit - Edit Report', () => {
     });
   });
 
+  it('shows split container weight fields', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(await screen.findByText('+ Add Container'));
+    expect(await screen.findByText('No. of Bales')).toBeInTheDocument();
+    expect(screen.getByText('Weighbridge Ticket')).toBeInTheDocument();
+    expect(screen.getByText('Weight')).toBeInTheDocument();
+  });
+
   it('should add container for plastics edit', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 2,

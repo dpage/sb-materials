@@ -320,7 +320,16 @@ export function ReportEdit() {
     const tempId = nextTempId.current--;
     setContainers((prev) => [
       ...prev,
-      { id: tempId, container_number: '', seal_number: '', weight_info: '', sort_order: prev.length },
+      {
+        id: tempId,
+        container_number: '',
+        seal_number: '',
+        weight_info: '',
+        number_of_bales: '',
+        weighbridge_ticket: '',
+        weight: '',
+        sort_order: prev.length,
+      },
     ]);
   };
 
@@ -901,13 +910,31 @@ export function ReportEdit() {
                           style={inputStyle}
                         />
                       </div>
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={labelStyle}>Weight Info</label>
+                      <div>
+                        <label style={labelStyle}>No. of Bales</label>
                         <input
-                          value={c.weight_info || ''}
-                          onChange={(e) => updateContainer(i, 'weight_info', e.target.value)}
+                          value={c.number_of_bales || ''}
+                          onChange={(e) => updateContainer(i, 'number_of_bales', e.target.value)}
                           style={inputStyle}
-                          placeholder="e.g. 32 Bales - 786371 - 19.04 Tonnes"
+                          placeholder="e.g. 32 Bales"
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Weighbridge Ticket</label>
+                        <input
+                          value={c.weighbridge_ticket || ''}
+                          onChange={(e) => updateContainer(i, 'weighbridge_ticket', e.target.value)}
+                          style={inputStyle}
+                          placeholder="e.g. 786371"
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Weight</label>
+                        <input
+                          value={c.weight || ''}
+                          onChange={(e) => updateContainer(i, 'weight', e.target.value)}
+                          style={inputStyle}
+                          placeholder="e.g. 19.04 Tonnes"
                         />
                       </div>
                     </div>
