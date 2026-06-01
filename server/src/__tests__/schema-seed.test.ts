@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { createSchema, migratePhotoSubdirs } from '../db/schema';
-import { seedData } from '../db/seed';
+import { seedData, ensureReferenceData } from '../db/seed';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -96,6 +96,33 @@ describe('refined schema', () => {
     );
     const lookupClients = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lookup_clients'").get();
     expect(lookupClients).toBeDefined();
+  });
+});
+
+describe('ensureReferenceData', () => {
+  it('adds refined lookups idempotently', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    ensureReferenceData(db);
+    ensureReferenceData(db); // idempotent — second run must not duplicate
+
+    const clients = db.prepare('SELECT value FROM lookup_clients').all() as { value: string }[];
+    expect(clients.map((c) => c.value)).toEqual(
+      expect.arrayContaining(['VISY Recycling UK', 'Genus Trading', 'CTL Europe', 'MRL LTD', 'Baileys Skip Hire']),
+    );
+    expect(clients.length).toBe(5); // no duplicates after two runs
+
+    const grades = db
+      .prepare("SELECT value FROM lookup_product_grades WHERE report_type = 'loading_inspection'")
+      .all() as { value: string }[];
+    expect(grades.map((g) => g.value)).toContain('95/5 HDPE');
+
+    const unwanted = db
+      .prepare("SELECT value FROM lookup_unwanted_materials WHERE report_type = 'loading_inspection'")
+      .all() as { value: string }[];
+    expect(unwanted.map((u) => u.value)).toContain('Other');
   });
 });
 

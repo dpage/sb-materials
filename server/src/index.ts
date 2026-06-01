@@ -9,7 +9,7 @@ import SqliteStore from 'better-sqlite3-session-store';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { createSchema, migratePhotoSubdirs } from './db/schema';
-import { seedData } from './db/seed';
+import { seedData, ensureReferenceData } from './db/seed';
 import { migrateRefined } from './db/migrate-refined';
 import { csrfProtection } from './middleware/csrf';
 import { authRoutes } from './routes/auth';
@@ -36,6 +36,7 @@ db.pragma('foreign_keys = ON');
 createSchema(db);
 seedData(db);
 migrateRefined(db);
+ensureReferenceData(db);
 migratePhotoSubdirs(db, config.uploadsDir);
 
 // Initialize Express

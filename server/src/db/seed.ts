@@ -95,3 +95,49 @@ export function seedData(db: Database.Database): void {
 
   logger.info('Seed data created. Default login: admin / admin');
 }
+
+export function ensureReferenceData(db: Database.Database): void {
+  const GRADES = [
+    '95/5 OCC', '98/2 OCC', '90/10 OCC', 'OCC 80/20', 'Mixed Paper', 'Fruit Box',
+    'HDPE 80/20', '95/5 HDPE', 'PET 80/20', 'PET 60/40', 'Aluminium',
+  ];
+  const STORAGE = [
+    'Stand Trailer',
+    'Bale Stack - Undercover Storage',
+    'Bale Stacking - Outside Storage',
+    'Bale Stacking - Outside & Undercover Storage',
+  ];
+  const UNWANTED = ['Paper', 'Greyboard', 'Cores', 'Magazines', 'Newspaper', 'PET', 'LDPE', 'PP', 'Ferrous Metals', 'Other'];
+  const CONTAMINANTS = ['Metal', 'Polythene', 'Polystyrene', 'Food Waste', 'Medical', 'Hazardous', 'Fibre', 'Other'];
+  const CLIENTS = ['VISY Recycling UK', 'Genus Trading', 'CTL Europe', 'MRL LTD', 'Baileys Skip Hire'];
+  const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
+
+  const ensureGlobal = (table: string, values: string[]) => {
+    const existing = new Set(
+      (db.prepare(`SELECT value FROM ${table}`).all() as { value: string }[]).map((r) => r.value),
+    );
+    const ins = db.prepare(`INSERT INTO ${table} (value) VALUES (?)`);
+    for (const v of values) if (!existing.has(v)) ins.run(v);
+  };
+
+  const ensureTyped = (table: string, reportType: string, values: string[]) => {
+    const existing = new Set(
+      (db.prepare(`SELECT value FROM ${table} WHERE report_type = ?`).all(reportType) as { value: string }[]).map(
+        (r) => r.value,
+      ),
+    );
+    const ins = db.prepare(`INSERT INTO ${table} (report_type, value) VALUES (?, ?)`);
+    for (const v of values) if (!existing.has(v)) ins.run(reportType, v);
+  };
+
+  const tx = db.transaction(() => {
+    ensureGlobal('lookup_clients', CLIENTS);
+    ensureGlobal('lookup_storage_modes', STORAGE);
+    for (const t of INSPECTION_TYPES) {
+      ensureTyped('lookup_product_grades', t, GRADES);
+      ensureTyped('lookup_unwanted_materials', t, UNWANTED);
+      ensureTyped('lookup_contaminants', t, CONTAMINANTS);
+    }
+  });
+  tx();
+}
