@@ -477,6 +477,13 @@ describe('ReportEdit - New Report', () => {
     fireEvent.click(screen.getByText('Back to Reports'));
     expect(screen.getByText('Home')).toBeInTheDocument();
   });
+
+  it('renders an Other/Notes box under Unwanted Materials', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    const labels = screen.getAllByText('Other / Notes');
+    expect(labels.length).toBeGreaterThanOrEqual(2); // unwanted + contaminants
+  });
 });
 
 describe('ReportEdit - Edit Report', () => {
