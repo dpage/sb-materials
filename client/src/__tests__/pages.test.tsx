@@ -158,7 +158,7 @@ describe('Reports Page', () => {
       data: [
         {
           id: 1,
-          report_type: 'inspection_fibre',
+          report_type: 'loading_inspection',
           customer_name: 'Test Customer',
           site_address: '123 Test St',
           inspection_date: '2025-01-15',
@@ -307,7 +307,7 @@ describe('Reports Page', () => {
     (api.getReports as any).mockResolvedValue({
       data: Array.from({ length: 25 }, (_, i) => ({
         id: i + 1,
-        report_type: 'inspection_fibre',
+        report_type: 'loading_inspection',
         customer_name: `Customer ${i}`,
         inspection_date: '2025-01-15',
         inspector_name: 'Inspector',
@@ -1088,8 +1088,8 @@ describe('Users Page', () => {
 describe('Lookups Page', () => {
   beforeEach(() => {
     (api.getLookupsAll as any).mockResolvedValue([
-      { id: 1, value: 'OCC', report_type: 'inspection_fibre', is_active: 1 },
-      { id: 2, value: 'Mixed Paper', report_type: 'inspection_fibre', is_active: 1 },
+      { id: 1, value: 'OCC', report_type: 'loading_inspection', is_active: 1 },
+      { id: 2, value: 'Mixed Paper', report_type: 'loading_inspection', is_active: 1 },
     ]);
   });
 
@@ -1173,7 +1173,7 @@ describe('Lookups Page', () => {
         'lookup_product_descriptions',
         expect.objectContaining({
           value: 'New Grade',
-          report_type: 'inspection_fibre',
+          report_type: 'loading_inspection',
         }),
       );
     });
@@ -1313,7 +1313,7 @@ describe('Lookups Page', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByText('Fibre').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Loading').length).toBeGreaterThan(0);
     });
   });
 });

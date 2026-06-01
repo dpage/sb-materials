@@ -142,8 +142,10 @@ describe('ReportEdit - New Report', () => {
   it('defaults to loading_inspection and can switch to Quarterly PERN', async () => {
     renderNew();
     await screen.findByText('New Report');
+    // Loading Reference is a loading_inspection-only field
+    expect(await screen.findByText('Loading Reference')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
-    expect(screen.getByText('Quarterly PERN Inspection')).toBeInTheDocument();
+    expect(screen.queryByText('Loading Reference')).not.toBeInTheDocument();
   });
 
   it('should switch to PERN audit fields', async () => {

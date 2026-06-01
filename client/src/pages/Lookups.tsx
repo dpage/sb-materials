@@ -12,16 +12,16 @@ const TABLES = [
 ];
 
 const REPORT_TYPES = [
-  { key: 'inspection_fibre', label: 'Fibre' },
-  { key: 'inspection_plastics', label: 'Plastics' },
-  { key: 'inspection_metals', label: 'Metals' },
+  { key: 'loading_inspection', label: 'Loading & Inspection' },
+  { key: 'quarterly_pern', label: 'Quarterly PERN Inspection' },
+  { key: 'pern_audit', label: 'PERN Audit' },
 ];
 
 export function Lookups() {
   const [activeTable, setActiveTable] = useState(TABLES[0]);
   const [values, setValues] = useState<LookupValue[]>([]);
   const [newValue, setNewValue] = useState('');
-  const [newType, setNewType] = useState('inspection_fibre');
+  const [newType, setNewType] = useState('loading_inspection');
   const [editId, setEditId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
 
