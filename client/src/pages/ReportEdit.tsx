@@ -28,7 +28,7 @@ export function ReportEdit() {
   const isEdit = !!id;
 
   // Core fields
-  const [reportType, setReportType] = useState<ReportType>('inspection_fibre');
+  const [reportType, setReportType] = useState<ReportType>('loading_inspection');
   const [customerId, setCustomerId] = useState<number | ''>('');
   const [siteId, setSiteId] = useState<number | ''>('');
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
@@ -121,16 +121,14 @@ export function ReportEdit() {
 
   // Load lookups when report type changes
   useEffect(() => {
-    if (reportType.startsWith('inspection_')) {
+    if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
       api.getLookups('lookup_product_grades', reportType).then(setProductGrades);
       api.getLookups('lookup_unwanted_materials', reportType).then(setUnwantedOptions);
       api.getLookups('lookup_contaminants', reportType).then(setContaminantOptions);
+      api.getLookups('lookup_storage_modes').then(setStorageModes);
 
-      if (reportType !== 'inspection_fibre') {
+      if (reportType === 'loading_inspection') {
         api.getLookups('lookup_product_descriptions', reportType).then(setProductDescs);
-      }
-      if (reportType === 'inspection_fibre') {
-        api.getLookups('lookup_storage_modes').then(setStorageModes);
       }
     }
   }, [reportType]);
@@ -217,7 +215,7 @@ export function ReportEdit() {
         status: overrideStatus || status,
       };
 
-      if (reportType.startsWith('inspection_')) {
+      if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
         data.inspection_details = details;
         data.unwanted_materials = unwantedMaterials.map((m) => ({
           material: m.material,
@@ -233,7 +231,7 @@ export function ReportEdit() {
         if (contaminantOther.trim()) {
           data.contaminants.push({ contaminant: 'Other', notes: contaminantOther.trim() });
         }
-        if (reportType !== 'inspection_fibre') {
+        if (reportType === 'loading_inspection') {
           data.containers = containers;
         }
       } else if (reportType === 'pern_audit') {
@@ -350,8 +348,9 @@ export function ReportEdit() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>;
 
-  const isFibre = reportType === 'inspection_fibre';
-  const isInspection = reportType.startsWith('inspection_');
+  const isLoading = reportType === 'loading_inspection';
+  const isQuarterly = reportType === 'quarterly_pern';
+  const isInspection = isLoading || isQuarterly;
   const isPern = reportType === 'pern_audit';
 
   return (
@@ -494,7 +493,7 @@ export function ReportEdit() {
           <>
             <Section title="Product Details">
               <div style={formGrid}>
-                {!isFibre && (
+                {isLoading && (
                   <div>
                     <label style={labelStyle}>Product Description</label>
                     <select
@@ -526,23 +525,25 @@ export function ReportEdit() {
                     ))}
                   </select>
                 </div>
-                {isFibre && (
+                {isLoading && (
+                  <div>
+                    <label style={labelStyle}>Mode of Storage</label>
+                    <select
+                      value={details.mode_of_storage || ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, mode_of_storage: e.target.value || null }))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select...</option>
+                      {storageModes.map((s) => (
+                        <option key={s.id} value={s.value}>
+                          {s.value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {isInspection && (
                   <>
-                    <div>
-                      <label style={labelStyle}>Mode of Storage</label>
-                      <select
-                        value={details.mode_of_storage || ''}
-                        onChange={(e) => setDetails((d) => ({ ...d, mode_of_storage: e.target.value || null }))}
-                        style={inputStyle}
-                      >
-                        <option value="">Select...</option>
-                        {storageModes.map((s) => (
-                          <option key={s.id} value={s.value}>
-                            {s.value}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                     <div>
                       <label style={labelStyle}>Moisture Reading Low</label>
                       <input
@@ -561,17 +562,19 @@ export function ReportEdit() {
                         placeholder="e.g. 14.2%"
                       />
                     </div>
-                    <div>
-                      <label style={labelStyle}>Stock & Bale Count</label>
-                      <input
-                        value={details.stock_bale_count || ''}
-                        onChange={(e) => setDetails((d) => ({ ...d, stock_bale_count: e.target.value || null }))}
-                        style={inputStyle}
-                      />
-                    </div>
                   </>
                 )}
-                {!isFibre && (
+                {isLoading && (
+                  <div>
+                    <label style={labelStyle}>Stock & Bale Count</label>
+                    <input
+                      value={details.stock_bale_count || ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, stock_bale_count: e.target.value || null }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                )}
+                {isLoading && (
                   <>
                     <div>
                       <label style={labelStyle}>Loading Reference</label>
@@ -696,7 +699,7 @@ export function ReportEdit() {
             {/* Compliance Questions */}
             <Section title="Compliance">
               <div style={formGrid}>
-                {isFibre && (
+                {isLoading && (
                   <>
                     <div>
                       <label style={labelStyle}>Mixed Paper exceeds 34.5% packaging?</label>
@@ -716,7 +719,7 @@ export function ReportEdit() {
                     </div>
                   </>
                 )}
-                {!isFibre && (
+                {isQuarterly && (
                   <div>
                     <label style={labelStyle}>Plastic exceeds 97.5% packaging?</label>
                     <RadioGroup
@@ -820,8 +823,8 @@ export function ReportEdit() {
               </div>
             </Section>
 
-            {/* Containers (plastics/metals) */}
-            {!isFibre && (
+            {/* Containers (loading inspection only) */}
+            {isLoading && (
               <Section title="Containers">
                 {containers.map((c, i) => (
                   <div

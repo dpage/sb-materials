@@ -92,7 +92,7 @@ beforeEach(() => {
     },
   ]);
   (api.getSites as any).mockResolvedValue([{ id: 1, customer_id: 1, address: '123 Test St', is_active: 1 }]);
-  (api.getLookups as any).mockResolvedValue([{ id: 1, value: 'OCC', report_type: 'inspection_fibre', is_active: 1 }]);
+  (api.getLookups as any).mockResolvedValue([{ id: 1, value: 'OCC', report_type: 'loading_inspection', is_active: 1 }]);
   (api.createReport as any).mockResolvedValue({ id: 1, containerIds: [] });
   (api.updateReport as any).mockResolvedValue({ ok: true, containerIds: [] });
   (api.uploadPhotos as any).mockResolvedValue([]);
@@ -139,18 +139,11 @@ describe('ReportEdit - New Report', () => {
     expect(screen.getByText('Moisture Reading High')).toBeInTheDocument();
   });
 
-  it('should switch to plastics fields', async () => {
+  it('defaults to loading_inspection and can switch to Quarterly PERN', async () => {
     renderNew();
     await screen.findByText('New Report');
-    fireEvent.click(screen.getByText('Quality & Inspection - Plastics'));
-    expect(await screen.findByText('Loading Reference')).toBeInTheDocument();
-  });
-
-  it('should switch to metals fields', async () => {
-    renderNew();
-    await screen.findByText('New Report');
-    fireEvent.click(screen.getByText('Quality & Inspection - Metals'));
-    expect(await screen.findByText('Loading Reference')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
+    expect(screen.getByText('Quarterly PERN Inspection')).toBeInTheDocument();
   });
 
   it('should switch to PERN audit fields', async () => {
@@ -297,24 +290,21 @@ describe('ReportEdit - New Report', () => {
     expect(await screen.findByText('Clear Signature')).toBeInTheDocument();
   });
 
-  it('should show Number of Containers for plastics', async () => {
+  it('should show Number of Containers for loading inspection', async () => {
     renderNew();
     await screen.findByText('New Report');
-    fireEvent.click(screen.getByText('Quality & Inspection - Plastics'));
     expect(await screen.findByText('Number of Containers')).toBeInTheDocument();
   });
 
-  it('should show Add Container button for plastics', async () => {
+  it('should show Add Container button for loading inspection', async () => {
     renderNew();
     await screen.findByText('New Report');
-    fireEvent.click(screen.getByText('Quality & Inspection - Plastics'));
     expect(await screen.findByText('+ Add Container')).toBeInTheDocument();
   });
 
-  it('should add a container for plastics', async () => {
+  it('should add a container for loading inspection', async () => {
     renderNew();
     await screen.findByText('New Report');
-    fireEvent.click(screen.getByText('Quality & Inspection - Plastics'));
     await screen.findByText('+ Add Container');
     fireEvent.click(screen.getByText('+ Add Container'));
     expect(await screen.findByText('Container 1')).toBeInTheDocument();
@@ -408,7 +398,7 @@ describe('ReportEdit - New Report', () => {
     await waitFor(() => {
       expect(api.createReport).toHaveBeenCalledWith(
         expect.objectContaining({
-          report_type: 'inspection_fibre',
+          report_type: 'loading_inspection',
           customer_id: 1,
           site_id: 1,
           status: 'draft',
@@ -478,7 +468,7 @@ describe('ReportEdit - Edit Report', () => {
   beforeEach(() => {
     (api.getReport as any).mockResolvedValue({
       id: 1,
-      report_type: 'inspection_fibre',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-01-15',
@@ -535,7 +525,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should load a plastics report with containers', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 2,
-      report_type: 'inspection_plastics',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-02-15',
@@ -590,7 +580,7 @@ describe('ReportEdit - Edit Report', () => {
       expect(api.updateReport).toHaveBeenCalledWith(
         1,
         expect.objectContaining({
-          report_type: 'inspection_fibre',
+          report_type: 'loading_inspection',
           customer_id: 1,
           site_id: 1,
           status: 'draft',
@@ -602,7 +592,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should show existing photos', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 1,
-      report_type: 'inspection_fibre',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-01-15',
@@ -625,7 +615,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should show existing signature', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 1,
-      report_type: 'inspection_fibre',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-01-15',
@@ -649,7 +639,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should load report with Other unwanted material', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 1,
-      report_type: 'inspection_fibre',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-01-15',
@@ -682,7 +672,7 @@ describe('ReportEdit - Edit Report', () => {
     (api.deletePhoto as any).mockResolvedValue({});
     (api.getReport as any).mockResolvedValue({
       id: 1,
-      report_type: 'inspection_fibre',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-01-15',
@@ -713,7 +703,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should add container for plastics edit', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 2,
-      report_type: 'inspection_plastics',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-02-15',
@@ -784,7 +774,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should remove a container', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 2,
-      report_type: 'inspection_plastics',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-02-15',
@@ -813,7 +803,7 @@ describe('ReportEdit - Edit Report', () => {
   it('should handle completed report with date_completed', async () => {
     (api.getReport as any).mockResolvedValue({
       id: 1,
-      report_type: 'inspection_fibre',
+      report_type: 'loading_inspection',
       customer_id: 1,
       site_id: 1,
       inspection_date: '2025-01-15',
