@@ -63,7 +63,7 @@ export function Layout() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <NavLink to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img src={logoUrl} alt="SB Materials" style={{ height: 34, width: 'auto', display: 'block' }} />
+            <img src={logoUrl} alt="SB Materials" className="brand-logo" style={{ width: 'auto', display: 'block' }} />
           </NavLink>
 
           {/* Desktop nav */}
@@ -178,9 +178,14 @@ export function Layout() {
       )}
 
       <style>{`
+        .brand-logo { height: 34px; }
         @media (max-width: 768px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
+          .brand-logo { height: 26px; }
+        }
+        @media (max-width: 380px) {
+          .brand-logo { height: 22px; }
         }
         @media (min-width: 769px) {
           .mobile-nav { display: none !important; }
