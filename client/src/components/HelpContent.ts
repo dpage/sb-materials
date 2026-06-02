@@ -26,15 +26,15 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Filtering',
-        body: 'Click the "Filters" button to reveal filter options. You can filter by customer, report type (Fibre, Plastics, Metals, PERN), status (Draft or Completed), and date range. A badge on the Filters button shows how many filters are active.',
+        body: 'Click the "Filters" button to reveal filter options. You can filter by customer, report type (Loading & Inspection, Quarterly PERN Inspection, PERN Audit), status (Draft, Assigned, or Completed), and date range. There is also an "Assigned to me" filter to show only the reports assigned to you. A badge on the Filters button shows how many filters are active.',
       },
       {
         title: 'Report Actions',
-        body: 'Each report has three actions:\n\n- Edit \u2014 Open the report for editing\n- PDF \u2014 Download the report as a formatted PDF document\n- Delete \u2014 Permanently remove the report (you will be asked to confirm)',
+        body: 'Each report row has actions:\n\n- Edit \u2014 Open the report for editing\n- PDF \u2014 Download the report as a formatted PDF document\n- Submit \u2014 On an Assigned report, mark it Completed and send it back to the owner\n- Reopen \u2014 On a Completed report, move it back to Assigned for further changes\n- Delete \u2014 Permanently remove the report (you will be asked to confirm)',
       },
       {
         title: 'Report Status',
-        body: 'Reports are either "Draft" or "Completed". Draft reports are still being worked on. Set a report to Completed and add a completion date when the inspection is finalised.',
+        body: 'Reports move through three statuses:\n\n- Draft \u2014 being set up\n- Assigned \u2014 handed to an inspector to complete on site\n- Completed \u2014 signed off and back with the owner\n\nReopen a completed report if it needs further changes.',
       },
       {
         title: 'Pagination',
@@ -52,23 +52,31 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Report Type',
-        body: 'Choose from four report types:\n\n- Fibre Inspection \u2014 For fibre material inspections, includes moisture readings, bale counts, and storage mode\n- Plastics Inspection \u2014 For plastics material inspections, includes container tracking and loading references\n- Metals Inspection \u2014 For metals material inspections, similar to plastics\n- PERN Audit \u2014 A comprehensive compliance audit form with detailed site and process assessments',
+        body: 'Choose from three report types:\n\n- Loading & Inspection \u2014 Carried out as containers are loaded. Captures product grade, moisture readings, storage mode, container details, packaging content, and photos.\n- Quarterly PERN Inspection \u2014 A periodic site inspection. Includes a "Bale break performed?" toggle that reveals bale-break results and packaging-content checks when switched on.\n- PERN Audit \u2014 A comprehensive compliance audit with detailed site and process assessments.\n\nThe material being inspected is chosen from the Product Grade dropdown rather than being a separate report type.',
       },
       {
         title: 'Customer & Site',
-        body: 'Select the customer and their inspection site from the dropdowns. If the customer or site doesn\'t exist yet, click the "+" button next to the dropdown to quickly add one without leaving the form.',
+        body: 'Select the customer and their inspection site from the dropdowns. If the customer or site doesn\'t exist yet, click the "+" button next to the dropdown to quickly add one without leaving the form. The "On Behalf Of" dropdown records the trading company the inspection is being carried out for (e.g. VISY, Genus, CTL) \u2014 also add-able on the fly with its "+" button.',
       },
       {
         title: 'Inspection Details',
-        body: 'Fill in the core inspection fields: date, time, inspector name, and quality score (1\u201310). For fibre inspections, record moisture readings (low/high), storage mode, and bale count. For plastics/metals, record the loading reference and number of containers.',
+        body: 'Fill in the core inspection fields: date, time, inspector name, who the inspection is carried out on behalf of, and a quality score (1 = poor, 5 = excellent). Record moisture readings (low/high) and storage mode. For Loading & Inspection, also capture the loading reference, number of containers, and stock/bale count.',
       },
       {
         title: 'Unwanted Materials & Contaminants',
-        body: 'Check any unwanted materials or contaminants found during the inspection. These options come from lookup values and are specific to the report type. You can add notes for any item, or use the "Other" field for items not in the list.',
+        body: 'Check any unwanted materials or contaminants found during the inspection. These options come from lookup values. You can add notes for any item, or use the "Other / Notes" box for items not in the list.',
       },
       {
         title: 'Containers',
-        body: 'For plastics and metals inspections, you can track individual containers. Click "+ Add Container" to add container numbers, seal numbers, and weight information. Photos can be associated with specific containers.',
+        body: 'For Loading & Inspection reports you can track individual containers. Click "+ Add Container" to record the container number, seal number, and the load details \u2014 number of bales, weighbridge ticket, and weight. Photos can be associated with specific containers.',
+      },
+      {
+        title: 'Bale Break (Quarterly PERN)',
+        body: 'On a Quarterly PERN Inspection, use the "Bale break performed?" toggle. When switched on it reveals the bale-break results field and the packaging-content checks (e.g. "OCC exceeds 97.5%"). Leave it off and those extra fields stay hidden.',
+      },
+      {
+        title: 'Assigning to an Inspector',
+        body: 'Superusers can hand a report to another inspector. Fill in the header (date, site, contact, what is being inspected), pick the inspector in the "Assign To" dropdown, and use "Save & Assign". The inspector finds it under the "Assigned to me" filter, completes it on site, signs, and taps "Submit" to send it back marked Completed. Assigning is optional \u2014 leave it unassigned and complete the report yourself if you prefer.',
       },
       {
         title: 'PERN Audit Fields',
@@ -76,7 +84,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Photos',
-        body: 'Upload photos by clicking "Add Photos". You can optionally label each photo and, for plastics/metals inspections, associate a photo with a specific container. Photos appear as thumbnails and can be removed individually.',
+        body: 'Upload photos by clicking "Add Photos". You can optionally label each photo and, for Loading & Inspection reports, associate a photo with a specific container. Photos appear as thumbnails and can be removed individually.',
       },
       {
         title: 'Signature',
@@ -84,7 +92,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Saving',
-        body: 'Click "Save Report" to save your work. The report will be saved as a draft by default. Set the status to "Completed" and add a completion date when the inspection is finalised. Use "Cancel" to go back to the reports list without saving.',
+        body: 'Use "Save as Draft" to save work in progress. If you are handing the report to an inspector, choose them in "Assign To" and use "Save & Assign". The assigned inspector taps "Submit" once it is finished. To complete a report yourself, use "Save & Complete". "Cancel" returns to the reports list without saving.',
       },
     ],
   },
@@ -154,11 +162,11 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Lookup Categories',
-        body: "There are five categories of lookup values:\n\n- Product Descriptions \u2014 The types of materials being inspected\n- Product Grades \u2014 Quality grades for materials\n- Storage Modes \u2014 How materials are stored (e.g. baled, loose)\n- Unwanted Materials \u2014 Materials that shouldn't be present\n- Contaminants \u2014 Contaminating substances found during inspection",
+        body: "The lookup categories are:\n\n- Product Descriptions \u2014 The types of materials being inspected\n- Product Grades \u2014 Quality grades for materials\n- Storage Modes \u2014 How materials are stored (e.g. baled, loose)\n- Unwanted Materials \u2014 Materials that shouldn't be present\n- Contaminants \u2014 Contaminating substances found during inspection\n- Clients (On Behalf Of) \u2014 The trading companies inspections are carried out for",
       },
       {
         title: 'Report Type Association',
-        body: 'Most lookup values are associated with a specific report type (Fibre, Plastics, or Metals). This means the options shown in the report form will change depending on the selected report type. Storage Modes are shared across all types.',
+        body: 'Some lookup values are associated with a specific report type (Loading & Inspection or Quarterly PERN), so the options shown in the report form change with the selected type. Storage Modes and Clients (On Behalf Of) are shared across all types.',
       },
       {
         title: 'Adding a Value',
