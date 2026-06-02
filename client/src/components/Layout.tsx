@@ -33,13 +33,14 @@ export function Layout() {
   };
 
   const navStyle = (isActive: boolean): React.CSSProperties => ({
-    padding: '8px 16px',
-    textDecoration: 'none',
+    padding: '8px 12px',
+    textDecoration: isActive ? 'underline' : 'none',
+    textUnderlineOffset: 6,
+    textDecorationThickness: 2,
     color: isActive ? '#1a5276' : '#57606a',
-    background: isActive ? '#eaf2f8' : 'transparent',
-    borderRadius: 6,
+    background: 'transparent',
     fontSize: 14,
-    fontWeight: isActive ? 600 : 500,
+    fontWeight: isActive ? 700 : 500,
   });
 
   return (
