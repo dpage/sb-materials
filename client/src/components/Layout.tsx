@@ -35,25 +35,26 @@ export function Layout() {
   const navStyle = (isActive: boolean): React.CSSProperties => ({
     padding: '8px 16px',
     textDecoration: 'none',
-    color: isActive ? '#fff' : 'rgba(255,255,255,0.8)',
-    background: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+    color: isActive ? '#1a5276' : '#57606a',
+    background: isActive ? '#eaf2f8' : 'transparent',
     borderRadius: 6,
     fontSize: 14,
-    fontWeight: isActive ? 600 : 400,
+    fontWeight: isActive ? 600 : 500,
   });
 
   return (
     <div style={{ minHeight: '100vh' }}>
       <header
         style={{
-          background: 'linear-gradient(135deg, #1a5276, #2980b9)',
-          color: '#fff',
+          background: '#ffffff',
+          color: '#24292f',
+          borderBottom: '1px solid #e1e4e8',
           padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          height: 56,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          height: 60,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -61,19 +62,7 @@ export function Layout() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <NavLink to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img
-              src={logoUrl}
-              alt="SB Materials"
-              style={{
-                height: 30,
-                width: 'auto',
-                display: 'block',
-                background: '#fff',
-                padding: '5px 10px',
-                borderRadius: 8,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }}
-            />
+            <img src={logoUrl} alt="SB Materials" style={{ height: 34, width: 'auto', display: 'block' }} />
           </NavLink>
 
           {/* Desktop nav */}
@@ -96,15 +85,15 @@ export function Layout() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, opacity: 0.9 }} className="desktop-nav">
+          <span style={{ fontSize: 13, color: '#57606a' }} className="desktop-nav">
             {user?.displayName}
           </span>
           <button
             onClick={handleLogout}
             style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              color: '#fff',
+              background: '#f6f8fa',
+              border: '1px solid #d0d7de',
+              color: '#24292f',
               padding: '6px 14px',
               borderRadius: 6,
               cursor: 'pointer',
@@ -117,9 +106,9 @@ export function Layout() {
             onClick={() => openHelp()}
             title="Help"
             style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              color: '#fff',
+              background: '#f6f8fa',
+              border: '1px solid #d0d7de',
+              color: '#24292f',
               width: 32,
               height: 32,
               borderRadius: 6,
@@ -141,7 +130,7 @@ export function Layout() {
               display: 'none',
               background: 'none',
               border: 'none',
-              color: '#fff',
+              color: '#24292f',
               fontSize: 24,
               cursor: 'pointer',
             }}
@@ -155,17 +144,18 @@ export function Layout() {
       {menuOpen && (
         <nav
           style={{
-            background: '#1a5276',
+            background: '#ffffff',
+            borderBottom: '1px solid #e1e4e8',
             padding: '8px 20px 12px',
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
             position: 'fixed',
-            top: 56,
+            top: 60,
             left: 0,
             right: 0,
             zIndex: 99,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
           }}
           className="mobile-nav"
         >
