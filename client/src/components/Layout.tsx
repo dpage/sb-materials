@@ -61,7 +61,19 @@ export function Layout() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <NavLink to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img src={logoUrl} alt="SB Materials" style={{ height: 32, width: 'auto' }} />
+            <img
+              src={logoUrl}
+              alt="SB Materials"
+              style={{
+                height: 30,
+                width: 'auto',
+                display: 'block',
+                background: '#fff',
+                padding: '5px 10px',
+                borderRadius: 8,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }}
+            />
           </NavLink>
 
           {/* Desktop nav */}
