@@ -383,10 +383,14 @@ describe('ReportEdit - New Report', () => {
     expect(await screen.findByText('Photos')).toBeInTheDocument();
   });
 
-  it('should show Compliance section for fibre', async () => {
+  it('should show Compliance section with verbatim legal questions', async () => {
     renderNew();
     expect(await screen.findByText('Compliance')).toBeInTheDocument();
-    expect(screen.getByText(/Does material originate in UK/)).toBeInTheDocument();
+    expect(screen.getByText('Does the material originate in the UK')).toBeInTheDocument();
+    // Verbatim PERN-revenue question must not be shortened (it's the legal wording)
+    expect(
+      screen.getByText(/material purchase price quoted includes PERN revenue which is only eligible in UK/),
+    ).toBeInTheDocument();
   });
 
   it('should show fibre packaging content checkboxes', async () => {
@@ -753,6 +757,17 @@ describe('ReportEdit - Edit Report', () => {
     expect(await screen.findByText('No. of Bales')).toBeInTheDocument();
     expect(screen.getByText('Weighbridge Ticket')).toBeInTheDocument();
     expect(screen.getByText('Weight')).toBeInTheDocument();
+  });
+
+  it('shows a Moisture Reading Photos box on both inspection types (not a text field)', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    // Loading & Inspection (default): photo box present, old plain text field gone
+    expect(await screen.findByText('Moisture Reading Photos')).toBeInTheDocument();
+    expect(screen.queryByText('Moisture Readings')).not.toBeInTheDocument();
+    // Quarterly PERN: photo box present here too
+    fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
+    expect(await screen.findByText('Moisture Reading Photos')).toBeInTheDocument();
   });
 
   it('should add container for plastics edit', async () => {

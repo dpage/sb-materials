@@ -257,13 +257,22 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
   const complianceRows: TableCell[][] = [];
 
   complianceRows.push(
-    ...fieldRow('Material originates in UK?', d.material_originates_uk),
-    ...fieldRow('Supplier aware of PERN?', d.supplier_aware_pern),
-    ...fieldRow('Supplier controls volume?', d.supplier_controls_volume),
-    ...fieldRow('Volume consistency notes', d.volume_consistency_notes),
-    ...fieldRow('Site buys pre-baled?', d.site_buys_prebaled),
-    ...fieldRow('Pre-baled UK assurance', d.prebaled_uk_assurance),
-    ...fieldRow('Site aware of non-UK material?', d.site_aware_non_uk),
+    ...fieldRow('Does the material originate in the UK', d.material_originates_uk),
+    ...fieldRow(
+      'Is the supplier aware that the material purchase price quoted includes PERN revenue which is only eligible in UK?',
+      d.supplier_aware_pern,
+    ),
+    ...fieldRow('Does the supplier have control of all volume coming in to the site?', d.supplier_controls_volume),
+    ...fieldRow(
+      'If NO, how does the supplier ensure all material is consistent in source & quality?',
+      d.volume_consistency_notes,
+    ),
+    ...fieldRow('Does the site buy in pre-baled material?', d.site_buys_prebaled),
+    ...fieldRow('If yes, how does the supplier ensure this is only UK packaging?', d.prebaled_uk_assurance),
+    ...fieldRow(
+      'Is the site aware of any material that is not defined as UK post consumer packaging?',
+      d.site_aware_non_uk,
+    ),
   );
 
   content.push({
@@ -320,8 +329,28 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     }
   }
 
-  // General photos
-  const generalPhotos = (report.photos || []).filter((p: any) => !p.container_id);
+  // Moisture reading photos (grouped under a reserved photo_label)
+  const moisturePhotos = (report.photos || []).filter(
+    (p: any) => !p.container_id && p.photo_label === 'Moisture Readings',
+  );
+  if (moisturePhotos.length) {
+    content.push({
+      text: 'Moisture Reading Photos',
+      style: 'subheader',
+      margin: [0, 10, 0, 5] as [number, number, number, number],
+    } as any);
+    for (const photo of moisturePhotos) {
+      const base64 = getPhotoAsBase64(uploadsDir, photo.file_path);
+      if (base64) {
+        content.push(photoBlock(base64, null));
+      }
+    }
+  }
+
+  // General photos (moisture-grouped photos are shown in their own section above)
+  const generalPhotos = (report.photos || []).filter(
+    (p: any) => !p.container_id && p.photo_label !== 'Moisture Readings',
+  );
   if (generalPhotos.length) {
     content.push({
       text: 'Photos',

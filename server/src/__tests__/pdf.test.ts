@@ -341,6 +341,37 @@ describe('PDF Generator', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
+  it('embeds moisture-reading photos for a loading inspection', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-'));
+    const photoDir = path.join(tmpDir, '1');
+    fs.mkdirSync(photoDir, { recursive: true });
+    const pngData = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    fs.writeFileSync(path.join(photoDir, 'moist.png'), pngData);
+
+    const report = {
+      id: 1,
+      report_type: 'loading_inspection',
+      customer_name: 'Test',
+      site_address: 'Test',
+      inspection_date: '2026-05-01',
+      inspector_name: 'Test',
+      status: 'completed',
+      inspection_details: { product_grade: 'OCC', moisture_reading_low: '9%', moisture_reading_high: '14%' },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [{ file_path: '1/moist.png', photo_label: 'Moisture Readings', container_id: null }],
+    };
+
+    const buffer = await generatePdf(report as any, tmpDir);
+    expect(buffer).toBeInstanceOf(Buffer);
+    expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
   it('should handle report with no signature gracefully', async () => {
     const report = {
       id: 1,

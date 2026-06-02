@@ -29,6 +29,8 @@ const PACKAGING_THRESHOLDS = [
   'PET exceeds 97.5%',
   'Aluminium exceeds 97.5%',
 ];
+// Reserved photo_label used to group moisture-reading evidence photos
+const MOISTURE_PHOTO_LABEL = 'Moisture Readings';
 
 export function ReportEdit() {
   const { id } = useParams();
@@ -412,6 +414,19 @@ export function ReportEdit() {
     e.target.value = '';
   };
 
+  const handleMoisturePhotoAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles = Array.from(files).map((f) => ({
+      file: f,
+      label: MOISTURE_PHOTO_LABEL,
+      containerId: null as number | null,
+      previewUrl: URL.createObjectURL(f),
+    }));
+    setNewPhotos((prev) => [...prev, ...newFiles]);
+    e.target.value = '';
+  };
+
   const removeNewPhoto = (index: number) => {
     setNewPhotos((prev) => {
       URL.revokeObjectURL(prev[index].previewUrl);
@@ -625,6 +640,29 @@ export function ReportEdit() {
                 </div>
               </div>
             )}
+            {isLoading && (
+              <>
+                <div>
+                  <label style={labelStyle}>Loading Reference</label>
+                  <input
+                    value={details.loading_reference || ''}
+                    onChange={(e) => setDetails((d) => ({ ...d, loading_reference: e.target.value || null }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Number of Containers</label>
+                  <input
+                    type="number"
+                    value={details.number_of_containers || ''}
+                    onChange={(e) =>
+                      setDetails((d) => ({ ...d, number_of_containers: parseInt(e.target.value) || null }))
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </Section>
 
@@ -702,6 +740,61 @@ export function ReportEdit() {
                         placeholder="e.g. 14.2%"
                       />
                     </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={labelStyle}>Moisture Reading Photos</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                        {photos
+                          .filter((p) => p.photo_label === MOISTURE_PHOTO_LABEL)
+                          .map((p) => (
+                            <div key={p.id} style={photoThumbStyle}>
+                              <img
+                                src={api.getPhotoUrl(p.file_path)}
+                                alt="Moisture reading"
+                                style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 6 }}
+                              />
+                              <button onClick={() => deleteExistingPhoto(p.id)} style={photoRemoveBtn}>
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        {newPhotos.map((p, idx) =>
+                          p.label === MOISTURE_PHOTO_LABEL ? (
+                            <div key={`m-${idx}`} style={photoThumbStyle}>
+                              <img
+                                src={p.previewUrl}
+                                alt=""
+                                style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 6 }}
+                              />
+                              <button onClick={() => removeNewPhoto(idx)} style={photoRemoveBtn}>
+                                ×
+                              </button>
+                            </div>
+                          ) : null,
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <label style={{ ...addBtnStyle, display: 'inline-block', cursor: 'pointer' }}>
+                          + Add Photos
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleMoisturePhotoAdd}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                        <label style={{ ...addBtnStyle, display: 'inline-block', cursor: 'pointer' }}>
+                          Camera
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleMoisturePhotoAdd}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </div>
+                    </div>
                   </>
                 )}
                 {isLoading && (
@@ -725,45 +818,15 @@ export function ReportEdit() {
                   </div>
                 )}
                 {isLoading && (
-                  <>
-                    <div>
-                      <label style={labelStyle}>Loading Reference</label>
-                      <input
-                        value={details.loading_reference || ''}
-                        onChange={(e) => setDetails((d) => ({ ...d, loading_reference: e.target.value || null }))}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Number of Containers</label>
-                      <input
-                        type="number"
-                        value={details.number_of_containers || ''}
-                        onChange={(e) =>
-                          setDetails((d) => ({ ...d, number_of_containers: parseInt(e.target.value) || null }))
-                        }
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Moisture Readings</label>
-                      <input
-                        value={details.moisture_readings || ''}
-                        onChange={(e) => setDetails((d) => ({ ...d, moisture_readings: e.target.value || null }))}
-                        style={inputStyle}
-                        placeholder="N/A"
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Radiation Reading</label>
-                      <input
-                        value={details.radiation_reading || ''}
-                        onChange={(e) => setDetails((d) => ({ ...d, radiation_reading: e.target.value || null }))}
-                        style={inputStyle}
-                        placeholder="N/A"
-                      />
-                    </div>
-                  </>
+                  <div>
+                    <label style={labelStyle}>Radiation Reading</label>
+                    <input
+                      value={details.radiation_reading || ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, radiation_reading: e.target.value || null }))}
+                      style={inputStyle}
+                      placeholder="N/A"
+                    />
+                  </div>
                 )}
               </div>
             </Section>
@@ -850,7 +913,7 @@ export function ReportEdit() {
             <Section title="Compliance">
               <div style={formGrid}>
                 <div>
-                  <label style={labelStyle}>Does material originate in UK?</label>
+                  <label style={labelStyle}>Does the material originate in the UK</label>
                   <RadioGroup
                     options={YES_NO}
                     value={details.material_originates_uk || ''}
@@ -858,7 +921,10 @@ export function ReportEdit() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Supplier aware of PERN?</label>
+                  <label style={labelStyle}>
+                    Is the supplier aware that the material purchase price quoted includes PERN revenue which is only
+                    eligible in UK?
+                  </label>
                   <RadioGroup
                     options={YES_NO}
                     value={details.supplier_aware_pern || ''}
@@ -866,7 +932,7 @@ export function ReportEdit() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Supplier controls volume?</label>
+                  <label style={labelStyle}>Does the supplier have control of all volume coming in to the site?</label>
                   <RadioGroup
                     options={YES_NO}
                     value={details.supplier_controls_volume || ''}
@@ -874,7 +940,9 @@ export function ReportEdit() {
                   />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Volume consistency notes</label>
+                  <label style={labelStyle}>
+                    If NO, how does the supplier ensure all material is consistent in source &amp; quality?
+                  </label>
                   <input
                     value={details.volume_consistency_notes || ''}
                     onChange={(e) => setDetails((d) => ({ ...d, volume_consistency_notes: e.target.value || null }))}
@@ -882,7 +950,7 @@ export function ReportEdit() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Site buys pre-baled material?</label>
+                  <label style={labelStyle}>Does the site buy in pre-baled material?</label>
                   <RadioGroup
                     options={YES_NO_NA}
                     value={details.site_buys_prebaled || ''}
@@ -890,7 +958,7 @@ export function ReportEdit() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Pre-baled UK assurance</label>
+                  <label style={labelStyle}>If yes, how does the supplier ensure this is only UK packaging?</label>
                   <input
                     value={details.prebaled_uk_assurance || ''}
                     onChange={(e) => setDetails((d) => ({ ...d, prebaled_uk_assurance: e.target.value || null }))}
@@ -898,7 +966,9 @@ export function ReportEdit() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Site aware of non-UK material?</label>
+                  <label style={labelStyle}>
+                    Is the site aware of any material that is not defined as UK post consumer packaging?
+                  </label>
                   <RadioGroup
                     options={YES_NO}
                     value={details.site_aware_non_uk || ''}
@@ -1128,7 +1198,7 @@ export function ReportEdit() {
         <Section title="Photos">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {photos
-              .filter((p) => !p.container_id)
+              .filter((p) => !p.container_id && p.photo_label !== MOISTURE_PHOTO_LABEL)
               .map((p) => (
                 <div key={p.id} style={photoThumbStyle}>
                   <img
@@ -1143,7 +1213,7 @@ export function ReportEdit() {
                 </div>
               ))}
             {newPhotos.map((p, idx) =>
-              p.containerId === null ? (
+              p.containerId === null && p.label !== MOISTURE_PHOTO_LABEL ? (
                 <div key={`new-${idx}`} style={photoThumbStyle}>
                   <img
                     src={p.previewUrl}
