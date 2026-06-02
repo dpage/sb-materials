@@ -108,9 +108,9 @@ describe('User Routes', () => {
       // Create a second user to deactivate
       const bcrypt = await import('bcryptjs');
       const hash = bcrypt.hashSync('testpass', 10);
-      const result = db.prepare('INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, 0)').run(
-        'testuser', hash, 'Test User',
-      );
+      const result = db
+        .prepare('INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, 0)')
+        .run('testuser', hash, 'Test User');
       const userId = result.lastInsertRowid;
 
       const res = await request(app).put(`/api/users/${userId}`).set('Cookie', cookie).send({ is_active: false });

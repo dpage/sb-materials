@@ -118,7 +118,10 @@ export function ReportEdit() {
   // Load assignable users (superuser only)
   useEffect(() => {
     if (user?.isSuperuser) {
-      api.getUsers().then(setUsers).catch(() => setUsers([]));
+      api
+        .getUsers()
+        .then(setUsers)
+        .catch(() => setUsers([]));
     }
   }, [user]);
 
@@ -233,10 +236,7 @@ export function ReportEdit() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleSave = async (
-    overrideStatus?: string,
-    opts?: { skipNavigate?: boolean },
-  ): Promise<number | null> => {
+  const handleSave = async (overrideStatus?: string, opts?: { skipNavigate?: boolean }): Promise<number | null> => {
     if (!customerId || !siteId || !inspectionDate || !inspectorName) {
       setFormError('Please fill in all required fields (Customer, Site, Date, Inspector)');
       return null;
@@ -433,7 +433,11 @@ export function ReportEdit() {
         return (
           <label
             key={t}
-            style={{ ...checkboxLabel, background: checked ? '#ebf5fb' : '#f8f9fa', borderColor: checked ? '#2980b9' : '#dde' }}
+            style={{
+              ...checkboxLabel,
+              background: checked ? '#ebf5fb' : '#f8f9fa',
+              borderColor: checked ? '#2980b9' : '#dde',
+            }}
           >
             <input type="checkbox" checked={!!checked} onChange={() => togglePackaging(t)} style={{ marginRight: 6 }} />
             {t}
@@ -904,11 +908,7 @@ export function ReportEdit() {
               </div>
             </Section>
 
-            {isLoading && (
-              <Section title="Packaging Content">
-                {packagingCheckboxes}
-              </Section>
-            )}
+            {isLoading && <Section title="Packaging Content">{packagingCheckboxes}</Section>}
 
             {isQuarterly && (
               <Section title="Bale Break">
@@ -927,9 +927,7 @@ export function ReportEdit() {
                       <label style={labelStyle}>Bale Break Results</label>
                       <textarea
                         value={details.bale_break_results || ''}
-                        onChange={(e) =>
-                          setDetails((d) => ({ ...d, bale_break_results: e.target.value || null }))
-                        }
+                        onChange={(e) => setDetails((d) => ({ ...d, bale_break_results: e.target.value || null }))}
                         style={{ ...inputStyle, minHeight: 60 }}
                       />
                     </div>

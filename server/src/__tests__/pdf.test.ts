@@ -104,12 +104,30 @@ describe('PDF Generator', () => {
 
   it('generates a loading_inspection PDF with refined fields', async () => {
     const report = {
-      id: 1, report_type: 'loading_inspection', status: 'completed',
-      customer_name: 'Cust', site_address: 'Addr', inspection_date: '2026-05-01',
-      inspector_name: 'Insp', on_behalf_of: 'VISY Recycling UK',
-      inspection_details: { product_grade: '95/5 OCC', rejected_bales: '2', packaging_thresholds: JSON.stringify(['OCC 80%']) },
-      unwanted_materials: [], contaminants: [],
-      containers: [{ container_number: 'A1', seal_number: 'S1', number_of_bales: '32 Bales', weighbridge_ticket: '786371', weight: '19.04 Tonnes' }],
+      id: 1,
+      report_type: 'loading_inspection',
+      status: 'completed',
+      customer_name: 'Cust',
+      site_address: 'Addr',
+      inspection_date: '2026-05-01',
+      inspector_name: 'Insp',
+      on_behalf_of: 'VISY Recycling UK',
+      inspection_details: {
+        product_grade: '95/5 OCC',
+        rejected_bales: '2',
+        packaging_thresholds: JSON.stringify(['OCC 80%']),
+      },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [
+        {
+          container_number: 'A1',
+          seal_number: 'S1',
+          number_of_bales: '32 Bales',
+          weighbridge_ticket: '786371',
+          weight: '19.04 Tonnes',
+        },
+      ],
       photos: [],
     };
     const buf = await generatePdf(report as any, tmpDir);
@@ -119,10 +137,22 @@ describe('PDF Generator', () => {
 
   it('generates a quarterly_pern PDF with bale-break results', async () => {
     const report = {
-      id: 2, report_type: 'quarterly_pern', status: 'completed',
-      customer_name: 'Cust', site_address: 'Addr', inspection_date: '2026-05-02', inspector_name: 'Insp',
-      inspection_details: { bale_break: 1, bale_break_results: 'clean', packaging_thresholds: JSON.stringify(['OCC 97.5%']) },
-      unwanted_materials: [], contaminants: [], containers: [], photos: [],
+      id: 2,
+      report_type: 'quarterly_pern',
+      status: 'completed',
+      customer_name: 'Cust',
+      site_address: 'Addr',
+      inspection_date: '2026-05-02',
+      inspector_name: 'Insp',
+      inspection_details: {
+        bale_break: 1,
+        bale_break_results: 'clean',
+        packaging_thresholds: JSON.stringify(['OCC 97.5%']),
+      },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [],
     };
     const buf = await generatePdf(report as any, tmpDir);
     expect(buf.subarray(0, 5).toString()).toBe('%PDF-');

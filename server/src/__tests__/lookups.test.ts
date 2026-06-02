@@ -123,7 +123,10 @@ describe('Lookup Routes', () => {
       const app = createTestApp(db);
       const cookie = await loginAsAdmin(app);
 
-      const created = await request(app).post('/api/lookups/lookup_clients').set('Cookie', cookie).send({ value: 'New Co' });
+      const created = await request(app)
+        .post('/api/lookups/lookup_clients')
+        .set('Cookie', cookie)
+        .send({ value: 'New Co' });
       expect(created.status).toBe(200);
       expect(created.body.value).toBe('New Co');
 

@@ -203,7 +203,16 @@ export function reportRoutes(db: Database.Database): Router {
         );
         for (let i = 0; i < containers.length; i++) {
           const c = containers[i];
-          const r = stmt.run(reportId, c.container_number, c.seal_number, c.weight_info, c.number_of_bales ?? null, c.weighbridge_ticket ?? null, c.weight ?? null, i);
+          const r = stmt.run(
+            reportId,
+            c.container_number,
+            c.seal_number,
+            c.weight_info,
+            c.number_of_bales ?? null,
+            c.weighbridge_ticket ?? null,
+            c.weight ?? null,
+            i,
+          );
           containerIds.push(r.lastInsertRowid as number);
         }
       }
@@ -332,7 +341,16 @@ export function reportRoutes(db: Database.Database): Router {
           const newContainerIds: number[] = [];
           for (let i = 0; i < containers.length; i++) {
             const c = containers[i];
-            const r = stmt.run(reportId, c.container_number, c.seal_number, c.weight_info, c.number_of_bales ?? null, c.weighbridge_ticket ?? null, c.weight ?? null, i);
+            const r = stmt.run(
+              reportId,
+              c.container_number,
+              c.seal_number,
+              c.weight_info,
+              c.number_of_bales ?? null,
+              c.weighbridge_ticket ?? null,
+              c.weight ?? null,
+              i,
+            );
             newContainerIds.push(r.lastInsertRowid as number);
           }
           return newContainerIds;
@@ -369,19 +387,25 @@ export function reportRoutes(db: Database.Database): Router {
     if (!req.session.isSuperuser && report.created_by_id !== me && report.assigned_to_id !== me) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    db.prepare("UPDATE reports SET status = 'completed', date_completed = date('now'), updated_at = datetime('now') WHERE id = ?").run(id);
+    db.prepare(
+      "UPDATE reports SET status = 'completed', date_completed = date('now'), updated_at = datetime('now') WHERE id = ?",
+    ).run(id);
     res.json({ ok: true });
   });
 
   // Reopen report (returns to assigned)
   router.post('/:id/reopen', (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const report = db.prepare('SELECT created_by_id FROM reports WHERE id = ?').get(id) as { created_by_id: number | null } | undefined;
+    const report = db.prepare('SELECT created_by_id FROM reports WHERE id = ?').get(id) as
+      | { created_by_id: number | null }
+      | undefined;
     if (!report) return res.status(404).json({ error: 'Not found' });
     if (!req.session.isSuperuser && report.created_by_id !== req.session.userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    db.prepare("UPDATE reports SET status = 'assigned', date_completed = NULL, updated_at = datetime('now') WHERE id = ?").run(id);
+    db.prepare(
+      "UPDATE reports SET status = 'assigned', date_completed = NULL, updated_at = datetime('now') WHERE id = ?",
+    ).run(id);
     res.json({ ok: true });
   });
 

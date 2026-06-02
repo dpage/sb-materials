@@ -26,7 +26,9 @@ export function Reports() {
 
   const limit = 25;
 
-  const activeFilterCount = [customerId, reportType, status, dateFrom, dateTo, assignedToMe ? 'yes' : ''].filter(Boolean).length;
+  const activeFilterCount = [customerId, reportType, status, dateFrom, dateTo, assignedToMe ? 'yes' : ''].filter(
+    Boolean,
+  ).length;
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -322,7 +324,16 @@ export function Reports() {
             />
           </div>
           <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', textTransform: 'none', fontSize: 13 }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontSize: 13,
+              }}
+            >
               <input
                 type="checkbox"
                 checked={assignedToMe}
@@ -395,7 +406,10 @@ export function Reports() {
                         {r.status === 'assigned' && (
                           <button
                             className="action-btn"
-                            onClick={async () => { await api.submitReport(r.id); fetchReports(); }}
+                            onClick={async () => {
+                              await api.submitReport(r.id);
+                              fetchReports();
+                            }}
                           >
                             Submit
                           </button>
@@ -403,7 +417,10 @@ export function Reports() {
                         {r.status === 'completed' && (
                           <button
                             className="action-btn"
-                            onClick={async () => { await api.reopenReport(r.id); fetchReports(); }}
+                            onClick={async () => {
+                              await api.reopenReport(r.id);
+                              fetchReports();
+                            }}
                           >
                             Reopen
                           </button>
@@ -471,7 +488,10 @@ export function Reports() {
                   {r.status === 'assigned' && (
                     <button
                       className="card-action-btn"
-                      onClick={async () => { await api.submitReport(r.id); fetchReports(); }}
+                      onClick={async () => {
+                        await api.submitReport(r.id);
+                        fetchReports();
+                      }}
                     >
                       Submit
                     </button>
@@ -479,7 +499,10 @@ export function Reports() {
                   {r.status === 'completed' && (
                     <button
                       className="card-action-btn"
-                      onClick={async () => { await api.reopenReport(r.id); fetchReports(); }}
+                      onClick={async () => {
+                        await api.reopenReport(r.id);
+                        fetchReports();
+                      }}
                     >
                       Reopen
                     </button>

@@ -15,7 +15,8 @@ export function loadReportWithDetails(db: Database.Database, reportId: number): 
 
   if (!report) return null;
 
-  const isInspection = INSPECTION_REPORT_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_');
+  const isInspection =
+    INSPECTION_REPORT_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_');
   if (isInspection) {
     report.inspection_details = db.prepare('SELECT * FROM report_inspection_details WHERE report_id = ?').get(reportId);
     report.unwanted_materials = db.prepare('SELECT * FROM report_unwanted_materials WHERE report_id = ?').all(reportId);

@@ -878,10 +878,7 @@ describe('ReportEdit - Edit Report', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(api.updateReport).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ status: 'assigned' }),
-      );
+      expect(api.updateReport).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'assigned' }));
     });
     await waitFor(() => {
       expect(api.submitReport).toHaveBeenCalledWith(1);

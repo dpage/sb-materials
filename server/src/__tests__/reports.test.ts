@@ -366,8 +366,19 @@ describe('Report Routes', () => {
           inspection_date: '2026-05-01',
           inspector_name: 'Insp',
           on_behalf_of: 'VISY Recycling UK',
-          inspection_details: { product_grade: '95/5 OCC', rejected_bales: '2', packaging_thresholds: ['OCC 80%', 'PET 97.5%'] },
-          containers: [{ container_number: 'AAA1', number_of_bales: '32 Bales', weighbridge_ticket: '786371', weight: '19.04 Tonnes' }],
+          inspection_details: {
+            product_grade: '95/5 OCC',
+            rejected_bales: '2',
+            packaging_thresholds: ['OCC 80%', 'PET 97.5%'],
+          },
+          containers: [
+            {
+              container_number: 'AAA1',
+              number_of_bales: '32 Bales',
+              weighbridge_ticket: '786371',
+              weight: '19.04 Tonnes',
+            },
+          ],
         });
       expect(res.status).toBe(200);
 
@@ -432,8 +443,11 @@ describe('Report Routes', () => {
       const { customerId, siteId } = createTestCustomerAndSite(db);
 
       await request(app).post('/api/reports').set('Cookie', adminCookie).send({
-        report_type: 'loading_inspection', customer_id: customerId, site_id: siteId,
-        inspection_date: '2026-05-01', inspector_name: 'A',
+        report_type: 'loading_inspection',
+        customer_id: customerId,
+        site_id: siteId,
+        inspection_date: '2026-05-01',
+        inspector_name: 'A',
       });
 
       const regularCookie = await loginAsRegularUser(app, db);
@@ -450,14 +464,20 @@ describe('Report Routes', () => {
       const cookie = await loginAsAdmin(app);
       const { customerId, siteId } = createTestCustomerAndSite(db);
       const res = await request(app).post('/api/reports').set('Cookie', cookie).send({
-        report_type: 'loading_inspection', customer_id: customerId, site_id: siteId,
-        inspection_date: '2026-05-01', inspector_name: 'A', status: 'assigned',
+        report_type: 'loading_inspection',
+        customer_id: customerId,
+        site_id: siteId,
+        inspection_date: '2026-05-01',
+        inspector_name: 'A',
+        status: 'assigned',
       });
       const id = res.body.id;
 
       const submit = await request(app).post(`/api/reports/${id}/submit`).set('Cookie', cookie).send({});
       expect(submit.status).toBe(200);
-      expect((db.prepare('SELECT status, date_completed FROM reports WHERE id = ?').get(id) as any).status).toBe('completed');
+      expect((db.prepare('SELECT status, date_completed FROM reports WHERE id = ?').get(id) as any).status).toBe(
+        'completed',
+      );
 
       const reopen = await request(app).post(`/api/reports/${id}/reopen`).set('Cookie', cookie).send({});
       expect(reopen.status).toBe(200);

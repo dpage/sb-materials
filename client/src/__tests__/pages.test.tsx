@@ -650,9 +650,7 @@ describe('Reports Page', () => {
     const checkbox = screen.getByRole('checkbox', { name: /assigned to me/i });
     fireEvent.click(checkbox);
     await waitFor(() => {
-      expect(api.getReports).toHaveBeenCalledWith(
-        expect.objectContaining({ assigned_to_me: 'true' }),
-      );
+      expect(api.getReports).toHaveBeenCalledWith(expect.objectContaining({ assigned_to_me: 'true' }));
     });
   });
 });

@@ -98,8 +98,17 @@ export function seedData(db: Database.Database): void {
 
 export function ensureReferenceData(db: Database.Database): void {
   const GRADES = [
-    '95/5 OCC', '98/2 OCC', '90/10 OCC', 'OCC 80/20', 'Mixed Paper', 'Fruit Box',
-    'HDPE 80/20', '95/5 HDPE', 'PET 80/20', 'PET 60/40', 'Aluminium',
+    '95/5 OCC',
+    '98/2 OCC',
+    '90/10 OCC',
+    'OCC 80/20',
+    'Mixed Paper',
+    'Fruit Box',
+    'HDPE 80/20',
+    '95/5 HDPE',
+    'PET 80/20',
+    'PET 60/40',
+    'Aluminium',
   ];
   const STORAGE = [
     'Stand Trailer',
@@ -107,7 +116,18 @@ export function ensureReferenceData(db: Database.Database): void {
     'Bale Stacking - Outside Storage',
     'Bale Stacking - Outside & Undercover Storage',
   ];
-  const UNWANTED = ['Paper', 'Greyboard', 'Cores', 'Magazines', 'Newspaper', 'PET', 'LDPE', 'PP', 'Ferrous Metals', 'Other'];
+  const UNWANTED = [
+    'Paper',
+    'Greyboard',
+    'Cores',
+    'Magazines',
+    'Newspaper',
+    'PET',
+    'LDPE',
+    'PP',
+    'Ferrous Metals',
+    'Other',
+  ];
   const CONTAMINANTS = ['Metal', 'Polythene', 'Polystyrene', 'Food Waste', 'Medical', 'Hazardous', 'Fibre', 'Other'];
   const CLIENTS = ['VISY Recycling UK', 'Genus Trading', 'CTL Europe', 'MRL LTD', 'Baileys Skip Hire'];
   const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];

@@ -132,7 +132,12 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
         {
           stack: [
             { text: 'Stewart Bassett, Director', fontSize: 9, alignment: 'right' as const },
-            { text: 'stewart@sbmaterials.co.uk · 07881 337457', fontSize: 8, alignment: 'right' as const, color: '#555' },
+            {
+              text: 'stewart@sbmaterials.co.uk · 07881 337457',
+              fontSize: 8,
+              alignment: 'right' as const,
+              color: '#555',
+            },
           ],
           margin: [0, 18, 40, 0] as [number, number, number, number],
         },
@@ -289,8 +294,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
         margin: [0, 10, 0, 5] as [number, number, number, number],
       });
       const containerRows: TableCell[][] = [...fieldRow('Seal Number', container.seal_number)];
-      const hasSplitFields =
-        container.number_of_bales || container.weighbridge_ticket || container.weight;
+      const hasSplitFields = container.number_of_bales || container.weighbridge_ticket || container.weight;
       if (hasSplitFields) {
         containerRows.push(
           ...fieldRow('Bales', container.number_of_bales),

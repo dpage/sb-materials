@@ -13,8 +13,15 @@ export function migrateRefined(db: Database.Database): void {
     if (repointed.changes > 0) logger.info(`Re-pointed ${repointed.changes} report(s) to loading_inspection`);
 
     // 2. Re-point lookup report_type values too (so existing lookups still resolve)
-    for (const table of ['lookup_product_descriptions', 'lookup_product_grades', 'lookup_unwanted_materials', 'lookup_contaminants']) {
-      db.prepare(`UPDATE ${table} SET report_type = 'loading_inspection' WHERE report_type IN (${placeholders})`).run(...OLD_TYPES);
+    for (const table of [
+      'lookup_product_descriptions',
+      'lookup_product_grades',
+      'lookup_unwanted_materials',
+      'lookup_contaminants',
+    ]) {
+      db.prepare(`UPDATE ${table} SET report_type = 'loading_inspection' WHERE report_type IN (${placeholders})`).run(
+        ...OLD_TYPES,
+      );
     }
 
     // 3. Backfill created_by_id from inspector_id
@@ -45,7 +52,9 @@ export function migrateRefined(db: Database.Database): void {
       mixed_paper_exceeds_34_5: string | null;
       plastic_exceeds_97_5: string | null;
     }[];
-    const setThresholds = db.prepare('UPDATE report_inspection_details SET packaging_thresholds = ? WHERE report_id = ?');
+    const setThresholds = db.prepare(
+      'UPDATE report_inspection_details SET packaging_thresholds = ? WHERE report_id = ?',
+    );
     for (const d of details) {
       const arr: string[] = [];
       if (d.occ_exceeds_80 === 'YES') arr.push('OCC 80%');
