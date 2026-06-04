@@ -102,6 +102,24 @@ describe('Photo Routes', () => {
     expect(res.body[0].id).toBeDefined();
   });
 
+  it('should accept a single save with more than 20 photos', async () => {
+    // Reproduces Stew's "Save failed: Upload failed" — inspectors attach many
+    // photos to one report and the client posts them all in a single request.
+    const pngData = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+
+    let req = request(app).post(`/api/photos/upload/${reportId}`).set('Cookie', cookie);
+    for (let i = 0; i < 25; i++) {
+      req = req.attach('photos', pngData, `photo${i}.png`);
+    }
+    const res = await req;
+
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(25);
+  });
+
   it('should downscale a large photo to an archival JPEG on upload', async () => {
     // A 4000x3000 photo, larger than the 2048px archival cap.
     const bigPhoto = await sharp({

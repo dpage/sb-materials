@@ -8,6 +8,13 @@ import { config } from '../config';
 import { archiveImageFile } from '../utils/image';
 import { logger } from '../utils/logger';
 
+// Max photos accepted in a single upload request. The client posts all newly
+// added photos for a report in one request, and inspections routinely carry
+// dozens of photos, so this needs generous headroom (the per-file size limit
+// and nginx body limit are the real backstops). The old cap of 20 caused
+// "Save failed: Upload failed" (MulterError: Unexpected field) on big reports.
+const MAX_PHOTOS_PER_UPLOAD = 100;
+
 export function photoRoutes(db: Database.Database): Router {
   const router = Router();
 
@@ -46,7 +53,7 @@ export function photoRoutes(db: Database.Database): Router {
   });
 
   // Upload photo(s) for a report
-  router.post('/upload/:reportId', upload.array('photos', 20), async (req, res) => {
+  router.post('/upload/:reportId', upload.array('photos', MAX_PHOTOS_PER_UPLOAD), async (req, res) => {
     const reportId = parseInt(req.params.reportId as string, 10);
     const report = db.prepare('SELECT id FROM reports WHERE id = ?').get(reportId);
     if (!report) {
