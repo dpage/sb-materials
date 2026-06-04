@@ -13,6 +13,7 @@
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build --workspace=client && npm run build --workspace=server",
     "start": "npm run start --workspace=server",
+    "migrate:images": "npm run migrate:images --workspace=server",
     "lint": "eslint 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts'",
     "lint:fix": "eslint --fix 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts'",
     "format": "prettier --write 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts'",
