@@ -4,6 +4,7 @@ import fs from 'fs';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { logger } from './logger';
 import { SB_LOGO_DATA_URL } from './logo';
+import { imageFileToJpegDataUrl, PDF_MAX_DIM, PDF_QUALITY } from './image';
 
 const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
 
@@ -54,6 +55,18 @@ function getPhotoAsBase64(uploadsDir: string, filename: string): string | null {
     logger.warn(`Failed to read photo ${filename}:`, err);
     return null;
   }
+}
+
+// Downscale every report photo to a JPEG data URL once, keyed by file_path.
+// Signatures are handled separately (kept as PNG to preserve transparency).
+async function buildPhotoDataMap(report: any, uploadsDir: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  for (const photo of report.photos || []) {
+    if (!photo.file_path || map.has(photo.file_path)) continue;
+    const dataUrl = await imageFileToJpegDataUrl(path.resolve(uploadsDir, photo.file_path), PDF_MAX_DIM, PDF_QUALITY);
+    if (dataUrl) map.set(photo.file_path, dataUrl);
+  }
+  return map;
 }
 
 // Center an image using a single-cell table (pdfmake's reliable centering method)
@@ -111,10 +124,14 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
     margin: [0, 0, 0, 15] as [number, number, number, number],
   });
 
+  // Pre-downscale every photo to a JPEG data URL once, up front. Embedding the
+  // full-resolution originals is what turns a report into a 90MB PDF.
+  const photoData = await buildPhotoDataMap(report, uploadsDir);
+
   if (report.report_type === 'pern_audit') {
-    buildPernAudit(content, report, uploadsDir);
+    buildPernAudit(content, report, uploadsDir, photoData);
   } else if (INSPECTION_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_')) {
-    buildInspectionReport(content, report, uploadsDir);
+    buildInspectionReport(content, report, uploadsDir, photoData);
   }
 
   const docDefinition: TDocumentDefinitions = {
@@ -175,7 +192,7 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
 
 // ─── Inspection Reports (Fibre / Plastics / Metals) ───
 
-function buildInspectionReport(content: Content[], report: any, uploadsDir: string) {
+function buildInspectionReport(content: Content[], report: any, uploadsDir: string, photoData: Map<string, string>) {
   const d = report.inspection_details || {};
   const isLoading = report.report_type === 'loading_inspection';
   const isQuarterlyPern = report.report_type === 'quarterly_pern';
@@ -321,7 +338,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
 
       const containerPhotos = (report.photos || []).filter((p: any) => p.container_id === container.id);
       for (const photo of containerPhotos) {
-        const base64 = getPhotoAsBase64(uploadsDir, photo.file_path);
+        const base64 = photoData.get(photo.file_path) ?? null;
         if (base64) {
           content.push(photoBlock(base64, photo.photo_label));
         }
@@ -340,7 +357,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
       margin: [0, 10, 0, 5] as [number, number, number, number],
     } as any);
     for (const photo of moisturePhotos) {
-      const base64 = getPhotoAsBase64(uploadsDir, photo.file_path);
+      const base64 = photoData.get(photo.file_path) ?? null;
       if (base64) {
         content.push(photoBlock(base64, null));
       }
@@ -359,7 +376,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
       pageBreak: 'before',
     } as any);
     for (const photo of generalPhotos) {
-      const base64 = getPhotoAsBase64(uploadsDir, photo.file_path);
+      const base64 = photoData.get(photo.file_path) ?? null;
       if (base64) {
         content.push(photoBlock(base64, photo.photo_label));
       }
@@ -408,7 +425,7 @@ Further references / links:
 Producer Responsibility (Packaging Waste) Regulations 2017
 https://www.gov.uk/guidance/packaging-producer-responsibilities`;
 
-function buildPernAudit(content: Content[], report: any, uploadsDir: string) {
+function buildPernAudit(content: Content[], report: any, uploadsDir: string, photoData: Map<string, string>) {
   const p = report.pern_details || {};
 
   // Introductory letter (only if provided)
@@ -571,7 +588,7 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string) {
       pageBreak: 'before',
     } as any);
     for (const photo of photos) {
-      const base64 = getPhotoAsBase64(uploadsDir, photo.file_path);
+      const base64 = photoData.get(photo.file_path) ?? null;
       if (base64) {
         content.push(photoBlock(base64, photo.photo_label));
       }

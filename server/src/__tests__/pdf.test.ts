@@ -7,6 +7,8 @@ import { generatePdf } from '../utils/pdf-generator';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
+import crypto from 'crypto';
 
 describe('PDF Routes', () => {
   let db: Database.Database;
@@ -338,6 +340,40 @@ describe('PDF Generator', () => {
 
     const buffer = await generatePdf(report, tmpDir);
     expect(buffer).toBeInstanceOf(Buffer);
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('downscales large photos so the PDF stays small', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-'));
+    const photoDir = path.join(tmpDir, '1');
+    fs.mkdirSync(photoDir, { recursive: true });
+
+    // A 2400x1800 incompressible (random) image: ~13MB if embedded at full
+    // resolution, but a few hundred KB once downscaled to the PDF cap.
+    const W = 2400;
+    const H = 1800;
+    const raw = crypto.randomBytes(W * H * 3);
+    await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).png().toFile(path.join(photoDir, 'big.png'));
+
+    const report = {
+      id: 1,
+      report_type: 'loading_inspection',
+      customer_name: 'Test',
+      site_address: 'Test',
+      inspection_date: '2026-05-01',
+      inspector_name: 'Test',
+      status: 'completed',
+      inspection_details: { product_grade: 'OCC' },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [{ file_path: '1/big.png', photo_label: 'Big Photo', container_id: null }],
+    };
+
+    const buffer = await generatePdf(report as any, tmpDir);
+    expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
+    // Full-res embedding would be several MB; downscaled it must be well under 1MB.
+    expect(buffer.length).toBeLessThan(1_000_000);
     fs.rmSync(tmpDir, { recursive: true });
   });
 
