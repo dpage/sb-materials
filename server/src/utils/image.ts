@@ -57,7 +57,11 @@ export async function archiveImageFile(filePath: string): Promise<string> {
  * in a PDF. Returns null if the file is missing or can't be processed (callers
  * treat that as "no image" rather than failing the whole document).
  */
-export async function imageFileToJpegDataUrl(filePath: string, maxDim: number, quality: number): Promise<string | null> {
+export async function imageFileToJpegDataUrl(
+  filePath: string,
+  maxDim: number,
+  quality: number,
+): Promise<string | null> {
   if (!fs.existsSync(filePath)) return null;
   try {
     const jpeg = await resizeToJpeg(fs.readFileSync(filePath), maxDim, quality);

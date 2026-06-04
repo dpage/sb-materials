@@ -353,7 +353,9 @@ describe('PDF Generator', () => {
     const W = 2400;
     const H = 1800;
     const raw = crypto.randomBytes(W * H * 3);
-    await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).png().toFile(path.join(photoDir, 'big.png'));
+    await sharp(raw, { raw: { width: W, height: H, channels: 3 } })
+      .png()
+      .toFile(path.join(photoDir, 'big.png'));
 
     const report = {
       id: 1,
