@@ -17,6 +17,7 @@ import type {
   Contaminant,
 } from '../types';
 import { REPORT_TYPE_LABELS } from '../types';
+import { chunkBySizeAndCount } from '../utils/uploadChunks';
 
 const YES_NO = ['YES', 'NO'];
 const YES_NO_NA = ['YES', 'NO', 'N/A'];
@@ -300,9 +301,6 @@ export function ReportEdit() {
 
       // Upload new photos - map temporary container IDs to real DB IDs
       if (newPhotos.length > 0) {
-        const files = newPhotos.map((p) => p.file);
-        const labels = newPhotos.map((p) => p.label);
-
         // Build mapping from old container IDs (including temp negatives) to new DB IDs
         const idMap = new Map<number, number>();
         if (newContainerIds?.length && data.containers?.length) {
@@ -314,12 +312,24 @@ export function ReportEdit() {
           }
         }
 
-        const containerIds = newPhotos.map((p) => {
-          if (p.containerId === null) return null;
-          // Map to new DB ID if available, otherwise use the existing ID (already a real DB ID)
-          return idMap.get(p.containerId) ?? p.containerId;
-        });
-        await api.uploadPhotos(reportId, files, labels, containerIds);
+        // A report's photos are posted in one request; large batches would blow
+        // past the server file cap / nginx body limit, so split into chunks that
+        // each stay within both. Upload sequentially and drop each chunk from
+        // newPhotos as it succeeds, so a mid-batch failure can be retried without
+        // re-uploading (duplicating) the photos already saved.
+        const chunks = chunkBySizeAndCount(newPhotos, (p) => p.file.size);
+        for (const chunk of chunks) {
+          const files = chunk.map((p) => p.file);
+          const labels = chunk.map((p) => p.label);
+          const containerIds = chunk.map((p) => {
+            if (p.containerId === null) return null;
+            // Map to new DB ID if available, otherwise use the existing ID (already a real DB ID)
+            return idMap.get(p.containerId) ?? p.containerId;
+          });
+          await api.uploadPhotos(reportId, files, labels, containerIds);
+          const uploaded = new Set(chunk);
+          setNewPhotos((prev) => prev.filter((p) => !uploaded.has(p)));
+        }
       }
 
       // Upload signature

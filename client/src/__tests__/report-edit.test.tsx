@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -955,5 +955,54 @@ describe('ReportEdit - Edit Report', () => {
     const statusSelect = document.querySelectorAll('select');
     const completedSelect = Array.from(statusSelect).find((s) => (s as HTMLSelectElement).value === 'completed');
     expect(completedSelect).toBeTruthy();
+  });
+});
+
+describe('ReportEdit - large photo batches', () => {
+  const realCreate = (globalThis.URL as any).createObjectURL;
+  const realRevoke = (globalThis.URL as any).revokeObjectURL;
+
+  beforeEach(() => {
+    (globalThis.URL as any).createObjectURL = vi.fn(() => 'blob:fake');
+    (globalThis.URL as any).revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    (globalThis.URL as any).createObjectURL = realCreate;
+    (globalThis.URL as any).revokeObjectURL = realRevoke;
+  });
+
+  function bigJpeg(name: string, bytes: number): File {
+    const f = new File(['x'], name, { type: 'image/jpeg' });
+    Object.defineProperty(f, 'size', { value: bytes });
+    return f;
+  }
+
+  it('splits an oversized photo batch into multiple upload requests', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: '1' } }); // customer
+    await waitFor(() => expect(api.getSites).toHaveBeenCalledWith(1));
+    const allSelects = document.querySelectorAll('select');
+    fireEvent.change(allSelects[1], { target: { value: '1' } }); // site
+
+    // Two 40MB photos -> 80MB total, over the 70MB request cap -> 2 requests.
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    const generalInput = fileInputs[fileInputs.length - 1] as HTMLInputElement;
+    fireEvent.change(generalInput, {
+      target: { files: [bigJpeg('a.jpg', 40 * 1024 * 1024), bigJpeg('b.jpg', 40 * 1024 * 1024)] },
+    });
+
+    fireEvent.click(screen.getByText('Save as Draft'));
+
+    await waitFor(() => expect(api.uploadPhotos).toHaveBeenCalledTimes(2));
+    // Both photos uploaded across the two requests, none dropped.
+    const totalFiles = (api.uploadPhotos as any).mock.calls.reduce(
+      (sum: number, call: any[]) => sum + call[1].length,
+      0,
+    );
+    expect(totalFiles).toBe(2);
   });
 });
