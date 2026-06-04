@@ -8,9 +8,10 @@ export const ARCHIVE_MAX_DIM = 2048;
 export const ARCHIVE_QUALITY = 82;
 
 // Further-downscaled copy embedded in generated PDFs. The PDF only ever shows
-// photos at ~400pt wide, so 1200px is plenty and keeps the file lean.
-export const PDF_MAX_DIM = 1200;
-export const PDF_QUALITY = 80;
+// photos at ~400pt (~5.5in) wide, so 900px (~160 DPI) is plenty and keeps
+// photo-heavy reports small enough to email.
+export const PDF_MAX_DIM = 900;
+export const PDF_QUALITY = 72;
 
 /**
  * Resize and re-encode an image buffer to JPEG.
