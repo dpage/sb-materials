@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import sharp from 'sharp';
 import { createSchema } from '../db/schema';
 import { seedData } from '../db/seed';
 import { authRoutes } from '../routes/auth';
@@ -99,6 +100,50 @@ describe('Photo Routes', () => {
     expect(res.body.length).toBe(1);
     expect(res.body[0].file_path).toContain(`${reportId}/`);
     expect(res.body[0].id).toBeDefined();
+  });
+
+  it('should downscale a large photo to an archival JPEG on upload', async () => {
+    // A 4000x3000 photo, larger than the 2048px archival cap.
+    const bigPhoto = await sharp({
+      create: { width: 4000, height: 3000, channels: 3, background: { r: 90, g: 140, b: 60 } },
+    })
+      .png()
+      .toBuffer();
+
+    const res = await request(app)
+      .post(`/api/photos/upload/${reportId}`)
+      .set('Cookie', cookie)
+      .attach('photos', bigPhoto, 'huge.png');
+
+    expect(res.status).toBe(200);
+    const relPath = res.body[0].file_path as string;
+    // Stored as JPEG regardless of the uploaded extension.
+    expect(relPath.toLowerCase().endsWith('.jpg')).toBe(true);
+
+    const storedPath = path.join(tmpDir, 'uploads', relPath);
+    const meta = await sharp(fs.readFileSync(storedPath)).metadata();
+    expect(meta.format).toBe('jpeg');
+    expect(Math.max(meta.width!, meta.height!)).toBeLessThanOrEqual(2048);
+    expect(meta.width).toBe(2048);
+    expect(meta.height).toBe(1536);
+  });
+
+  it('should leave signatures as-is (PNG, not JPEG-compressed)', async () => {
+    const pngData = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+
+    const res = await request(app)
+      .post(`/api/photos/signature/${reportId}`)
+      .set('Cookie', cookie)
+      .attach('signature', pngData, 'signature.png');
+
+    expect(res.status).toBe(200);
+    const relPath = res.body.signature_path as string;
+    expect(relPath.toLowerCase().endsWith('.png')).toBe(true);
+    const meta = await sharp(fs.readFileSync(path.join(tmpDir, 'uploads', relPath))).metadata();
+    expect(meta.format).toBe('png');
   });
 
   it('should upload multiple photos with labels', async () => {

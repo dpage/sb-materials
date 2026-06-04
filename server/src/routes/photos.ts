@@ -5,6 +5,8 @@ import path from 'path';
 import fs from 'fs';
 import { requireAuth } from '../middleware/auth';
 import { config } from '../config';
+import { archiveImageFile } from '../utils/image';
+import { logger } from '../utils/logger';
 
 export function photoRoutes(db: Database.Database): Router {
   const router = Router();
@@ -44,7 +46,7 @@ export function photoRoutes(db: Database.Database): Router {
   });
 
   // Upload photo(s) for a report
-  router.post('/upload/:reportId', upload.array('photos', 20), (req, res) => {
+  router.post('/upload/:reportId', upload.array('photos', 20), async (req, res) => {
     const reportId = parseInt(req.params.reportId as string, 10);
     const report = db.prepare('SELECT id FROM reports WHERE id = ?').get(reportId);
     if (!report) {
@@ -55,6 +57,22 @@ export function photoRoutes(db: Database.Database): Router {
     const files = req.files as Express.Multer.File[];
     if (!files?.length) {
       res.status(400).json({ error: 'No files uploaded' });
+      return;
+    }
+
+    // Downscale/re-encode every upload to an archival JPEG (also handles EXIF
+    // orientation and HEIC). Done before any DB insert so a failure leaves no
+    // dangling rows.
+    const filenames: string[] = [];
+    try {
+      for (const file of files) {
+        const newPath = await archiveImageFile(file.path);
+        filenames.push(path.basename(newPath));
+      }
+    } catch (err) {
+      logger.error('Failed to process uploaded photo:', err);
+      files.forEach((f) => fs.existsSync(f.path) && fs.unlinkSync(f.path));
+      res.status(400).json({ error: 'Failed to process image' });
       return;
     }
 
@@ -76,7 +94,7 @@ export function photoRoutes(db: Database.Database): Router {
     const inserted = [];
     for (let i = 0; i < files.length; i++) {
       // Store path relative to uploadsDir: "{reportId}/{filename}"
-      const relPath = `${reportId}/${files[i].filename}`;
+      const relPath = `${reportId}/${filenames[i]}`;
       const result = stmt.run(
         reportId,
         containerIds[i] ? parseInt(containerIds[i], 10) : null,
