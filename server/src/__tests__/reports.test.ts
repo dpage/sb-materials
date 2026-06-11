@@ -325,6 +325,71 @@ describe('Report Routes', () => {
       expect(res.body.containerIds).toHaveLength(1);
     });
 
+    it('should preserve container photos when a report is updated', async () => {
+      const createRes = await request(app).post('/api/reports').set('Cookie', cookie).send(createPlasticsReport());
+      const reportId = createRes.body.id;
+      const [c1, c2] = createRes.body.containerIds;
+
+      // Simulate a previously uploaded photo attached to the first container
+      db.prepare('INSERT INTO report_photos (report_id, container_id, photo_label, file_path) VALUES (?, ?, ?, ?)').run(
+        reportId,
+        c1,
+        'Container shot',
+        `${reportId}/photo.jpg`,
+      );
+
+      // Re-save as the client does: existing containers carry their real IDs,
+      // new ones a temporary negative ID
+      const res = await request(app)
+        .put(`/api/reports/${reportId}`)
+        .set('Cookie', cookie)
+        .send({
+          containers: [
+            { id: c1, container_number: 'C001', seal_number: 'S001', weight_info: '20t' },
+            { id: c2, container_number: 'C002-edited', seal_number: 'S002', weight_info: '18t' },
+            { id: -1, container_number: 'C003', seal_number: 'S003', weight_info: '15t' },
+          ],
+        });
+      expect(res.status).toBe(200);
+      expect(res.body.containerIds).toHaveLength(3);
+
+      const photo = db.prepare('SELECT * FROM report_photos WHERE report_id = ?').get(reportId) as any;
+      expect(photo).toBeDefined();
+      expect(photo.container_id).toBe(res.body.containerIds[0]);
+
+      const updated = db
+        .prepare('SELECT * FROM report_containers WHERE report_id = ? ORDER BY sort_order')
+        .all(reportId) as any[];
+      expect(updated).toHaveLength(3);
+      expect(updated[1].container_number).toBe('C002-edited');
+    });
+
+    it('should delete photos of containers removed from the report', async () => {
+      const createRes = await request(app).post('/api/reports').set('Cookie', cookie).send(createPlasticsReport());
+      const reportId = createRes.body.id;
+      const [c1, c2] = createRes.body.containerIds;
+
+      db.prepare('INSERT INTO report_photos (report_id, container_id, photo_label, file_path) VALUES (?, ?, ?, ?)').run(
+        reportId,
+        c2,
+        'Doomed shot',
+        `${reportId}/photo2.jpg`,
+      );
+
+      // Re-save with the second container removed
+      const res = await request(app)
+        .put(`/api/reports/${reportId}`)
+        .set('Cookie', cookie)
+        .send({
+          containers: [{ id: c1, container_number: 'C001', seal_number: 'S001', weight_info: '20t' }],
+        });
+      expect(res.status).toBe(200);
+      expect(res.body.containerIds).toEqual([c1]);
+
+      const photos = db.prepare('SELECT * FROM report_photos WHERE report_id = ?').all(reportId);
+      expect(photos).toHaveLength(0);
+    });
+
     it('should update a PERN audit', async () => {
       const createRes = await request(app).post('/api/reports').set('Cookie', cookie).send(createPernReport());
 

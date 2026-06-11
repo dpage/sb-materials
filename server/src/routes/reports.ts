@@ -330,18 +330,39 @@ export function reportRoutes(db: Database.Database): Router {
         }
       }
 
-      // Replace containers
+      // Reconcile containers in place. Existing rows must keep their IDs:
+      // report_photos.container_id references them with ON DELETE CASCADE, so
+      // a delete-and-reinsert would silently destroy the container photos.
       if (containers !== undefined) {
-        // Keep container IDs for photo references - delete containers without photos
-        db.prepare('DELETE FROM report_containers WHERE report_id = ?').run(reportId);
-        if (containers?.length) {
-          const stmt = db.prepare(
-            'INSERT INTO report_containers (report_id, container_number, seal_number, weight_info, number_of_bales, weighbridge_ticket, weight, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          );
-          const newContainerIds: number[] = [];
-          for (let i = 0; i < containers.length; i++) {
-            const c = containers[i];
-            const r = stmt.run(
+        const existingIds = new Set(
+          (db.prepare('SELECT id FROM report_containers WHERE report_id = ?').all(reportId) as { id: number }[]).map(
+            (r) => r.id,
+          ),
+        );
+        const insertStmt = db.prepare(
+          'INSERT INTO report_containers (report_id, container_number, seal_number, weight_info, number_of_bales, weighbridge_ticket, weight, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        );
+        const updateStmt = db.prepare(
+          'UPDATE report_containers SET container_number = ?, seal_number = ?, weight_info = ?, number_of_bales = ?, weighbridge_ticket = ?, weight = ?, sort_order = ? WHERE id = ? AND report_id = ?',
+        );
+        const newContainerIds: number[] = [];
+        for (let i = 0; i < (containers?.length ?? 0); i++) {
+          const c = containers[i];
+          if (typeof c.id === 'number' && existingIds.has(c.id)) {
+            updateStmt.run(
+              c.container_number,
+              c.seal_number,
+              c.weight_info,
+              c.number_of_bales ?? null,
+              c.weighbridge_ticket ?? null,
+              c.weight ?? null,
+              i,
+              c.id,
+              reportId,
+            );
+            newContainerIds.push(c.id);
+          } else {
+            const r = insertStmt.run(
               reportId,
               c.container_number,
               c.seal_number,
@@ -353,8 +374,15 @@ export function reportRoutes(db: Database.Database): Router {
             );
             newContainerIds.push(r.lastInsertRowid as number);
           }
-          return newContainerIds;
         }
+        // Containers the client no longer sends were removed by the user;
+        // deleting them cascades to their photos, which is intended.
+        const kept = new Set(newContainerIds);
+        const deleteStmt = db.prepare('DELETE FROM report_containers WHERE id = ?');
+        for (const oldId of existingIds) {
+          if (!kept.has(oldId)) deleteStmt.run(oldId);
+        }
+        return newContainerIds;
       }
 
       return [];
