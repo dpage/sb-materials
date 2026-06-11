@@ -146,10 +146,10 @@ describe('ReportEdit - New Report', () => {
   it('defaults to loading_inspection and can switch to Quarterly PERN', async () => {
     renderNew();
     await screen.findByText('New Report');
-    // Loading Reference is a loading_inspection-only field
-    expect(await screen.findByText('Loading Reference')).toBeInTheDocument();
+    // Loading Reference Number is a loading_inspection-only field
+    expect(await screen.findByText('Loading Reference Number')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
-    expect(screen.queryByText('Loading Reference')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Reference Number')).not.toBeInTheDocument();
   });
 
   it('should switch to PERN audit fields', async () => {
@@ -249,7 +249,8 @@ describe('ReportEdit - New Report', () => {
     renderNew();
     await screen.findByText('New Report');
     expect(screen.getByText('Date of Inspection *')).toBeInTheDocument();
-    expect(screen.getByText('Time of Inspection')).toBeInTheDocument();
+    // The default report type is loading_inspection, which uses the original form's label
+    expect(screen.getByText('Time Of First Loading')).toBeInTheDocument();
   });
 
   it('should show status select', async () => {
@@ -391,6 +392,66 @@ describe('ReportEdit - New Report', () => {
     expect(
       screen.getByText(/material purchase price quoted includes PERN revenue which is only eligible in UK/),
     ).toBeInTheDocument();
+  });
+
+  it('shows the verbatim Unwanted Material and Contaminates questions', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    expect(
+      screen.getByText(
+        'Unwanted Material (items that are not included in the grade being inspected - give details of the items found)',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Contaminates (give details of items found) If any medical or Hazardous Waste is found STOP Inspection and call Buyer)',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the notify instruction with a generic fallback when no client is selected', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    expect(screen.getByText('If yes, the site must notify the Trading Company immediately')).toBeInTheDocument();
+  });
+
+  it('names the selected On Behalf Of client in the notify instruction', async () => {
+    (api.getLookups as any).mockImplementation((table: string) =>
+      Promise.resolve(
+        table === 'lookup_clients'
+          ? [{ id: 9, value: 'VISY Recycling UK', is_active: 1 }]
+          : [{ id: 1, value: 'OCC', report_type: 'loading_inspection', is_active: 1 }],
+      ),
+    );
+    renderNew();
+    await screen.findByText('New Report');
+    const clientSelect = (await screen.findByText('Select client...')).closest('select')!;
+    fireEvent.change(clientSelect, { target: { value: 'VISY Recycling UK' } });
+    expect(await screen.findByText('If yes, the site must notify VISY Recycling UK immediately')).toBeInTheDocument();
+  });
+
+  it('uses the verbatim Quality Score and volume-consistency wording', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    expect(screen.getByText('Quality Score(1 being poor 5 being excellent)')).toBeInTheDocument();
+    expect(
+      screen.getByText('If no, how does the supplier ensure all material is consistent in source & quality?'),
+    ).toBeInTheDocument();
+  });
+
+  it('uses the original Google Form field labels on the loading form', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    expect(screen.getByText('Loading Reference Number')).toBeInTheDocument();
+    expect(screen.getByText('Time Of First Loading')).toBeInTheDocument();
+    expect(screen.getByText('Date Inspection Completed')).toBeInTheDocument();
+  });
+
+  it('keeps the verbatim Time Of Inspection label on the quarterly form', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
+    expect(await screen.findByText('Time Of Inspection')).toBeInTheDocument();
   });
 
   it('should show fibre packaging content checkboxes', async () => {
@@ -595,7 +656,7 @@ describe('ReportEdit - Edit Report', () => {
 
     renderEdit();
     await screen.findByText('Edit Report');
-    expect(await screen.findByText('Loading Reference')).toBeInTheDocument();
+    expect(await screen.findByText('Loading Reference Number')).toBeInTheDocument();
   });
 
   it('should load a PERN audit report', async () => {

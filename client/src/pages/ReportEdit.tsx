@@ -33,6 +33,22 @@ const PACKAGING_THRESHOLDS = [
 // Reserved photo_label used to group moisture-reading evidence photos
 const MOISTURE_PHOTO_LABEL = 'Moisture Readings';
 
+// Verbatim legal wording from the original Google Forms (see reference/sample-reports).
+// These strings must match the originals exactly, including their idiosyncratic
+// punctuation and capitalisation - do not tidy them up. Server copies live in
+// server/src/utils/wording.ts and must be kept in step.
+const UNWANTED_MATERIAL_QUESTION =
+  'Unwanted Material (items that are not included in the grade being inspected - give details of the items found)';
+const CONTAMINATES_QUESTION =
+  'Contaminates (give details of items found) If any medical or Hazardous Waste is found STOP Inspection and call Buyer)';
+const QUALITY_SCORE_LABEL = 'Quality Score(1 being poor 5 being excellent)';
+const VOLUME_CONSISTENCY_QUESTION =
+  'If no, how does the supplier ensure all material is consistent in source & quality?';
+// The original forms hardcoded 'Visy' here; the instruction is really about
+// whichever trading company the report is being completed on behalf of.
+const notifySiteLine = (onBehalfOf: string) =>
+  `If yes, the site must notify ${onBehalfOf || 'the Trading Company'} immediately`;
+
 export function ReportEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -590,7 +606,9 @@ export function ReportEdit() {
               />
             </div>
             <div>
-              <label style={labelStyle}>Time of Inspection</label>
+              <label style={labelStyle}>
+                {isLoading ? 'Time Of First Loading' : isQuarterly ? 'Time Of Inspection' : 'Time of Inspection'}
+              </label>
               <input
                 type="time"
                 value={inspectionTime}
@@ -653,7 +671,7 @@ export function ReportEdit() {
             {isLoading && (
               <>
                 <div>
-                  <label style={labelStyle}>Loading Reference</label>
+                  <label style={labelStyle}>Loading Reference Number</label>
                   <input
                     value={details.loading_reference || ''}
                     onChange={(e) => setDetails((d) => ({ ...d, loading_reference: e.target.value || null }))}
@@ -843,9 +861,7 @@ export function ReportEdit() {
 
             {/* Unwanted Materials */}
             <Section title="Unwanted Materials">
-              <p style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 10 }}>
-                Items not included in the grade being inspected - select all that apply
-              </p>
+              <p style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 10 }}>{UNWANTED_MATERIAL_QUESTION}</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {unwantedOptions.map((opt) => {
                   const checked = unwantedMaterials.some((m) => m.material === opt.value);
@@ -883,7 +899,7 @@ export function ReportEdit() {
             {/* Contaminants */}
             <Section title="Contaminants">
               <p style={{ fontSize: 13, color: '#e74c3c', marginBottom: 10, fontWeight: 500 }}>
-                If any medical or hazardous waste is found, STOP inspection and call buyer
+                {CONTAMINATES_QUESTION}
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {contaminantOptions.map((opt) => {
@@ -950,9 +966,7 @@ export function ReportEdit() {
                   />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>
-                    If NO, how does the supplier ensure all material is consistent in source &amp; quality?
-                  </label>
+                  <label style={labelStyle}>{VOLUME_CONSISTENCY_QUESTION}</label>
                   <input
                     value={details.volume_consistency_notes || ''}
                     onChange={(e) => setDetails((d) => ({ ...d, volume_consistency_notes: e.target.value || null }))}
@@ -979,6 +993,7 @@ export function ReportEdit() {
                   <label style={labelStyle}>
                     Is the site aware of any material that is not defined as UK post consumer packaging?
                   </label>
+                  <div style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 6 }}>{notifySiteLine(onBehalfOf)}</div>
                   <RadioGroup
                     options={YES_NO}
                     value={details.site_aware_non_uk || ''}
@@ -1022,7 +1037,7 @@ export function ReportEdit() {
             <Section title="Quality & Result">
               <div style={formGrid}>
                 <div>
-                  <label style={labelStyle}>Quality Score (1 = poor, 5 = excellent)</label>
+                  <label style={labelStyle}>{QUALITY_SCORE_LABEL}</label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button
@@ -1325,7 +1340,7 @@ export function ReportEdit() {
         {/* Date Completed */}
         <Section title="Completion">
           <div style={{ maxWidth: 300 }}>
-            <label style={labelStyle}>Date Completed</label>
+            <label style={labelStyle}>{isInspection ? 'Date Inspection Completed' : 'Date Completed'}</label>
             <input
               type="date"
               value={dateCompleted}
