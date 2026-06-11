@@ -646,7 +646,7 @@ export function ReportEdit() {
                 </select>
               </div>
             )}
-            {isInspection && (
+            {(isInspection || reportType === 'pern_audit') && (
               <div>
                 <label style={labelStyle}>On Behalf Of</label>
                 <div style={inputWithBtnRow}>

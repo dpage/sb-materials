@@ -159,6 +159,13 @@ describe('ReportEdit - New Report', () => {
     expect(await screen.findByText(/Company Name/i)).toBeInTheDocument();
   });
 
+  it('shows the On Behalf Of dropdown on the PERN Audit form', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getByText('PERN Audit'));
+    expect(await screen.findByText('On Behalf Of')).toBeInTheDocument();
+  });
+
   it('should load sites when customer is selected', async () => {
     renderNew();
     await screen.findByText('New Report');
