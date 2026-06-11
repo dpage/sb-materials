@@ -9,6 +9,33 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import crypto from 'crypto';
+import zlib from 'zlib';
+
+// Inflate every FlateDecode stream in a PDF and decode the hex-encoded text
+// runs (e.g. `[<4f6e20> 0] TJ`) so tests can assert on rendered text. pdfmake
+// emits one run per word with the trailing space inside the hex, so plain
+// concatenation reconstructs the visible text. Image streams fail to inflate
+// and are skipped.
+function extractPdfText(buf: Buffer): string {
+  const out: string[] = [];
+  let idx = 0;
+  while ((idx = buf.indexOf('stream', idx)) !== -1) {
+    const start = buf.indexOf('\n', idx) + 1;
+    const end = buf.indexOf('endstream', start);
+    if (end === -1) break;
+    let content = '';
+    try {
+      content = zlib.inflateSync(buf.subarray(start, end)).toString('latin1');
+    } catch {
+      // not a deflate stream (e.g. an image) - skip
+    }
+    for (const m of content.matchAll(/<([0-9a-fA-F]+)>/g)) {
+      out.push(Buffer.from(m[1], 'hex').toString('latin1'));
+    }
+    idx = end + 'endstream'.length;
+  }
+  return out.join('');
+}
 
 describe('PDF Routes', () => {
   let db: Database.Database;
@@ -308,6 +335,39 @@ describe('PDF Generator', () => {
     expect(buffer).toBeInstanceOf(Buffer);
     expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
     fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('includes On Behalf Of on the PERN audit PDF', async () => {
+    const baseAudit = {
+      id: 7,
+      report_type: 'pern_audit',
+      status: 'completed',
+      customer_name: 'Test Customer',
+      site_address: '123 Test St',
+      inspection_date: '2026-06-11',
+      inspector_name: 'Auditor',
+      on_behalf_of: 'Genus',
+      pern_details: { company_name_address: 'Enava Ltd', contact_name: 'Jo' },
+      photos: [],
+    };
+    // Control: the inspection PDF already renders On Behalf Of, proving the
+    // text-extraction technique works before we assert on the audit PDF.
+    const inspection = {
+      ...baseAudit,
+      id: 8,
+      report_type: 'loading_inspection',
+      inspection_details: { product_grade: 'OCC' },
+      pern_details: undefined,
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+    };
+    const controlText = extractPdfText(await generatePdf(inspection as any, tmpDir));
+    expect(controlText).toContain('On Behalf Of');
+
+    const auditText = extractPdfText(await generatePdf(baseAudit as any, tmpDir));
+    expect(auditText).toContain('On Behalf Of');
+    expect(auditText).toContain('Genus');
   });
 
   it('should handle photos in PDF', async () => {

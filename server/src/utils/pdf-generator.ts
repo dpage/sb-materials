@@ -458,6 +458,7 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     ...fieldRow('Report Reference', `SBM-${String(report.id).padStart(5, '0')}`),
     ...fieldRow('Status', (report.status || 'draft').charAt(0).toUpperCase() + (report.status || 'draft').slice(1)),
     ...fieldRow('Company Name & Address', p.company_name_address),
+    ...(report.on_behalf_of ? fieldRow('On Behalf Of', report.on_behalf_of) : []),
     ...fieldRow('Audit Date', report.inspection_date),
     ...fieldRow('Contact Name', p.contact_name),
     ...fieldRow('Email', p.email),
