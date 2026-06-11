@@ -5,6 +5,14 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import { logger } from './logger';
 import { SB_LOGO_DATA_URL } from './logo';
 import { imageFileToJpegDataUrl, PDF_MAX_DIM, PDF_QUALITY } from './image';
+import {
+  UNWANTED_MATERIAL_QUESTION,
+  CONTAMINATES_QUESTION,
+  POST_CONSUMER_QUESTION,
+  QUALITY_SCORE_LABEL,
+  VOLUME_CONSISTENCY_QUESTION,
+  notifySiteLine,
+} from './wording';
 
 const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
 
@@ -211,7 +219,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
 
   headerRows.push(
     ...fieldRow('Date of Inspection', report.inspection_date),
-    ...fieldRow('Time of Inspection', report.inspection_time || '-'),
+    ...fieldRow(isLoading ? 'Time Of First Loading' : 'Time Of Inspection', report.inspection_time || '-'),
     ...fieldRow('Inspector', report.inspector_name),
   );
 
@@ -222,7 +230,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
   if (isLoading) {
     headerRows.push(
       ...fieldRow('Product Description', d.product_description),
-      ...fieldRow('Loading Reference', d.loading_reference),
+      ...fieldRow('Loading Reference Number', d.loading_reference),
       ...fieldRow('Number of Containers', d.number_of_containers),
       ...fieldRow('Stock & Bale Count', d.stock_bale_count),
       ...fieldRow('Radiation Reading', d.radiation_reading),
@@ -252,7 +260,13 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     content.push({
       text: 'Unwanted Materials',
       style: 'subheader',
-      margin: [0, 10, 0, 5] as [number, number, number, number],
+      margin: [0, 10, 0, 2] as [number, number, number, number],
+    });
+    content.push({
+      text: UNWANTED_MATERIAL_QUESTION,
+      fontSize: 9,
+      italics: true,
+      margin: [0, 0, 0, 5] as [number, number, number, number],
     });
     const items = report.unwanted_materials.map((m: any) => (m.notes ? `${m.material} - ${m.notes}` : m.material));
     content.push({ ul: items, margin: [20, 0, 0, 10] as [number, number, number, number] });
@@ -263,7 +277,13 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     content.push({
       text: 'Contaminants',
       style: 'subheader',
-      margin: [0, 10, 0, 5] as [number, number, number, number],
+      margin: [0, 10, 0, 2] as [number, number, number, number],
+    });
+    content.push({
+      text: CONTAMINATES_QUESTION,
+      fontSize: 9,
+      italics: true,
+      margin: [0, 0, 0, 5] as [number, number, number, number],
     });
     const items = report.contaminants.map((c: any) => (c.notes ? `${c.contaminant} - ${c.notes}` : c.contaminant));
     content.push({ ul: items, margin: [20, 0, 0, 10] as [number, number, number, number] });
@@ -280,16 +300,10 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
       d.supplier_aware_pern,
     ),
     ...fieldRow('Does the supplier have control of all volume coming in to the site?', d.supplier_controls_volume),
-    ...fieldRow(
-      'If NO, how does the supplier ensure all material is consistent in source & quality?',
-      d.volume_consistency_notes,
-    ),
+    ...fieldRow(VOLUME_CONSISTENCY_QUESTION, d.volume_consistency_notes),
     ...fieldRow('Does the site buy in pre-baled material?', d.site_buys_prebaled),
     ...fieldRow('If yes, how does the supplier ensure this is only UK packaging?', d.prebaled_uk_assurance),
-    ...fieldRow(
-      'Is the site aware of any material that is not defined as UK post consumer packaging?',
-      d.site_aware_non_uk,
-    ),
+    ...fieldRow(`${POST_CONSUMER_QUESTION}\n${notifySiteLine(report.on_behalf_of)}`, d.site_aware_non_uk),
   );
 
   content.push({
@@ -303,7 +317,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     table: {
       widths: [180, '*'],
       body: [
-        ...fieldRow('Quality Score', report.quality_score ? `${report.quality_score} / 5` : '-'),
+        ...fieldRow(QUALITY_SCORE_LABEL, report.quality_score ? `${report.quality_score} / 5` : '-'),
         ...fieldRow('Inspection Passed', yesNo(report.inspection_passed)),
       ],
     },

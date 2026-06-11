@@ -97,6 +97,32 @@ describe('PDF Routes', () => {
   });
 });
 
+describe('Verbatim inspection wording', () => {
+  it('matches the original Google Form text exactly', async () => {
+    const w = await import('../utils/wording');
+    expect(w.UNWANTED_MATERIAL_QUESTION).toBe(
+      'Unwanted Material (items that are not included in the grade being inspected - give details of the items found)',
+    );
+    expect(w.CONTAMINATES_QUESTION).toBe(
+      'Contaminates (give details of items found) If any medical or Hazardous Waste is found STOP Inspection and call Buyer)',
+    );
+    expect(w.POST_CONSUMER_QUESTION).toBe(
+      'Is the site aware of any material that is not defined as UK post consumer packaging?',
+    );
+    expect(w.QUALITY_SCORE_LABEL).toBe('Quality Score(1 being poor 5 being excellent)');
+    expect(w.VOLUME_CONSISTENCY_QUESTION).toBe(
+      'If no, how does the supplier ensure all material is consistent in source & quality?',
+    );
+  });
+
+  it('names the trading company in the notify line, with a generic fallback', async () => {
+    const w = await import('../utils/wording');
+    expect(w.notifySiteLine('VISY Recycling UK')).toBe('If yes, the site must notify VISY Recycling UK immediately');
+    expect(w.notifySiteLine(null)).toBe('If yes, the site must notify the Trading Company immediately');
+    expect(w.notifySiteLine(undefined)).toBe('If yes, the site must notify the Trading Company immediately');
+  });
+});
+
 describe('PDF Generator', () => {
   let tmpDir: string;
 
