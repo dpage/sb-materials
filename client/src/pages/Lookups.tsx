@@ -179,8 +179,8 @@ export function Lookups() {
         <div className="lookups-card" style={{ marginBottom: 16 }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: '#2d3436' }}>Collection Notes</h3>
           <p style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 12 }}>
-            The reference for the next new collection note. Set this to carry on from the numbers already used outside
-            the app.
+            The number for the next new collection note reference (e.g. the 1061 in SBM1061). Set this to carry on from
+            the numbers already used outside the app.
           </p>
           {nextNumberError && (
             <div

@@ -232,6 +232,10 @@ export const helpTopics: Record<string, HelpTopic> = {
         title: 'Deactivating a Value',
         body: 'Click "Deactivate" to hide a value from dropdown lists without deleting it. Existing reports that use the value are not affected. Click "Activate" to restore it.',
       },
+      {
+        title: 'Collection Notes (superusers only)',
+        body: 'A "Collection Notes" card at the top of this page lets a superuser set the number for the next new collection note reference (e.g. the 1061 in SBM1061). Use it to carry the sequence on from numbers already used outside the app. Creating a note always advances the stored number automatically, so it will not go backwards on its own, but a superuser can still set it to any positive whole number by hand here.',
+      },
     ],
   },
 };
