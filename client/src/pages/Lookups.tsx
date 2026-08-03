@@ -212,7 +212,7 @@ export function Lookups() {
               />
             </div>
             <button className="add-btn" onClick={saveNextNumber}>
-              Save Number
+              Save number
             </button>
             {nextNumberSaved && <span style={{ color: '#27ae60', fontSize: 13 }}>Saved</span>}
           </div>

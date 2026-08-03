@@ -7,17 +7,42 @@ import { CollectionNoteEdit } from '../pages/CollectionNoteEdit';
 import { HelpProvider } from '../components/HelpContext';
 
 // jsdom has no canvas backing, so stub out the signature pad as the report
-// form's tests do.
-vi.mock('react-signature-canvas', () => ({
-  default: React.forwardRef((_props: any, ref: any) => {
-    React.useImperativeHandle(ref, () => ({
-      isEmpty: () => true,
-      clear: () => {},
-      toDataURL: () => 'data:image/png;base64,fake',
-    }));
-    return <canvas data-testid="signature-canvas" />;
-  }),
-}));
+// form's tests do. The pad's "drawn on" state is controllable per test via
+// signatureCanvasState, keyed by the canvas's position in the DOM (the
+// component renders the dispatched pad before the received pad). Each
+// component instance is assigned a stable index on its first render (via a
+// ref) and releases it on unmount, rather than incrementing on every render,
+// since the surrounding form re-renders far more often than the pads
+// themselves mount; releasing on unmount keeps the numbering 0/1 fresh for
+// each test now that testing-library auto-unmounts between tests.
+const signatureCanvasState: { isEmpty: boolean[] } = { isEmpty: [true, true] };
+
+vi.mock('react-signature-canvas', () => {
+  let instanceCount = 0;
+  return {
+    default: React.forwardRef((_props: any, ref: any) => {
+      const indexRef = React.useRef<number | null>(null);
+      if (indexRef.current === null) {
+        indexRef.current = instanceCount++;
+      }
+      const index = indexRef.current;
+      React.useEffect(() => {
+        return () => {
+          instanceCount -= 1;
+        };
+      }, []);
+      React.useImperativeHandle(ref, () => ({
+        isEmpty: () => signatureCanvasState.isEmpty[index] ?? true,
+        clear: () => {},
+        // Must be valid base64 - jsdom's fetch (Node's undici) rejects a
+        // malformed data: URL outright, before the component even reaches
+        // the upload call.
+        toDataURL: () => `data:image/png;base64,${Buffer.from(`fake-signature-${index}`).toString('base64')}`,
+      }));
+      return <canvas data-testid="signature-canvas" />;
+    }),
+  };
+});
 
 vi.mock('../api', () => ({
   api: {
@@ -161,6 +186,7 @@ describe('CollectionNoteEdit form', () => {
     // clean call history; the mocks are shared vi.fn() instances across the
     // whole file, so clear them before re-arranging their resolved values.
     vi.clearAllMocks();
+    signatureCanvasState.isEmpty = [true, true];
     vi.mocked(api.getNextCollectionNoteReference).mockResolvedValue({ reference: 'SBM1061', prefix: 'SBM' });
     vi.mocked(api.getCustomers).mockResolvedValue([
       {
@@ -329,5 +355,201 @@ describe('CollectionNoteEdit form', () => {
     await waitFor(() =>
       expect(api.updateCollectionNote).toHaveBeenCalledWith(5, expect.objectContaining({ reference: 'SBM1050' })),
     );
+  });
+
+  it('keeps deriving the collect from address across two consecutive customer changes', async () => {
+    vi.mocked(api.getCustomers).mockResolvedValue([
+      {
+        id: 1,
+        name: 'Acme Recycling Ltd',
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: '1 Test Way\nTestville TE5 7ST',
+        is_active: 1,
+      },
+      {
+        id: 2,
+        name: 'Test Metals Ltd',
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: '2 Foundry Road\nTestville TE5 7ST',
+        is_active: 1,
+      },
+    ] as never);
+
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(api.getCustomers).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    await waitFor(() =>
+      expect(screen.getByLabelText(/collect from/i)).toHaveValue('Acme Recycling Ltd\n1 Test Way\nTestville TE5 7ST'),
+    );
+
+    // A second, immediate customer change: the field still holds the value
+    // we derived a moment ago, so it remains safe to overwrite.
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '2' } });
+    await waitFor(() =>
+      expect(screen.getByLabelText(/collect from/i)).toHaveValue('Test Metals Ltd\n2 Foundry Road\nTestville TE5 7ST'),
+    );
+  });
+
+  it('preserves the note-saved address on customer change when it no longer matches the customer record on file', async () => {
+    // The note was saved with an address that no longer matches what the
+    // customer record on file would derive today (e.g. the customer's
+    // address has since changed, or the address was hand-typed at save
+    // time). Loading the note must not treat that stored text as merely a
+    // stale "derived" snapshot that is fair game to overwrite.
+    vi.mocked(api.getCustomers).mockResolvedValue([
+      {
+        id: 1,
+        name: 'Acme Recycling Ltd',
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: '1 Test Way\nTestville TE5 7ST',
+        is_active: 1,
+      },
+      {
+        id: 2,
+        name: 'Test Metals Ltd',
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: '2 Foundry Road\nTestville TE5 7ST',
+        is_active: 1,
+      },
+    ] as never);
+    vi.mocked(api.getCollectionNote).mockResolvedValue({
+      id: 5,
+      reference: 'SBM1050',
+      customer_id: 1,
+      site_id: null,
+      collect_from_address: 'Acme Recycling Ltd\nOld Yard, No Longer On File',
+      comments: null,
+      contact_name: null,
+      contact_phone: null,
+      po_number: null,
+      weight: null,
+      packing_list_no: null,
+      collection_date: '2026-07-01',
+      transport_company: null,
+      dispatched_signature_path: null,
+      dispatched_signed_date: null,
+      received_signature_path: null,
+      received_signed_date: null,
+      created_by_id: 1,
+      created_at: '2026-07-01T00:00:00Z',
+      updated_at: '2026-07-01T00:00:00Z',
+      items: [],
+    } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/collection-notes/5']}>
+        <HelpProvider>
+          <Routes>
+            <Route path="/collection-notes/:id" element={<CollectionNoteEdit />} />
+          </Routes>
+        </HelpProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText(/reference/i)).toHaveValue('SBM1050'));
+    expect(screen.getByLabelText(/collect from/i)).toHaveValue('Acme Recycling Ltd\nOld Yard, No Longer On File');
+
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '2' } });
+    expect(screen.getByLabelText(/collect from/i)).toHaveValue('Acme Recycling Ltd\nOld Yard, No Longer On File');
+  });
+
+  it('preserves repeated hand-edits to the collect from address across customer changes', async () => {
+    vi.mocked(api.getCustomers).mockResolvedValue([
+      {
+        id: 1,
+        name: 'Acme Recycling Ltd',
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: '1 Test Way\nTestville TE5 7ST',
+        is_active: 1,
+      },
+      {
+        id: 2,
+        name: 'Test Metals Ltd',
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: '2 Foundry Road\nTestville TE5 7ST',
+        is_active: 1,
+      },
+    ] as never);
+
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(api.getCustomers).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    await waitFor(() =>
+      expect(screen.getByLabelText(/collect from/i)).toHaveValue('Acme Recycling Ltd\n1 Test Way\nTestville TE5 7ST'),
+    );
+
+    fireEvent.change(screen.getByLabelText(/collect from/i), { target: { value: 'Hand edited address one' } });
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '2' } });
+    expect(screen.getByLabelText(/collect from/i)).toHaveValue('Hand edited address one');
+
+    fireEvent.change(screen.getByLabelText(/collect from/i), { target: { value: 'Hand edited address two' } });
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    expect(screen.getByLabelText(/collect from/i)).toHaveValue('Hand edited address two');
+  });
+
+  it('creates the note before uploading either signature, in dispatched-then-received order', async () => {
+    signatureCanvasState.isEmpty = [false, false];
+    const callOrder: string[] = [];
+    vi.mocked(api.createCollectionNote).mockImplementation(async (data: any) => {
+      callOrder.push('create');
+      return { id: 42, reference: data.reference };
+    });
+    vi.mocked(api.uploadCollectionNoteSignature).mockImplementation(async (noteId: any, kind: any) => {
+      callOrder.push(`upload:${kind}:${noteId}`);
+      return {} as never;
+    });
+
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/reference/i)).toHaveValue('SBM1061'));
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(api.uploadCollectionNoteSignature).toHaveBeenCalledTimes(2));
+
+    expect(api.createCollectionNote).toHaveBeenCalledTimes(1);
+    expect(api.uploadCollectionNoteSignature).toHaveBeenNthCalledWith(1, 42, 'dispatched', expect.anything());
+    expect(api.uploadCollectionNoteSignature).toHaveBeenNthCalledWith(2, 42, 'received', expect.anything());
+    // Records actual invocation order rather than merely checking both were
+    // called, so a regression that issues an upload before the note id
+    // exists (or races the create call) is caught.
+    expect(callOrder).toEqual(['create', 'upload:dispatched:42', 'upload:received:42']);
+  });
+
+  it('does not upload any signature when neither pad has been drawn on', async () => {
+    signatureCanvasState.isEmpty = [true, true];
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/reference/i)).toHaveValue('SBM1061'));
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(api.createCollectionNote).toHaveBeenCalledTimes(1));
+    expect(api.uploadCollectionNoteSignature).not.toHaveBeenCalled();
+  });
+
+  it('still saves the note and tells the user when a signature upload fails', async () => {
+    signatureCanvasState.isEmpty = [false, true];
+    vi.mocked(api.uploadCollectionNoteSignature).mockRejectedValue(new Error('Signature upload failed'));
+
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/reference/i)).toHaveValue('SBM1061'));
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(await screen.findByText(/signature upload failed/i)).toBeInTheDocument();
+    expect(api.createCollectionNote).toHaveBeenCalledTimes(1);
   });
 });
