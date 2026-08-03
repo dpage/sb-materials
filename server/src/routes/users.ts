@@ -11,7 +11,7 @@ export function userRoutes(db: Database.Database): Router {
   router.get('/', (_req, res) => {
     const users = db
       .prepare(
-        'SELECT id, username, display_name, is_superuser, is_active, created_at FROM users ORDER BY display_name',
+        'SELECT id, username, display_name, phone, is_superuser, is_active, created_at FROM users ORDER BY display_name',
       )
       .all();
     res.json(users);
@@ -19,7 +19,7 @@ export function userRoutes(db: Database.Database): Router {
 
   router.get('/:id', (req, res) => {
     const user = db
-      .prepare('SELECT id, username, display_name, is_superuser, is_active, created_at FROM users WHERE id = ?')
+      .prepare('SELECT id, username, display_name, phone, is_superuser, is_active, created_at FROM users WHERE id = ?')
       .get(req.params.id);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -29,7 +29,7 @@ export function userRoutes(db: Database.Database): Router {
   });
 
   router.post('/', (req, res) => {
-    const { username, password, display_name, is_superuser } = req.body;
+    const { username, password, display_name, phone, is_superuser } = req.body;
     if (!username || !password || !display_name) {
       res.status(400).json({ error: 'Username, password, and display name required' });
       return;
@@ -37,8 +37,10 @@ export function userRoutes(db: Database.Database): Router {
     const hash = bcrypt.hashSync(password, 10);
     try {
       const result = db
-        .prepare('INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, ?)')
-        .run(username, hash, display_name, is_superuser ? 1 : 0);
+        .prepare(
+          'INSERT INTO users (username, password_hash, display_name, phone, is_superuser) VALUES (?, ?, ?, ?, ?)',
+        )
+        .run(username, hash, display_name, phone ?? null, is_superuser ? 1 : 0);
       res.json({ id: result.lastInsertRowid });
     } catch (err: any) {
       if (err.message?.includes('UNIQUE')) {
@@ -50,7 +52,7 @@ export function userRoutes(db: Database.Database): Router {
   });
 
   router.put('/:id', (req, res) => {
-    const { username, password, display_name, is_superuser, is_active } = req.body;
+    const { username, password, display_name, phone, is_superuser, is_active } = req.body;
     const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -63,10 +65,11 @@ export function userRoutes(db: Database.Database): Router {
     }
 
     db.prepare(
-      'UPDATE users SET username = COALESCE(?, username), display_name = COALESCE(?, display_name), is_superuser = COALESCE(?, is_superuser), is_active = COALESCE(?, is_active) WHERE id = ?',
+      'UPDATE users SET username = COALESCE(?, username), display_name = COALESCE(?, display_name), phone = COALESCE(?, phone), is_superuser = COALESCE(?, is_superuser), is_active = COALESCE(?, is_active) WHERE id = ?',
     ).run(
       username,
       display_name,
+      phone ?? null,
       is_superuser !== undefined ? (is_superuser ? 1 : 0) : null,
       is_active !== undefined ? (is_active ? 1 : 0) : null,
       req.params.id,

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import supertest from 'supertest';
 import Database from 'better-sqlite3';
-import { createTestDb } from './helpers';
+import { createTestDb, createTestApp, loginAsAdmin, loginAsRegularUser } from './helpers';
 import { getSetting, setSetting, getAllSettings } from '../utils/settings';
 import { allocateNextReference, recordReferenceUsed } from '../utils/collection-note-reference';
 
@@ -120,5 +121,246 @@ describe('collection note schema', () => {
 
     const remaining = db.prepare('SELECT COUNT(*) AS n FROM collection_note_items').get() as { n: number };
     expect(remaining.n).toBe(0);
+  });
+});
+
+describe('collection note routes', () => {
+  let db: Database.Database;
+  let app: ReturnType<typeof createTestApp>;
+  let cookie: string;
+  let customerId: number;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    app = createTestApp(db);
+    cookie = await loginAsAdmin(app);
+    const cust = db
+      .prepare('INSERT INTO customers (name, address) VALUES (?, ?)')
+      .run('Acme Recycling Ltd', '1 Test Way');
+    customerId = cust.lastInsertRowid as number;
+  });
+
+  const validNote = () => ({
+    reference: 'SBM1061',
+    customer_id: customerId,
+    collect_from_address: 'Acme Recycling Ltd\n1 Test Way\nTestville TE5 7ST',
+    comments: 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD',
+    contact_name: 'Test User',
+    contact_phone: '07700 900123',
+    po_number: 'N/A',
+    weight: '24t',
+    packing_list_no: 'PL-1',
+    collection_date: '2026-08-03',
+    transport_company: 'Test Haulage',
+    items: [
+      { quantity: '1x', description: 'Poly cup reels', collection_point: 'Bay 3' },
+      { quantity: '2x', description: 'Mixed paper bales', collection_point: 'Yard' },
+    ],
+  });
+
+  it('requires authentication', async () => {
+    await supertest(app).get('/api/collection-notes').expect(401);
+  });
+
+  it('creates and reads back a note with its items', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send(validNote())
+      .expect(200);
+    expect(created.body.id).toBeGreaterThan(0);
+    expect(created.body.reference).toBe('SBM1061');
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.customer_name).toBe('Acme Recycling Ltd');
+    expect(fetched.body.weight).toBe('24t');
+    expect(fetched.body.items).toHaveLength(2);
+    expect(fetched.body.items[0].description).toBe('Poly cup reels');
+    expect(fetched.body.items[1].sort_order).toBe(1);
+  });
+
+  it('records the creating user', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send(validNote())
+      .expect(200);
+    const row = db.prepare('SELECT created_by_id FROM collection_notes WHERE id = ?').get(created.body.id) as {
+      created_by_id: number | null;
+    };
+    expect(row.created_by_id).not.toBeNull();
+  });
+
+  it('rejects a note with no reference', async () => {
+    const res = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: '' })
+      .expect(400);
+    expect(res.body.error).toMatch(/reference/i);
+  });
+
+  it('rejects a note with no customer', async () => {
+    const res = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), customer_id: undefined })
+      .expect(400);
+    expect(res.body.error).toMatch(/customer/i);
+  });
+
+  it('returns 409 on a duplicate reference', async () => {
+    await supertest(app).post('/api/collection-notes').set('Cookie', cookie).send(validNote()).expect(200);
+    const res = await supertest(app).post('/api/collection-notes').set('Cookie', cookie).send(validNote()).expect(409);
+    expect(res.body.error).toMatch(/SBM1061/);
+  });
+
+  it('advances the stored next number after a create', async () => {
+    setSetting(db, 'collection_note_next_number', '1061');
+    await supertest(app).post('/api/collection-notes').set('Cookie', cookie).send(validNote()).expect(200);
+    const res = await supertest(app).get('/api/collection-notes/next-reference').set('Cookie', cookie).expect(200);
+    expect(res.body.reference).toBe('SBM1062');
+  });
+
+  it('replaces items wholesale on update', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send(validNote())
+      .expect(200);
+
+    await supertest(app)
+      .put(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        weight: '26t',
+        items: [{ quantity: '5x', description: 'Shrink wrap', collection_point: 'Bay 1' }],
+      })
+      .expect(200);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.weight).toBe('26t');
+    expect(fetched.body.items).toHaveLength(1);
+    expect(fetched.body.items[0].description).toBe('Shrink wrap');
+  });
+
+  it('returns 409 when an update collides with another reference', async () => {
+    const first = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send(validNote())
+      .expect(200);
+    await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: 'SBM1062' })
+      .expect(200);
+
+    await supertest(app)
+      .put(`/api/collection-notes/${first.body.id}`)
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: 'SBM1062' })
+      .expect(409);
+  });
+
+  it('returns 404 for an unknown note on get, put, and delete', async () => {
+    await supertest(app).get('/api/collection-notes/9999').set('Cookie', cookie).expect(404);
+    await supertest(app).put('/api/collection-notes/9999').set('Cookie', cookie).send(validNote()).expect(404);
+    await supertest(app).delete('/api/collection-notes/9999').set('Cookie', cookie).expect(404);
+  });
+
+  it('deletes a note and its items', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send(validNote())
+      .expect(200);
+    await supertest(app).delete(`/api/collection-notes/${created.body.id}`).set('Cookie', cookie).expect(200);
+    const items = db.prepare('SELECT COUNT(*) AS n FROM collection_note_items').get() as { n: number };
+    expect(items.n).toBe(0);
+  });
+
+  it('lists notes newest collection date first', async () => {
+    await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: 'SBM1', collection_date: '2026-01-01' })
+      .expect(200);
+    await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: 'SBM2', collection_date: '2026-06-01' })
+      .expect(200);
+
+    const res = await supertest(app).get('/api/collection-notes').set('Cookie', cookie).expect(200);
+    expect(res.body.data.map((n: { reference: string }) => n.reference)).toEqual(['SBM2', 'SBM1']);
+    expect(res.body.total).toBe(2);
+    expect(res.body.data[0].customer_name).toBe('Acme Recycling Ltd');
+  });
+
+  it('searches by reference, customer, and item description', async () => {
+    await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        reference: 'SBM77',
+        items: [{ quantity: '1x', description: 'Widget offcuts', collection_point: 'Bay 9' }],
+      })
+      .expect(200);
+
+    for (const term of ['SBM77', 'Acme', 'Widget']) {
+      const res = await supertest(app).get(`/api/collection-notes?search=${term}`).set('Cookie', cookie).expect(200);
+      expect(res.body.data).toHaveLength(1);
+    }
+
+    const noMatch = await supertest(app).get('/api/collection-notes?search=zzzznope').set('Cookie', cookie).expect(200);
+    expect(noMatch.body.data).toHaveLength(0);
+  });
+
+  it('sorts by reference when asked', async () => {
+    await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: 'SBM1' })
+      .expect(200);
+    await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), reference: 'SBM2' })
+      .expect(200);
+    const res = await supertest(app)
+      .get('/api/collection-notes?sort=reference&order=ASC')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(res.body.data.map((n: { reference: string }) => n.reference)).toEqual(['SBM1', 'SBM2']);
+  });
+
+  it('ignores an unrecognised sort column', async () => {
+    await supertest(app).post('/api/collection-notes').set('Cookie', cookie).send(validNote()).expect(200);
+    await supertest(app).get('/api/collection-notes?sort=DROP+TABLE').set('Cookie', cookie).expect(200);
+  });
+
+  it('lets a regular user create and read notes', async () => {
+    const userCookie = await loginAsRegularUser(app, db);
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', userCookie)
+      .send(validNote())
+      .expect(200);
+    await supertest(app).get(`/api/collection-notes/${created.body.id}`).set('Cookie', userCookie).expect(200);
+  });
+
+  it('returns a next reference for a fresh database', async () => {
+    const res = await supertest(app).get('/api/collection-notes/next-reference').set('Cookie', cookie).expect(200);
+    expect(res.body.reference).toBe('SBM1');
+    expect(res.body.prefix).toBe('SBM');
   });
 });

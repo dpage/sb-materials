@@ -10,6 +10,8 @@ import { lookupRoutes } from '../routes/lookups';
 import { reportRoutes } from '../routes/reports';
 import { photoRoutes } from '../routes/photos';
 import { pdfRoutes } from '../routes/pdf';
+import { collectionNoteRoutes } from '../routes/collection-notes';
+import { settingsRoutes } from '../routes/settings';
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -38,6 +40,8 @@ export function createTestApp(db: Database.Database) {
   app.use('/api/reports', reportRoutes(db));
   app.use('/api/photos', photoRoutes(db));
   app.use('/api/pdf', pdfRoutes(db));
+  app.use('/api/collection-notes', collectionNoteRoutes(db));
+  app.use('/api/settings', settingsRoutes(db));
 
   return app;
 }
