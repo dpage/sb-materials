@@ -129,6 +129,34 @@ export function CollectionNotes() {
         .action-btn.delete { color: #e74c3c; }
         .actions-row { display: flex; gap: 6px; }
 
+        /* Mobile cards */
+        .cn-cards { display: none; }
+        .cn-card {
+          background: #fff; border-radius: 10px; padding: 14px 16px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 10px;
+        }
+        .cn-card-top {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          margin-bottom: 8px;
+        }
+        .cn-card-date { font-size: 13px; color: #7f8c8d; font-weight: 500; }
+        .cn-card-customer { font-size: 16px; font-weight: 600; color: #2d3436; margin-bottom: 2px; }
+        .cn-card-reference { font-size: 13px; color: #636e72; margin-bottom: 6px; }
+        .cn-card-meta {
+          display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+          margin-bottom: 10px; font-size: 13px; color: #636e72;
+        }
+        .cn-card-actions {
+          display: flex; gap: 8px; border-top: 1px solid #f0f0f0; padding-top: 10px;
+        }
+        .cn-card-action-btn {
+          flex: 1; padding: 8px 0; border: 1px solid #dde1e6; border-radius: 6px;
+          background: #fff; cursor: pointer; font-size: 13px; font-weight: 500;
+          color: #2980b9; text-align: center; text-decoration: none;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .cn-card-action-btn.delete { color: #e74c3c; }
+
         .pagination {
           display: flex; justify-content: center; padding: 14px; gap: 8px;
         }
@@ -143,8 +171,10 @@ export function CollectionNotes() {
           padding: 40px 20px; text-align: center; color: #999; font-size: 15px;
         }
 
+        /* Responsive: cards on mobile, table on desktop */
         @media (max-width: 768px) {
-          .cn-table-wrap { overflow-x: auto; }
+          .cn-table-wrap { display: none; }
+          .cn-cards { display: block; }
         }
       `}</style>
 
@@ -196,6 +226,7 @@ export function CollectionNotes() {
         </div>
       ) : (
         <>
+          {/* Desktop: Table */}
           <div className="cn-table-wrap">
             <table className="cn-table">
               <thead>
@@ -242,6 +273,51 @@ export function CollectionNotes() {
                 ))}
               </tbody>
             </table>
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button className="page-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  Prev
+                </button>
+                <span className="page-info">
+                  Page {page} of {totalPages}
+                </span>
+                <button className="page-btn" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile: Cards */}
+          <div className="cn-cards">
+            {notes.map((n) => (
+              <div className="cn-card" key={n.id}>
+                <div className="cn-card-top">
+                  <div>
+                    <div className="cn-card-customer">{n.customer_name}</div>
+                    <div className="cn-card-reference">{n.reference}</div>
+                  </div>
+                  <div className="cn-card-date">{formatUkDate(n.collection_date)}</div>
+                </div>
+                <div className="cn-card-meta">
+                  <span>{n.items_summary}</span>
+                </div>
+                <div className="cn-card-meta">
+                  <span>{n.transport_company}</span>
+                </div>
+                <div className="cn-card-actions">
+                  <button className="cn-card-action-btn" onClick={() => navigate(`/collection-notes/${n.id}`)}>
+                    Edit
+                  </button>
+                  <a className="cn-card-action-btn" href={api.downloadCollectionNotePdf(n.id)}>
+                    PDF
+                  </a>
+                  <button className="cn-card-action-btn delete" onClick={() => setDeleteId(n.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
             {totalPages > 1 && (
               <div className="pagination">
                 <button className="page-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { CollectionNotes } from '../pages/CollectionNotes';
@@ -52,9 +52,9 @@ describe('CollectionNotes list', () => {
 
   it('lists notes with reference, customer, and date', async () => {
     render(<CollectionNotes />, { wrapper: TestWrapper });
-    await waitFor(() => expect(screen.getByText('SBM1061')).toBeInTheDocument());
-    expect(screen.getByText('Acme Recycling Ltd')).toBeInTheDocument();
-    expect(screen.getByText('03/08/2026')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('SBM1061').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Acme Recycling Ltd').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('03/08/2026').length).toBeGreaterThan(0);
   });
 
   it('shows an empty state when there are no notes', async () => {
@@ -74,15 +74,59 @@ describe('CollectionNotes list', () => {
 
   it('asks for confirmation before deleting', async () => {
     render(<CollectionNotes />, { wrapper: TestWrapper });
-    await waitFor(() => expect(screen.getByText('SBM1061')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await waitFor(() => expect(screen.getAllByText('SBM1061').length).toBeGreaterThan(0));
+    const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+    fireEvent.click(deleteButtons[0]);
     expect(await screen.findByText(/are you sure/i)).toBeInTheDocument();
     expect(api.deleteCollectionNote).not.toHaveBeenCalled();
   });
 
   it('offers a PDF link for each note', async () => {
     render(<CollectionNotes />, { wrapper: TestWrapper });
-    await waitFor(() => expect(screen.getByText('SBM1061')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: /pdf/i })).toHaveAttribute('href', '/api/pdf/collection-note/1');
+    await waitFor(() => expect(screen.getAllByText('SBM1061').length).toBeGreaterThan(0));
+    const pdfLinks = screen.getAllByRole('link', { name: /pdf/i });
+    expect(pdfLinks.length).toBeGreaterThan(0);
+    pdfLinks.forEach((link) => expect(link).toHaveAttribute('href', '/api/pdf/collection-note/1'));
+  });
+
+  it('sorts by a column heading and reverses order on repeat click', async () => {
+    render(<CollectionNotes />, { wrapper: TestWrapper });
+    await waitFor(() => expect(api.getCollectionNotes).toHaveBeenCalled());
+
+    fireEvent.click(within(screen.getByRole('table')).getByText(/^Reference/));
+    await waitFor(() =>
+      expect(api.getCollectionNotes).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'reference', order: 'DESC' }),
+      ),
+    );
+
+    fireEvent.click(within(screen.getByRole('table')).getByText(/^Reference/));
+    await waitFor(() =>
+      expect(api.getCollectionNotes).toHaveBeenCalledWith(expect.objectContaining({ sort: 'reference', order: 'ASC' })),
+    );
+  });
+
+  it('sorts by customer when the Customer heading is clicked', async () => {
+    render(<CollectionNotes />, { wrapper: TestWrapper });
+    await waitFor(() => expect(api.getCollectionNotes).toHaveBeenCalled());
+
+    fireEvent.click(within(screen.getByRole('table')).getByText(/^Customer/));
+    await waitFor(() =>
+      expect(api.getCollectionNotes).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'customer_name', order: 'DESC' }),
+      ),
+    );
+  });
+
+  it('passes customer_id when a customer is chosen from the filter dropdown', async () => {
+    vi.mocked(api.getCustomers).mockResolvedValue([{ id: 7, name: 'Acme Recycling Ltd' } as never]);
+    render(<CollectionNotes />, { wrapper: TestWrapper });
+    await waitFor(() => expect(api.getCollectionNotes).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getAllByText('Acme Recycling Ltd').length).toBeGreaterThan(0));
+
+    fireEvent.change(screen.getByDisplayValue('All customers'), { target: { value: '7' } });
+    await waitFor(() =>
+      expect(api.getCollectionNotes).toHaveBeenCalledWith(expect.objectContaining({ customer_id: '7' })),
+    );
   });
 });
