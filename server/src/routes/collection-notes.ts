@@ -255,7 +255,7 @@ export function collectionNoteRoutes(db: Database.Database): Router {
   });
 
   router.post('/:id/signature/:kind', upload.single('signature'), (req, res) => {
-    const noteId = parseInt(req.params.id, 10);
+    const noteId = parseInt(req.params.id as string, 10);
     const kind = req.params.kind as SignatureKind;
 
     if (!SIGNATURE_KINDS.includes(kind)) {

@@ -8,7 +8,7 @@ export function Users() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ username: '', password: '', display_name: '', is_superuser: false });
+  const [form, setForm] = useState({ username: '', password: '', display_name: '', phone: '', is_superuser: false });
   const [formError, setFormError] = useState('');
 
   const load = () => api.getUsers().then(setUsers);
@@ -25,7 +25,12 @@ export function Users() {
     }
     setFormError('');
     if (editId) {
-      const data: any = { username: form.username, display_name: form.display_name, is_superuser: form.is_superuser };
+      const data: any = {
+        username: form.username,
+        display_name: form.display_name,
+        phone: form.phone,
+        is_superuser: form.is_superuser,
+      };
       if (form.password) data.password = form.password;
       await api.updateUser(editId, data);
     } else {
@@ -33,7 +38,7 @@ export function Users() {
     }
     setShowForm(false);
     setEditId(null);
-    setForm({ username: '', password: '', display_name: '', is_superuser: false });
+    setForm({ username: '', password: '', display_name: '', phone: '', is_superuser: false });
     load();
   };
 
@@ -44,7 +49,13 @@ export function Users() {
 
   const startEdit = (u: UserRecord) => {
     setEditId(u.id);
-    setForm({ username: u.username, password: '', display_name: u.display_name, is_superuser: !!u.is_superuser });
+    setForm({
+      username: u.username,
+      password: '',
+      display_name: u.display_name,
+      phone: u.phone || '',
+      is_superuser: !!u.is_superuser,
+    });
     setShowForm(true);
   };
 
@@ -159,7 +170,7 @@ export function Users() {
           onClick={() => {
             setShowForm(true);
             setEditId(null);
-            setForm({ username: '', password: '', display_name: '', is_superuser: false });
+            setForm({ username: '', password: '', display_name: '', phone: '', is_superuser: false });
           }}
         >
           + New User
@@ -199,6 +210,15 @@ export function Users() {
                 type="text"
                 value={form.display_name}
                 onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="user-phone">Phone</label>
+              <input
+                id="user-phone"
+                type="text"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               />
             </div>
             <div className="form-field">

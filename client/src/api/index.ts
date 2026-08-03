@@ -22,6 +22,7 @@ interface CreateUserData {
   username: string;
   password: string;
   display_name: string;
+  phone?: string;
   is_superuser?: boolean;
 }
 
@@ -29,6 +30,7 @@ interface UpdateUserData {
   username?: string;
   password?: string;
   display_name?: string;
+  phone?: string;
   is_superuser?: boolean;
   is_active?: number;
 }
