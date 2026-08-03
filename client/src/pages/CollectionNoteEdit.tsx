@@ -33,6 +33,14 @@ export function CollectionNoteEdit() {
   const { user } = useAuth();
   const isEdit = !!id;
 
+  // Once a save has created the note, its id is remembered here so that a
+  // retry (e.g. after a failed signature upload) updates the note that now
+  // exists rather than attempting to create it again, which would trip the
+  // server's unique-reference check and strand the user on the form.
+  const [createdNoteId, setCreatedNoteId] = useState<number | null>(null);
+  const effectiveId = id ? parseInt(id) : createdNoteId;
+  const noteExists = isEdit || createdNoteId !== null;
+
   const [reference, setReference] = useState('');
   const [customerId, setCustomerId] = useState<number | ''>('');
   const [siteId, setSiteId] = useState<number | ''>('');
@@ -151,6 +159,7 @@ export function CollectionNoteEdit() {
     }
     if (hasError) return;
 
+    if (saving) return;
     setSaving(true);
     try {
       const data = {
@@ -176,12 +185,13 @@ export function CollectionNoteEdit() {
       };
 
       let noteId: number;
-      if (isEdit) {
-        await api.updateCollectionNote(parseInt(id!), data);
-        noteId = parseInt(id!);
+      if (noteExists) {
+        noteId = effectiveId!;
+        await api.updateCollectionNote(noteId, data);
       } else {
         const result = await api.createCollectionNote(data);
         noteId = result.id;
+        setCreatedNoteId(noteId);
       }
 
       if (dispatchedSigRef.current && !dispatchedSigRef.current.isEmpty()) {

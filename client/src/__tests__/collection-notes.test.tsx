@@ -540,7 +540,7 @@ describe('CollectionNoteEdit form', () => {
     expect(api.uploadCollectionNoteSignature).not.toHaveBeenCalled();
   });
 
-  it('still saves the note and tells the user when a signature upload fails', async () => {
+  it('still saves the note and keeps the user on the form when a signature upload fails', async () => {
     signatureCanvasState.isEmpty = [false, true];
     vi.mocked(api.uploadCollectionNoteSignature).mockRejectedValue(new Error('Signature upload failed'));
 
@@ -549,7 +549,26 @@ describe('CollectionNoteEdit form', () => {
     fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
-    expect(await screen.findByText(/signature upload failed/i)).toBeInTheDocument();
+    await waitFor(() => expect(api.createCollectionNote).toHaveBeenCalledTimes(1));
+    expect(api.uploadCollectionNoteSignature).toHaveBeenCalledTimes(1);
+
+    // The user is told something went wrong, and crucially they are not
+    // navigated away: the form (and its Save button) is still on screen,
+    // which is what actually matters to someone stuck in a yard.
+    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/reference/i)).toHaveValue('SBM1061');
+
+    // Retrying must update the note the create already produced, not create
+    // it again (which would trip the server's unique-reference check), and
+    // must re-attempt the signature upload against that same id.
+    vi.mocked(api.uploadCollectionNoteSignature).mockResolvedValue({} as never);
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(api.updateCollectionNote).toHaveBeenCalledWith(7, expect.anything()));
     expect(api.createCollectionNote).toHaveBeenCalledTimes(1);
+    expect(api.uploadCollectionNoteSignature).toHaveBeenLastCalledWith(7, 'dispatched', expect.anything());
+
+    // The retry succeeded, so the earlier error is no longer shown.
+    await waitFor(() => expect(screen.queryByText(/signature upload failed/i)).not.toBeInTheDocument());
   });
 });
