@@ -29,12 +29,13 @@ export function collectionNoteRoutes(db: Database.Database): Router {
 
   const storage = multer.diskStorage({
     destination: (req: any, _file, cb) => {
-      // The signature URL is /:id/signature/:kind, so the id sits before the
-      // word "signature" rather than after it, unlike the report photo route.
-      const match =
-        req.originalUrl?.match(/collection-notes\/(\d+)\/signature/) || req.url?.match(/\/(\d+)\/signature/);
-      const noteId = match ? match[1] : 'misc';
-      const dir = path.join(config.uploadsDir, SIGNATURE_SUBDIR, noteId);
+      // By the time multer runs, Express has already matched the route and
+      // populated req.params against the /:id/signature/:kind pattern, and
+      // the validation middleware below has confirmed :id is a plain
+      // integer, so this always agrees with what the handler later derives
+      // for the stored path - no separate URL-regex parsing to fall out of
+      // step with it.
+      const dir = path.join(config.uploadsDir, SIGNATURE_SUBDIR, req.params.id);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
@@ -254,24 +255,38 @@ export function collectionNoteRoutes(db: Database.Database): Router {
     res.json({ ok: true });
   });
 
-  router.post('/:id/signature/:kind', upload.single('signature'), (req, res) => {
-    const noteId = parseInt(req.params.id as string, 10);
+  // Validate :id and :kind, and confirm the note exists, before the upload
+  // middleware runs, so a malformed or bogus URL is rejected without ever
+  // writing a file to disk (rather than writing it under a "misc" fallback
+  // directory and then rejecting).
+  function validateSignatureTarget(req: any, res: any, next: any): void {
     const kind = req.params.kind as SignatureKind;
-
     if (!SIGNATURE_KINDS.includes(kind)) {
       res.status(400).json({ error: 'Signature kind must be dispatched or received' });
       return;
     }
-    if (!db.prepare('SELECT id FROM collection_notes WHERE id = ?').get(noteId)) {
+    if (
+      !/^\d+$/.test(req.params.id) ||
+      !db.prepare('SELECT id FROM collection_notes WHERE id = ?').get(req.params.id)
+    ) {
       res.status(404).json({ error: 'Collection note not found' });
       return;
     }
+    next();
+  }
+
+  router.post('/:id/signature/:kind', validateSignatureTarget, upload.single('signature'), (req, res) => {
+    const noteId = parseInt(req.params.id as string, 10);
+    const kind = req.params.kind as SignatureKind;
+
     if (!req.file) {
       res.status(400).json({ error: 'No file uploaded' });
       return;
     }
 
-    const relPath = `${SIGNATURE_SUBDIR}/${noteId}/${req.file.filename}`;
+    // Derived from where the file actually landed, rather than reconstructed
+    // from the id and kind, so it can never disagree with reality.
+    const relPath = path.relative(config.uploadsDir, req.file.path);
     const column = kind === 'dispatched' ? 'dispatched_signature_path' : 'received_signature_path';
     db.prepare(`UPDATE collection_notes SET ${column} = ?, updated_at = datetime('now') WHERE id = ?`).run(
       relPath,
@@ -283,13 +298,23 @@ export function collectionNoteRoutes(db: Database.Database): Router {
   return router;
 }
 
+function isBlankItem(item: any): boolean {
+  const blank = (v: unknown) => v === null || v === undefined || String(v).trim() === '';
+  return blank(item?.quantity) && blank(item?.description) && blank(item?.collection_point);
+}
+
 function insertItems(db: Database.Database, noteId: number, items: any): void {
   if (!Array.isArray(items) || !items.length) return;
   const stmt = db.prepare(
     'INSERT INTO collection_note_items (note_id, quantity, description, collection_point, sort_order) VALUES (?, ?, ?, ?, ?)',
   );
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i] ?? {};
-    stmt.run(noteId, item.quantity ?? null, item.description ?? null, item.collection_point ?? null, i);
+  // The form always starts with (and can be left with) one blank line item,
+  // so skip rows where quantity, description, and collection point are all
+  // empty rather than storing and later printing an empty PDF table row.
+  let sortOrder = 0;
+  for (const item of items) {
+    if (isBlankItem(item)) continue;
+    stmt.run(noteId, item?.quantity ?? null, item?.description ?? null, item?.collection_point ?? null, sortOrder);
+    sortOrder += 1;
   }
 }
