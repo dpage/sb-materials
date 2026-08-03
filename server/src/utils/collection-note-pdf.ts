@@ -16,7 +16,12 @@ export const DEFAULT_COMMENTS = 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD';
 export const TRANSPORT_COMPANY_LABEL = 'Transport Company';
 export const GOODS_DISPATCHED_LABEL = 'Goods Dispatched';
 export const GOODS_RECEIVED_LABEL = 'Goods Received';
-export const SIGNED_RULE = 'Signed…………………………………………………………………………………………………';
+// Shortened from the original Word document's dot leader (which ran the full
+// width of a standalone signature table) so that "Signed" plus the leader fit
+// inside the QUANTITY+DESCRIPTION columns it now shares with the line-item
+// table, at the document's 10pt default font, without forcing those columns
+// wider than the page margin allows.
+export const SIGNED_RULE = 'Signed……………………………………………';
 export const DATE_LABEL = 'Date;';
 export const WASTE_BROKER_LINE = 'NRW Waste brokers registration CBDU027716';
 export const COMPANY_FOOTER_LINE =
@@ -64,8 +69,13 @@ export function collectionNotePdfFilename(note: CollectionNoteRecord): string {
 
 function signatureImage(uploadsDir: string, relPath: string | null): string | null {
   if (!relPath) return null;
-  const filePath = path.resolve(uploadsDir, relPath);
-  if (!filePath.startsWith(path.resolve(uploadsDir))) return null;
+  const resolvedUploadsDir = path.resolve(uploadsDir);
+  const filePath = path.resolve(resolvedUploadsDir, relPath);
+  // path.resolve alone would also match a sibling directory such as
+  // "uploads-evil" because startsWith() has no notion of a path separator, so
+  // require the resolved path to fall strictly inside uploadsDir (or equal it).
+  const relative = path.relative(resolvedUploadsDir, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
   if (!fs.existsSync(filePath)) return null;
   try {
     const data = fs.readFileSync(filePath);
@@ -79,9 +89,13 @@ function signatureImage(uploadsDir: string, relPath: string | null): string | nu
 
 /**
  * One of the two signature boxes: the captured signature when there is one, and
- * the original's ruled line when there is not.
+ * the original's dotted rule when there is not. Returned as a `TableCell` (not
+ * bare `Content`) with `colSpan: 2` so callers can drop it straight into the
+ * QUANTITY+DESCRIPTION columns of the shared line-item table; pdfmake requires
+ * a matching empty placeholder cell (`{}`) immediately after a colSpan cell in
+ * the same row.
  */
-function signatureCell(label: string, image: string | null): Content {
+function signatureCell(label: string, image: string | null): TableCell {
   const stack: Content[] = [{ text: label, margin: [0, 2, 0, 8] as [number, number, number, number] }];
   if (image) {
     stack.push({ image, width: 180, margin: [0, 0, 0, 4] as [number, number, number, number] } as Content);
@@ -89,7 +103,7 @@ function signatureCell(label: string, image: string | null): Content {
   } else {
     stack.push({ text: SIGNED_RULE, margin: [0, 0, 0, 4] as [number, number, number, number] });
   }
-  return { stack };
+  return { stack, colSpan: 2 };
 }
 
 function dateCell(value: string | null): Content {
@@ -162,20 +176,20 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
     { text: '' },
   ]);
 
-  content.push({
-    table: { widths: [80, '*', 130], headerRows: 1, body: itemBody },
-  });
-
+  // The Goods Dispatched / Goods Received rows are appended to this same
+  // table, rather than emitted as a second table, so the whole document is
+  // one continuous grid with a single right-hand edge: the signature cell
+  // spans the QUANTITY and DESCRIPTION columns (colSpan requires an empty
+  // placeholder cell straight after it), and the date falls in the third
+  // column, which already matches the standalone signature table's own
+  // right-hand width of 130.
   const dispatched = signatureImage(uploadsDir, note.dispatched_signature_path);
   const received = signatureImage(uploadsDir, note.received_signature_path);
+  itemBody.push([signatureCell(GOODS_DISPATCHED_LABEL, dispatched), {}, dateCell(note.dispatched_signed_date)]);
+  itemBody.push([signatureCell(GOODS_RECEIVED_LABEL, received), {}, dateCell(note.received_signed_date)]);
+
   content.push({
-    table: {
-      widths: ['*', 130],
-      body: [
-        [signatureCell(GOODS_DISPATCHED_LABEL, dispatched), dateCell(note.dispatched_signed_date)],
-        [signatureCell(GOODS_RECEIVED_LABEL, received), dateCell(note.received_signed_date)],
-      ],
-    },
+    table: { widths: [80, '*', 130], headerRows: 1, body: itemBody },
     margin: [0, 0, 0, 30] as [number, number, number, number],
   });
 

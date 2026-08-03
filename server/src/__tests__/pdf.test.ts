@@ -607,15 +607,36 @@ describe('collection note PDF', () => {
     await request(app).get('/api/pdf/collection-note/9999').set('Cookie', cookie).expect(404);
   });
 
+  it('maps every item row for the pure helper', () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const rows = collectionNoteItemRows(note);
+    expect(rows).toHaveLength(3);
+    expect(rows[2][1]).toBe('Shrink wrap');
+  });
+
   it('renders every line item', async () => {
     const note = loadCollectionNote(db, noteId)!;
     const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
     expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
-    // pdfmake lays text out as compressed glyph runs, so assert on the document
-    // model rather than on the byte stream.
-    const rows = collectionNoteItemRows(note);
-    expect(rows).toHaveLength(3);
-    expect(rows[2][1]).toBe('Shrink wrap');
+    // Assert on the text actually reaching the rendered page, not just on the
+    // pure helper: a regression that stops item rows from being pushed into
+    // the table body must fail this test.
+    const text = extractPdfText(buffer);
+    expect(text).toContain('Poly cup reels');
+    expect(text).toContain('Mixed paper bales');
+    expect(text).toContain('Shrink wrap');
+  });
+
+  it('renders the heading, reference, and footer lines', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
+    const text = extractPdfText(buffer);
+    expect(text).toContain('COLLECTION NOTE');
+    expect(text).toContain('SBM1061');
+    expect(text).toContain('NRW Waste brokers registration CBDU027716');
+    expect(text).toContain(
+      'SB Materials UK LTD 1 Deva Way, Wrexham, Wales LL13 9EU Registered in Wales & England No. 10896256',
+    );
   });
 
   it('still generates when the note has no items and no signatures', async () => {
