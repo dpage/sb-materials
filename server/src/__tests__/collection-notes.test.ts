@@ -108,6 +108,16 @@ describe('collection note schema', () => {
     expect(() => insert.run('SBM1', cust.lastInsertRowid)).toThrow(/UNIQUE/i);
   });
 
+  it('rejects a duplicate reference that differs only in case', () => {
+    // parseReferenceNumber treats "SBM1061" and "sbm1061" as the same
+    // reference, so the uniqueness constraint must agree, or a customer
+    // reading the two ends up with what looks like one duplicated note.
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Test Customer');
+    const insert = db.prepare('INSERT INTO collection_notes (reference, customer_id) VALUES (?, ?)');
+    insert.run('SBM1061', cust.lastInsertRowid);
+    expect(() => insert.run('sbm1061', cust.lastInsertRowid)).toThrow(/UNIQUE/i);
+  });
+
   it('cascades item deletion when the note is deleted', () => {
     const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Test Customer');
     const note = db
@@ -249,6 +259,46 @@ describe('collection note routes', () => {
     expect(fetched.body.weight).toBe('26t');
     expect(fetched.body.items).toHaveLength(1);
     expect(fetched.body.items[0].description).toBe('Shrink wrap');
+  });
+
+  it('drops all-blank line items rather than storing an empty row', async () => {
+    // The form always starts with (and can be left with) one blank line
+    // item, and always sends the items array, so the server must be the one
+    // to filter it out - otherwise an all-NULL row is stored and rendered
+    // as an empty row in the PDF table.
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        items: [
+          { quantity: '1x', description: 'Poly cup reels', collection_point: 'Bay 3' },
+          { quantity: '', description: '', collection_point: '' },
+          { quantity: null, description: null, collection_point: null },
+        ],
+      })
+      .expect(200);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.items).toHaveLength(1);
+    expect(fetched.body.items[0].description).toBe('Poly cup reels');
+  });
+
+  it('stores nothing at all for a note whose only item is blank', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), items: [{ quantity: '', description: '', collection_point: '' }] })
+      .expect(200);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.items).toHaveLength(0);
   });
 
   it('returns 409 when an update collides with another reference', async () => {
