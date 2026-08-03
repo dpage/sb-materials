@@ -667,6 +667,16 @@ describe('collection note PDF', () => {
     );
   });
 
+  it('sanitises the reference in the filename', () => {
+    // The reference is hand-typed, so a stray quote or slash must not break
+    // the quoted Content-Disposition header the filename is interpolated
+    // into.
+    const note = loadCollectionNote(db, noteId)!;
+    expect(collectionNotePdfFilename({ ...note, reference: 'SBM/1061"' })).toBe(
+      'SBM-1061-2026-08-03-Acme-Recycling-Ltd.pdf',
+    );
+  });
+
   it('falls back to the created date when there is no collection date', () => {
     const note = loadCollectionNote(db, noteId)!;
     expect(collectionNotePdfFilename({ ...note, collection_date: null })).toMatch(

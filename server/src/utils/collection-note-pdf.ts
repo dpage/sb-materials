@@ -66,8 +66,14 @@ export function collectionNoteItemRows(note: CollectionNoteRecord): string[][] {
  */
 export function collectionNotePdfFilename(note: CollectionNoteRecord): string {
   const date = (note.collection_date || note.created_at || '').slice(0, 10);
-  const customer = (note.customer_name || 'customer').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return `${note.reference}-${date}-${customer}.pdf`;
+  const sanitise = (value: string) => value.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const customer = sanitise(note.customer_name || 'customer');
+  // The reference is hand-typed by an inspector, so it must be sanitised the
+  // same way the customer name already is: it is interpolated raw into a
+  // quoted Content-Disposition header, and a stray quote or slash would
+  // otherwise break the filename (or the header).
+  const reference = sanitise(note.reference || 'note');
+  return `${reference}-${date}-${customer}.pdf`;
 }
 
 function signatureImage(uploadsDir: string, relPath: string | null): string | null {
