@@ -16,12 +16,15 @@ export const DEFAULT_COMMENTS = 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD';
 export const TRANSPORT_COMPANY_LABEL = 'Transport Company';
 export const GOODS_DISPATCHED_LABEL = 'Goods Dispatched';
 export const GOODS_RECEIVED_LABEL = 'Goods Received';
-// Shortened from the original Word document's dot leader (which ran the full
-// width of a standalone signature table) so that "Signed" plus the leader fit
-// inside the QUANTITY+DESCRIPTION columns it now shares with the line-item
-// table, at the document's 10pt default font, without forcing those columns
-// wider than the page margin allows.
-export const SIGNED_RULE = 'Signed……………………………………………';
+// The dot leader runs most of the width of its cell, as it does on the original
+// Word document, so that there is physical room to sign across it. It cannot run
+// the whole width: the leader is a single unbreakable run, so pdfmake sizes the
+// column to fit it, and an over-long leader pushes the shared QUANTITY +
+// DESCRIPTION columns past the page margin. At the document's 10pt default font
+// there is 375.28pt available, "Signed" takes 31.13pt, and each leader glyph
+// takes 10pt, so 34 glyphs is the ceiling; 30 leaves a comfortable margin for
+// cell padding and font-metric rounding.
+export const SIGNED_RULE = `Signed${'…'.repeat(30)}`;
 export const DATE_LABEL = 'Date;';
 export const WASTE_BROKER_LINE = 'NRW Waste brokers registration CBDU027716';
 export const COMPANY_FOOTER_LINE =
