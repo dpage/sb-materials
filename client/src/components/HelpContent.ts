@@ -97,6 +97,58 @@ export const helpTopics: Record<string, HelpTopic> = {
     ],
   },
 
+  'collection-notes': {
+    heading: 'Collection Notes',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Collection Notes page lists all collection notes in reverse date order, showing the reference, date, customer, item summary, and transport company at a glance. Every note carries a unique SBM reference (e.g. SBM1061), replacing the Word documents the office used to fill in by hand.',
+      },
+      {
+        title: 'Creating a Collection Note',
+        body: 'Click the "+ New Collection Note" button to raise a new note for material being picked up. You will be taken to the collection note form.',
+      },
+      {
+        title: 'Searching and Filtering',
+        body: 'Use the search box to find notes by reference, customer, or item description. Use the customer dropdown to narrow the list to a single customer.',
+      },
+      {
+        title: 'Sorting',
+        body: 'Click the Reference, Date, or Customer column heading to sort by that column; click again to reverse the order. Notes are sorted by collection date (newest first) by default.',
+      },
+      {
+        title: 'Note Actions',
+        body: 'Each note row has actions:\n\n- Edit — Open the note for editing\n- PDF — Download the note as a formatted PDF, named for its reference, date, and customer\n- Delete — Permanently remove the note (you will be asked to confirm)',
+      },
+    ],
+  },
+
+  'collection-note-edit': {
+    heading: 'Collection Note Form',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The collection note form is used to create and edit a collection note for material being picked up from a customer.',
+      },
+      {
+        title: 'Reference',
+        body: 'The SBM reference is filled in automatically when you start a new note, but you may overtype it if you need a specific reference.',
+      },
+      {
+        title: 'Customer & Collection Address',
+        body: "Choosing a customer fills in the collect-from address automatically. That address is then kept with the note, so it stays correct even if the customer's address changes later.",
+      },
+      {
+        title: 'Items',
+        body: 'List the items being collected, each with a quantity, description, and collection point. These appear on the PDF and in the item summary shown on the list page.',
+      },
+      {
+        title: 'Signatures',
+        body: 'Signatures for dispatch and receipt may be captured on screen using the signature pad, or left blank if the note is to be signed on paper instead.',
+      },
+    ],
+  },
+
   customers: {
     heading: 'Customers',
     sections: [

@@ -11,6 +11,7 @@ import { ReportEdit } from './pages/ReportEdit';
 import { Customers } from './pages/Customers';
 import { Users } from './pages/Users';
 import { Lookups } from './pages/Lookups';
+import { CollectionNotes } from './pages/CollectionNotes';
 
 interface AuthContextType {
   user: User | null;
@@ -78,6 +79,7 @@ export function App() {
               <Route index element={<Reports />} />
               <Route path="reports/new" element={<ReportEdit />} />
               <Route path="reports/:id" element={<ReportEdit />} />
+              <Route path="collection-notes" element={<CollectionNotes />} />
               <Route path="customers" element={<Customers />} />
               <Route path="users" element={<Users />} />
               <Route path="lookups" element={<Lookups />} />

@@ -11,6 +11,9 @@ import type {
   Contaminant,
   Container,
   PernDetails,
+  CollectionNote,
+  CollectionNoteData,
+  AppSettings,
 } from '../types';
 
 const BASE = '/api';
@@ -189,4 +192,34 @@ export const api = {
   getPhotoUrl: (filename: string) => `${BASE}/photos/file/${filename}`,
 
   downloadPdf: (reportId: number) => `${BASE}/pdf/${reportId}`,
+
+  // Collection notes
+  getCollectionNotes: (params: Record<string, string>) => {
+    const qs = new URLSearchParams(params);
+    return request<{ data: CollectionNote[]; total: number; page: number; limit: number }>(`/collection-notes?${qs}`);
+  },
+  getCollectionNote: (id: number) => request<CollectionNote>(`/collection-notes/${id}`),
+  getNextCollectionNoteReference: () =>
+    request<{ reference: string; prefix: string }>('/collection-notes/next-reference'),
+  createCollectionNote: (data: CollectionNoteData) =>
+    request<{ id: number; reference: string }>('/collection-notes', { method: 'POST', body: JSON.stringify(data) }),
+  updateCollectionNote: (id: number, data: CollectionNoteData) =>
+    request<{ ok: boolean }>(`/collection-notes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCollectionNote: (id: number) => request(`/collection-notes/${id}`, { method: 'DELETE' }),
+  uploadCollectionNoteSignature: async (noteId: number, kind: 'dispatched' | 'received', blob: Blob) => {
+    const formData = new FormData();
+    formData.append('signature', blob, 'signature.png');
+    const res = await fetch(`${BASE}/collection-notes/${noteId}/signature/${kind}`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Signature upload failed');
+    return res.json();
+  },
+  downloadCollectionNotePdf: (id: number) => `${BASE}/pdf/collection-note/${id}`,
+
+  // Settings
+  getSettings: () => request<AppSettings>('/settings'),
+  updateSettings: (data: AppSettings) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
 };
