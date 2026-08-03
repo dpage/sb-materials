@@ -3,9 +3,17 @@ import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
 
 export function seedData(db: Database.Database): void {
-  // Only seed if no users exist
+  // The lookup/user seeding below only ever runs once, on a fresh database,
+  // but ensureSettingDefaults() must run every time this function is
+  // called regardless (it is insert-only, so re-running it is harmless):
+  // it is what actually guarantees the collection note settings exist after
+  // seedData(), rather than that guarantee coming solely from whatever else
+  // happens to call ensureReferenceData() afterwards.
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-  if (userCount.count > 0) return;
+  if (userCount.count > 0) {
+    ensureSettingDefaults(db);
+    return;
+  }
 
   logger.info('Seeding default data...');
 
