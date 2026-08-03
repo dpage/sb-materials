@@ -217,13 +217,9 @@ export function CollectionNotes() {
       </div>
 
       {loading ? (
-        <div className="cn-table-wrap">
-          <div className="empty-state">Loading...</div>
-        </div>
+        <div className="empty-state">Loading...</div>
       ) : notes.length === 0 ? (
-        <div className="cn-table-wrap">
-          <div className="empty-state">No collection notes yet.</div>
-        </div>
+        <div className="empty-state">No collection notes yet.</div>
       ) : (
         <>
           {/* Desktop: Table */}

@@ -257,9 +257,11 @@ describe('Reports Page', () => {
       </TestWrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/No reports found/)).toBeInTheDocument();
-    });
+    const empty = await waitFor(() => screen.getByText(/No reports found/));
+    expect(empty).toBeInTheDocument();
+    // .report-table-wrap is display:none below 768px, so the empty state
+    // (equally reachable on a phone) must not be nested inside it.
+    expect(empty.closest('.report-table-wrap')).toBeNull();
   });
 
   it('should show delete confirmation dialog', async () => {

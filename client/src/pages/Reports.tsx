@@ -349,13 +349,9 @@ export function Reports() {
       )}
 
       {loading ? (
-        <div className="report-table-wrap">
-          <div className="empty-state">Loading...</div>
-        </div>
+        <div className="empty-state">Loading...</div>
       ) : reports.length === 0 ? (
-        <div className="report-table-wrap">
-          <div className="empty-state">No reports found. Click "+ New Report" to create one.</div>
-        </div>
+        <div className="empty-state">No reports found. Click "+ New Report" to create one.</div>
       ) : (
         <>
           {/* Desktop: Table */}
