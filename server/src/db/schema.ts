@@ -289,9 +289,6 @@ export function createSchema(db: Database.Database): void {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_collection_notes_reference
-      ON collection_notes(reference);
-
     CREATE TABLE IF NOT EXISTS collection_note_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       note_id INTEGER NOT NULL REFERENCES collection_notes(id) ON DELETE CASCADE,
@@ -310,6 +307,52 @@ export function createSchema(db: Database.Database): void {
   `);
 
   addColumns('users', [{ name: 'phone', type: 'TEXT' }]);
+
+  ensureCaseInsensitiveReferenceIndex(db);
+}
+
+/**
+ * Reference parsing (parseReferenceNumber) matches "SBM1061" and "sbm1061"
+ * as the same reference, so the uniqueness constraint must agree, otherwise
+ * a customer can end up with two notes bearing what reads as one reference.
+ *
+ * `CREATE UNIQUE INDEX IF NOT EXISTS` will not redefine an index that
+ * already exists on a developer or production database from before this
+ * change, so the upgrade is done explicitly: drop the plain-collation index
+ * and recreate it with `COLLATE NOCASE`, inside a transaction so a database
+ * that already has case-differing duplicate references (which would violate
+ * the new constraint) fails loudly and rolls back to the original index,
+ * rather than being left with no unique index at all or with the duplicates
+ * silently kept. Resolving such duplicates is a manual, human decision
+ * (which one is "correct"), so this deliberately does not try to merge or
+ * delete rows itself.
+ *
+ * Safe and cheap to call on every startup: once the index already carries
+ * COLLATE NOCASE, this is a single read of sqlite_master and nothing else.
+ */
+function ensureCaseInsensitiveReferenceIndex(db: Database.Database): void {
+  const existing = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_collection_notes_reference'")
+    .get() as { sql: string | null } | undefined;
+
+  if (existing && existing.sql && /COLLATE NOCASE/i.test(existing.sql)) return;
+
+  const migrate = db.transaction(() => {
+    db.exec('DROP INDEX IF EXISTS idx_collection_notes_reference');
+    db.exec('CREATE UNIQUE INDEX idx_collection_notes_reference ON collection_notes(reference COLLATE NOCASE)');
+  });
+
+  try {
+    migrate();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Cannot enforce case-insensitive collection note references: existing references collide when ` +
+        `compared case-insensitively (e.g. "SBM1061" and "sbm1061"). Resolve the duplicate rows by hand ` +
+        `and restart. Underlying error: ${message}`,
+      { cause: err },
+    );
+  }
 }
 
 /**
