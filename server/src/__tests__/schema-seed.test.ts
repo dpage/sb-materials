@@ -230,3 +230,43 @@ describe('Photo Migration', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 });
+
+describe('collection note tables and settings', () => {
+  it('creates the collection note tables', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(
+      (t) => t.name,
+    );
+    expect(tables).toContain('collection_notes');
+    expect(tables).toContain('collection_note_items');
+    expect(tables).toContain('app_settings');
+  });
+
+  it('adds a phone column to users', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
+    expect(cols).toContain('phone');
+  });
+
+  it('is idempotent across a second createSchema and ensureReferenceData run', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+    ensureReferenceData(db);
+
+    expect(() => {
+      createSchema(db);
+      ensureReferenceData(db);
+    }).not.toThrow();
+    const row = db.prepare('SELECT COUNT(*) AS n FROM app_settings WHERE key = ?').get('collection_note_prefix') as {
+      n: number;
+    };
+    expect(row.n).toBe(1);
+  });
+});

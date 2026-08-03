@@ -260,6 +260,56 @@ export function createSchema(db: Database.Database): void {
     { name: 'weighbridge_ticket', type: 'TEXT' },
     { name: 'weight', type: 'TEXT' },
   ]);
+
+  // ─── Collection notes ───
+  // A collection note is a standalone document rather than a report: it is
+  // raised for material being picked up, carries its own SBM reference, and is
+  // signed by both parties at the collection point.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS collection_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reference TEXT NOT NULL,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      site_id INTEGER REFERENCES customer_sites(id),
+      collect_from_address TEXT,
+      comments TEXT,
+      contact_name TEXT,
+      contact_phone TEXT,
+      po_number TEXT,
+      weight TEXT,
+      packing_list_no TEXT,
+      collection_date TEXT,
+      transport_company TEXT,
+      dispatched_signature_path TEXT,
+      dispatched_signed_date TEXT,
+      received_signature_path TEXT,
+      received_signed_date TEXT,
+      created_by_id INTEGER REFERENCES users(id),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_collection_notes_reference
+      ON collection_notes(reference);
+
+    CREATE TABLE IF NOT EXISTS collection_note_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      note_id INTEGER NOT NULL REFERENCES collection_notes(id) ON DELETE CASCADE,
+      quantity TEXT,
+      description TEXT,
+      collection_point TEXT,
+      sort_order INTEGER DEFAULT 0
+    );
+
+    -- Generic key/value settings, so values such as the collection note
+    -- sequence can be corrected without a redeploy.
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+
+  addColumns('users', [{ name: 'phone', type: 'TEXT' }]);
 }
 
 /**

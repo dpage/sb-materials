@@ -94,6 +94,23 @@ export function seedData(db: Database.Database): void {
   }
 
   logger.info('Seed data created. Default login: admin / admin');
+
+  ensureSettingDefaults(db);
+}
+
+/**
+ * Insert-only defaults for the collection note sequence. A superuser may change
+ * the next number from the admin page, so startup must never overwrite it.
+ */
+export function ensureSettingDefaults(db: Database.Database): void {
+  const defaults: [string, string][] = [
+    ['collection_note_prefix', 'SBM'],
+    ['collection_note_next_number', '1'],
+  ];
+  const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
+  for (const [key, value] of defaults) {
+    insert.run(key, value);
+  }
 }
 
 export function ensureReferenceData(db: Database.Database): void {
@@ -160,4 +177,6 @@ export function ensureReferenceData(db: Database.Database): void {
     }
   });
   tx();
+
+  ensureSettingDefaults(db);
 }
