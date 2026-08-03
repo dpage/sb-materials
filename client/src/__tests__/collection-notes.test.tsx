@@ -68,7 +68,7 @@ import { api } from '../api';
 // Mock useAuth (consumed indirectly via components under test)
 vi.mock('../App', () => ({
   useAuth: () => ({
-    user: { id: 1, username: 'admin', displayName: 'Administrator', isSuperuser: true },
+    user: { id: 1, username: 'admin', displayName: 'Administrator', phone: '07700 900123', isSuperuser: true },
     loading: false,
     login: vi.fn(),
     logout: vi.fn(),
@@ -109,7 +109,19 @@ describe('CollectionNotes list', () => {
   it('shows an empty state when there are no notes', async () => {
     vi.mocked(api.getCollectionNotes).mockResolvedValue({ data: [], total: 0, page: 1, limit: 25 });
     render(<CollectionNotes />, { wrapper: TestWrapper });
-    await waitFor(() => expect(screen.getByText(/no collection notes/i)).toBeInTheDocument());
+    const empty = await screen.findByText(/no collection notes/i);
+    expect(empty).toBeInTheDocument();
+    // .cn-table-wrap is display:none below 768px, so a mobile user (the
+    // primary platform here) must not have the empty state buried inside it.
+    expect(empty.closest('.cn-table-wrap')).toBeNull();
+  });
+
+  it('shows the loading state outside the desktop-only table wrapper', () => {
+    vi.mocked(api.getCollectionNotes).mockReturnValue(new Promise(() => {}));
+    render(<CollectionNotes />, { wrapper: TestWrapper });
+    const loading = screen.getByText('Loading...');
+    expect(loading).toBeInTheDocument();
+    expect(loading.closest('.cn-table-wrap')).toBeNull();
   });
 
   it('searches when the user types', async () => {
@@ -207,6 +219,16 @@ describe('CollectionNoteEdit form', () => {
   it('prefills the next reference on a new note', async () => {
     render(<CollectionNoteEdit />, { wrapper: TestWrapper });
     await waitFor(() => expect(screen.getByLabelText(/reference/i)).toHaveValue('SBM1061'));
+  });
+
+  it('prefills contact name and phone from the logged-in user, without calling the users API', async () => {
+    // The phone must come from useAuth(), not from api.getUser: that endpoint
+    // is superuser-only, so calling it is what silently left the field blank
+    // for every ordinary inspector.
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/contact name/i)).toHaveValue('Administrator'));
+    expect(screen.getByLabelText(/contact phone/i)).toHaveValue('07700 900123');
+    expect(api.getUser).not.toHaveBeenCalled();
   });
 
   it('lets the reference be overtyped', async () => {

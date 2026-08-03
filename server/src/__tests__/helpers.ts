@@ -62,11 +62,9 @@ export async function loginAsAdmin(app: express.Express): Promise<string> {
 export async function loginAsRegularUser(app: express.Express, db: Database.Database): Promise<string> {
   const bcrypt = await import('bcryptjs');
   const hash = bcrypt.hashSync('regular123', 10);
-  db.prepare('INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, 0)').run(
-    'regularuser',
-    hash,
-    'Regular User',
-  );
+  db.prepare(
+    'INSERT INTO users (username, password_hash, display_name, phone, is_superuser) VALUES (?, ?, ?, ?, 0)',
+  ).run('regularuser', hash, 'Regular User', '07700 900123');
 
   const supertest = (await import('supertest')).default;
   const res = await supertest(app).post('/api/auth/login').send({ username: 'regularuser', password: 'regular123' });

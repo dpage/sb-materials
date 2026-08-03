@@ -48,7 +48,7 @@ export function CollectionNoteEdit() {
   const [derivedCollectFrom, setDerivedCollectFrom] = useState('');
   const [comments, setComments] = useState(isEdit ? '' : DEFAULT_COMMENTS);
   const [contactName, setContactName] = useState(isEdit ? '' : user?.displayName || '');
-  const [contactPhone, setContactPhone] = useState('');
+  const [contactPhone, setContactPhone] = useState(isEdit ? '' : user?.phone || '');
   const [poNumber, setPoNumber] = useState('');
   const [weight, setWeight] = useState('');
   const [packingListNo, setPackingListNo] = useState('');
@@ -73,18 +73,14 @@ export function CollectionNoteEdit() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
 
-  // Prefill the reference and the current user's contact details on a new note.
+  // Prefill the reference on a new note. Contact name/phone are prefilled
+  // from useAuth() directly (see initial state above) rather than a
+  // separate lookup, since the users API is superuser-only and a plain
+  // inspector would otherwise never see their own phone number prefilled.
   useEffect(() => {
     if (isEdit) return;
     api.getNextCollectionNoteReference().then((r) => setReference(r.reference));
   }, [isEdit]);
-
-  useEffect(() => {
-    if (isEdit || !user) return;
-    Promise.resolve(api.getUser(user.id))
-      .then((u) => setContactPhone(u?.phone || ''))
-      .catch(() => {});
-  }, [isEdit, user]);
 
   // Load customers once.
   useEffect(() => {

@@ -5,6 +5,7 @@ declare module 'express-session' {
     userId: number;
     username: string;
     displayName: string;
+    phone: string | null;
     isSuperuser: boolean;
   }
 }
