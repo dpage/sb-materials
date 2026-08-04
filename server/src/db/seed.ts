@@ -109,11 +109,15 @@ export function seedData(db: Database.Database): void {
 /**
  * Insert-only defaults for the collection note sequence. A superuser may change
  * the next number from the admin page, so startup must never overwrite it.
+ *
+ * The sequence starts at 2000 because the notes raised by hand before this app
+ * existed had already passed that point, so the first note raised here is
+ * SBM2000 and cannot collide with one of the older documents.
  */
 export function ensureSettingDefaults(db: Database.Database): void {
   const defaults: [string, string][] = [
     ['collection_note_prefix', 'SBM'],
-    ['collection_note_next_number', '1'],
+    ['collection_note_next_number', '2000'],
   ];
   const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
   for (const [key, value] of defaults) {

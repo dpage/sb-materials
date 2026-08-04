@@ -13,7 +13,7 @@ describe('settings store', () => {
 
   it('returns the seeded collection note defaults', () => {
     expect(getSetting(db, 'collection_note_prefix', 'XXX')).toBe('SBM');
-    expect(getSetting(db, 'collection_note_next_number', '0')).toBe('1');
+    expect(getSetting(db, 'collection_note_next_number', '0')).toBe('2000');
   });
 
   it('returns the fallback for an unknown key', () => {
@@ -410,7 +410,7 @@ describe('collection note routes', () => {
 
   it('returns a next reference for a fresh database', async () => {
     const res = await supertest(app).get('/api/collection-notes/next-reference').set('Cookie', cookie).expect(200);
-    expect(res.body.reference).toBe('SBM1');
+    expect(res.body.reference).toBe('SBM2000');
     expect(res.body.prefix).toBe('SBM');
   });
 });
