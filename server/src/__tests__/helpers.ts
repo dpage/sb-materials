@@ -10,6 +10,8 @@ import { lookupRoutes } from '../routes/lookups';
 import { reportRoutes } from '../routes/reports';
 import { photoRoutes } from '../routes/photos';
 import { pdfRoutes } from '../routes/pdf';
+import { collectionNoteRoutes } from '../routes/collection-notes';
+import { settingsRoutes } from '../routes/settings';
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -38,6 +40,8 @@ export function createTestApp(db: Database.Database) {
   app.use('/api/reports', reportRoutes(db));
   app.use('/api/photos', photoRoutes(db));
   app.use('/api/pdf', pdfRoutes(db));
+  app.use('/api/collection-notes', collectionNoteRoutes(db));
+  app.use('/api/settings', settingsRoutes(db));
 
   return app;
 }
@@ -58,11 +62,9 @@ export async function loginAsAdmin(app: express.Express): Promise<string> {
 export async function loginAsRegularUser(app: express.Express, db: Database.Database): Promise<string> {
   const bcrypt = await import('bcryptjs');
   const hash = bcrypt.hashSync('regular123', 10);
-  db.prepare('INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, 0)').run(
-    'regularuser',
-    hash,
-    'Regular User',
-  );
+  db.prepare(
+    'INSERT INTO users (username, password_hash, display_name, phone, is_superuser) VALUES (?, ?, ?, ?, 0)',
+  ).run('regularuser', hash, 'Regular User', '07700 900123');
 
   const supertest = (await import('supertest')).default;
   const res = await supertest(app).post('/api/auth/login').send({ username: 'regularuser', password: 'regular123' });

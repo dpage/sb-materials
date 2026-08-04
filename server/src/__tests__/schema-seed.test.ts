@@ -73,6 +73,27 @@ describe('Seed Data', () => {
     const count2 = (db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
     expect(count1).toBe(count2);
   });
+
+  it('ensures the collection note setting defaults on the early-return path too, not only via ensureReferenceData', () => {
+    // seedData() returns early once users already exist, so the setting
+    // defaults it guarantees on that path must come from seedData() calling
+    // ensureSettingDefaults() itself, not merely from whatever else happens
+    // to call ensureReferenceData() afterwards.
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+    seedData(db);
+
+    // Remove the defaults a fresh seed would have created, so a pass here
+    // can only be explained by this second seedData() call restoring them.
+    db.prepare('DELETE FROM app_settings').run();
+
+    seedData(db); // users already exist, so this takes the early-return path
+    const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get('collection_note_prefix') as
+      | { value: string }
+      | undefined;
+    expect(row?.value).toBe('SBM');
+  });
 });
 
 describe('refined schema', () => {
@@ -106,7 +127,7 @@ describe('ensureReferenceData', () => {
     createSchema(db);
 
     ensureReferenceData(db);
-    ensureReferenceData(db); // idempotent — second run must not duplicate
+    ensureReferenceData(db); // idempotent: second run must not duplicate
 
     const clients = db.prepare('SELECT value FROM lookup_clients').all() as { value: string }[];
     expect(clients.map((c) => c.value)).toEqual(
@@ -228,5 +249,117 @@ describe('Photo Migration', () => {
     migratePhotoSubdirs(db, uploadsDir);
 
     fs.rmSync(tmpDir, { recursive: true });
+  });
+});
+
+describe('collection note tables and settings', () => {
+  it('creates the collection note tables', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(
+      (t) => t.name,
+    );
+    expect(tables).toContain('collection_notes');
+    expect(tables).toContain('collection_note_items');
+    expect(tables).toContain('app_settings');
+  });
+
+  it('adds a phone column to users', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
+    expect(cols).toContain('phone');
+  });
+
+  it('upgrades a pre-existing plain-collation reference index to COLLATE NOCASE', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+
+    // Simulate a database created before this change: build everything
+    // createSchema would, but with the original case-sensitive index.
+    db.exec(`
+      CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+      CREATE TABLE collection_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reference TEXT NOT NULL,
+        customer_id INTEGER NOT NULL REFERENCES customers(id)
+      );
+      CREATE UNIQUE INDEX idx_collection_notes_reference ON collection_notes(reference);
+    `);
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Pre-existing Ltd');
+    db.prepare('INSERT INTO collection_notes (reference, customer_id) VALUES (?, ?)').run('SBM1', cust.lastInsertRowid);
+
+    createSchema(db);
+
+    const indexSql = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_collection_notes_reference'")
+      .get() as { sql: string };
+    expect(indexSql.sql).toMatch(/COLLATE NOCASE/i);
+
+    // The pre-existing row survived the drop-and-recreate.
+    const row = db.prepare('SELECT reference FROM collection_notes WHERE customer_id = ?').get(cust.lastInsertRowid);
+    expect(row).toEqual({ reference: 'SBM1' });
+
+    // And the upgraded index now catches a case-differing duplicate.
+    expect(() =>
+      db
+        .prepare('INSERT INTO collection_notes (reference, customer_id) VALUES (?, ?)')
+        .run('sbm1', cust.lastInsertRowid),
+    ).toThrow(/UNIQUE/i);
+  });
+
+  it('refuses to upgrade the index, and leaves the old one intact, if case-differing duplicates already exist', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+
+    db.exec(`
+      CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+      CREATE TABLE collection_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reference TEXT NOT NULL,
+        customer_id INTEGER NOT NULL REFERENCES customers(id)
+      );
+      CREATE UNIQUE INDEX idx_collection_notes_reference ON collection_notes(reference);
+    `);
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Duplicate Holder Ltd');
+    // The old case-sensitive index allows both of these to coexist.
+    db.prepare('INSERT INTO collection_notes (reference, customer_id) VALUES (?, ?)').run(
+      'SBM1061',
+      cust.lastInsertRowid,
+    );
+    db.prepare('INSERT INTO collection_notes (reference, customer_id) VALUES (?, ?)').run(
+      'sbm1061',
+      cust.lastInsertRowid,
+    );
+
+    expect(() => createSchema(db)).toThrow(/case-insensitive/i);
+
+    // The old index must still be there and still enforcing something,
+    // rather than the table being left with no unique index at all.
+    const indexSql = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_collection_notes_reference'")
+      .get() as { sql: string };
+    expect(indexSql.sql).not.toMatch(/COLLATE NOCASE/i);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM collection_notes').get() as { n: number }).toEqual({ n: 2 });
+  });
+
+  it('is idempotent across a second createSchema and ensureReferenceData run', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+    ensureReferenceData(db);
+
+    expect(() => {
+      createSchema(db);
+      ensureReferenceData(db);
+    }).not.toThrow();
+    const row = db.prepare('SELECT COUNT(*) AS n FROM app_settings WHERE key = ?').get('collection_note_prefix') as {
+      n: number;
+    };
+    expect(row.n).toBe(1);
   });
 });

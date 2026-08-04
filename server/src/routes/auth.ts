@@ -14,7 +14,7 @@ export function authRoutes(db: Database.Database): Router {
 
     const user = db
       .prepare(
-        'SELECT id, username, password_hash, display_name, is_superuser, is_active FROM users WHERE username = ?',
+        'SELECT id, username, password_hash, display_name, phone, is_superuser, is_active FROM users WHERE username = ?',
       )
       .get(username) as any;
 
@@ -31,12 +31,14 @@ export function authRoutes(db: Database.Database): Router {
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.displayName = user.display_name;
+    req.session.phone = user.phone ?? null;
     req.session.isSuperuser = !!user.is_superuser;
 
     res.json({
       id: user.id,
       username: user.username,
       displayName: user.display_name,
+      phone: user.phone ?? null,
       isSuperuser: !!user.is_superuser,
     });
   });
@@ -60,6 +62,7 @@ export function authRoutes(db: Database.Database): Router {
       id: req.session.userId,
       username: req.session.username,
       displayName: req.session.displayName,
+      phone: req.session.phone ?? null,
       isSuperuser: req.session.isSuperuser,
     });
   });

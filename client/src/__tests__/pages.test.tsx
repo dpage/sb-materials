@@ -38,6 +38,8 @@ vi.mock('../api', () => ({
     deletePhoto: vi.fn(),
     getPhotoUrl: vi.fn((f: string) => `/api/photos/file/${f}`),
     downloadPdf: vi.fn((id: number) => `/api/pdf/${id}`),
+    getSettings: vi.fn(),
+    updateSettings: vi.fn(),
   },
 }));
 
@@ -255,9 +257,11 @@ describe('Reports Page', () => {
       </TestWrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/No reports found/)).toBeInTheDocument();
-    });
+    const empty = await waitFor(() => screen.getByText(/No reports found/));
+    expect(empty).toBeInTheDocument();
+    // .report-table-wrap is display:none below 768px, so the empty state
+    // (equally reachable on a phone) must not be nested inside it.
+    expect(empty.closest('.report-table-wrap')).toBeNull();
   });
 
   it('should show delete confirmation dialog', async () => {
@@ -1168,6 +1172,23 @@ describe('Users Page', () => {
     expect(screen.getByText('Edit User')).toBeInTheDocument();
   });
 
+  it('offers a phone field when editing a user', async () => {
+    render(
+      <TestWrapper>
+        <Users />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
+    });
+
+    const editBtns = screen.getAllByText('Edit');
+    fireEvent.click(editBtns[0]);
+
+    expect(await screen.findByLabelText(/phone/i)).toBeInTheDocument();
+  });
+
   it('should update a user', async () => {
     (api.updateUser as any).mockResolvedValue({});
     render(
@@ -1271,6 +1292,8 @@ describe('Lookups Page', () => {
       { id: 1, value: 'OCC', report_type: 'loading_inspection', is_active: 1 },
       { id: 2, value: 'Mixed Paper', report_type: 'loading_inspection', is_active: 1 },
     ]);
+    (api.getSettings as any).mockResolvedValue({ collection_note_prefix: 'SBM', collection_note_next_number: '1061' });
+    (api.updateSettings as any).mockResolvedValue({});
   });
 
   it('should render lookups page', async () => {
@@ -1495,6 +1518,19 @@ describe('Lookups Page', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Loading').length).toBeGreaterThan(0);
     });
+  });
+
+  it('lets a superuser set the next collection note number', async () => {
+    render(
+      <TestWrapper>
+        <Lookups />
+      </TestWrapper>,
+    );
+
+    const input = await screen.findByLabelText(/next collection note number/i);
+    fireEvent.change(input, { target: { value: '1500' } });
+    fireEvent.click(screen.getByRole('button', { name: /save number/i }));
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ collection_note_next_number: '1500' }));
   });
 });
 

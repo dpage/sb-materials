@@ -16,6 +16,10 @@ export function Layout() {
     const path = location.pathname;
     if (path.startsWith('/reports/')) {
       setTopic('report-edit');
+    } else if (path.startsWith('/collection-notes/')) {
+      setTopic('collection-note-edit');
+    } else if (path === '/collection-notes') {
+      setTopic('collection-notes');
     } else if (path === '/customers') {
       setTopic('customers');
     } else if (path === '/users') {
@@ -70,6 +74,9 @@ export function Layout() {
           <nav style={{ display: 'flex', gap: 4 }} className="desktop-nav">
             <NavLink to="/" end style={({ isActive }) => navStyle(isActive)}>
               Reports
+            </NavLink>
+            <NavLink to="/collection-notes" style={({ isActive }) => navStyle(isActive)}>
+              Collection Notes
             </NavLink>
             <NavLink to="/customers" style={({ isActive }) => navStyle(isActive)}>
               Customers
@@ -162,6 +169,13 @@ export function Layout() {
         >
           <NavLink to="/" end style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
             Reports
+          </NavLink>
+          <NavLink
+            to="/collection-notes"
+            style={({ isActive }) => navStyle(isActive)}
+            onClick={() => setMenuOpen(false)}
+          >
+            Collection Notes
           </NavLink>
           <NavLink to="/customers" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
             Customers

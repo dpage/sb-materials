@@ -30,11 +30,11 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Report Actions',
-        body: 'Each report row has actions:\n\n- Edit \u2014 Open the report for editing\n- PDF \u2014 Download the report as a formatted PDF document\n- Submit \u2014 On an Assigned report, mark it Completed and send it back to the owner\n- Reopen \u2014 On a Completed report, move it back to Assigned for further changes\n- Delete \u2014 Permanently remove the report (you will be asked to confirm)',
+        body: 'Each report row has actions:\n\n- Edit: Open the report for editing\n- PDF: Download the report as a formatted PDF document\n- Submit: On an Assigned report, mark it Completed and send it back to the owner\n- Reopen: On a Completed report, move it back to Assigned for further changes\n- Delete: Permanently remove the report (you will be asked to confirm)',
       },
       {
         title: 'Report Status',
-        body: 'Reports move through three statuses:\n\n- Draft \u2014 being set up\n- Assigned \u2014 handed to an inspector to complete on site\n- Completed \u2014 signed off and back with the owner\n\nReopen a completed report if it needs further changes.',
+        body: 'Reports move through three statuses:\n\n- Draft: being set up\n- Assigned: handed to an inspector to complete on site\n- Completed: signed off and back with the owner\n\nReopen a completed report if it needs further changes.',
       },
       {
         title: 'Pagination',
@@ -52,11 +52,11 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Report Type',
-        body: 'Choose from three report types:\n\n- Loading & Inspection \u2014 Carried out as containers are loaded. Captures product grade, moisture readings, storage mode, container details, packaging content, and photos.\n- Quarterly PERN Inspection \u2014 A periodic site inspection. Includes a "Bale break performed?" toggle that reveals bale-break results and packaging-content checks when switched on.\n- PERN Audit \u2014 A comprehensive compliance audit with detailed site and process assessments.\n\nThe material being inspected is chosen from the Product Grade dropdown rather than being a separate report type.',
+        body: 'Choose from three report types:\n\n- Loading & Inspection: Carried out as containers are loaded. Captures product grade, moisture readings, storage mode, container details, packaging content, and photos.\n- Quarterly PERN Inspection: A periodic site inspection. Includes a "Bale break performed?" toggle that reveals bale-break results and packaging-content checks when switched on.\n- PERN Audit: A comprehensive compliance audit with detailed site and process assessments.\n\nThe material being inspected is chosen from the Product Grade dropdown rather than being a separate report type.',
       },
       {
         title: 'Customer & Site',
-        body: 'Select the customer and their inspection site from the dropdowns. If the customer or site doesn\'t exist yet, click the "+" button next to the dropdown to quickly add one without leaving the form. The "On Behalf Of" dropdown records the trading company the inspection is being carried out for (e.g. VISY, Genus, CTL) \u2014 also add-able on the fly with its "+" button.',
+        body: 'Select the customer and their inspection site from the dropdowns. If the customer or site doesn\'t exist yet, click the "+" button next to the dropdown to quickly add one without leaving the form. The "On Behalf Of" dropdown records the trading company the inspection is being carried out for (e.g. VISY, Genus, CTL): also add-able on the fly with its "+" button.',
       },
       {
         title: 'Inspection Details',
@@ -68,7 +68,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Containers',
-        body: 'For Loading & Inspection reports you can track individual containers. Click "+ Add Container" to record the container number, seal number, and the load details \u2014 number of bales, weighbridge ticket, and weight. Photos can be associated with specific containers.',
+        body: 'For Loading & Inspection reports you can track individual containers. Click "+ Add Container" to record the container number, seal number, and the load details: number of bales, weighbridge ticket, and weight. Photos can be associated with specific containers.',
       },
       {
         title: 'Bale Break (Quarterly PERN)',
@@ -76,7 +76,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Assigning to an Inspector',
-        body: 'Superusers can hand a report to another inspector. Fill in the header (date, site, contact, what is being inspected), pick the inspector in the "Assign To" dropdown, and use "Save & Assign". The inspector finds it under the "Assigned to me" filter, completes it on site, signs, and taps "Submit" to send it back marked Completed. Assigning is optional \u2014 leave it unassigned and complete the report yourself if you prefer.',
+        body: 'Superusers can hand a report to another inspector. Fill in the header (date, site, contact, what is being inspected), pick the inspector in the "Assign To" dropdown, and use "Save & Assign". The inspector finds it under the "Assigned to me" filter, completes it on site, signs, and taps "Submit" to send it back marked Completed. Assigning is optional: leave it unassigned and complete the report yourself if you prefer.',
       },
       {
         title: 'PERN Audit Fields',
@@ -93,6 +93,58 @@ export const helpTopics: Record<string, HelpTopic> = {
       {
         title: 'Saving',
         body: 'Use "Save as Draft" to save work in progress. If you are handing the report to an inspector, choose them in "Assign To" and use "Save & Assign". The assigned inspector taps "Submit" once it is finished. To complete a report yourself, use "Save & Complete". "Cancel" returns to the reports list without saving.',
+      },
+    ],
+  },
+
+  'collection-notes': {
+    heading: 'Collection Notes',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Collection Notes page lists all collection notes in reverse date order, showing the reference, date, customer, item summary, and transport company at a glance. Every note carries a unique SBM reference (e.g. SBM1061), replacing the Word documents the office used to fill in by hand.',
+      },
+      {
+        title: 'Creating a Collection Note',
+        body: 'Click the "+ New Collection Note" button to raise a new note for material being picked up. You will be taken to the collection note form.',
+      },
+      {
+        title: 'Searching and Filtering',
+        body: 'Use the search box to find notes by reference, customer, or item description. Use the customer dropdown to narrow the list to a single customer.',
+      },
+      {
+        title: 'Sorting',
+        body: 'Click the Reference, Date, or Customer column heading to sort by that column; click again to reverse the order. Notes are sorted by collection date (newest first) by default.',
+      },
+      {
+        title: 'Note Actions',
+        body: 'Each note row has actions:\n\n- Edit: Open the note for editing\n- PDF: Download the note as a formatted PDF, named for its reference, date, and customer\n- Delete: Permanently remove the note (you will be asked to confirm)',
+      },
+    ],
+  },
+
+  'collection-note-edit': {
+    heading: 'Collection Note Form',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The collection note form is used to create and edit a collection note for material being picked up from a customer.',
+      },
+      {
+        title: 'Reference',
+        body: 'The SBM reference is filled in automatically when you start a new note, but you may overtype it if you need a specific reference.',
+      },
+      {
+        title: 'Customer & Collection Address',
+        body: "Choosing a customer fills in the collect-from address automatically. That address is then kept with the note, so it stays correct even if the customer's address changes later.",
+      },
+      {
+        title: 'Items',
+        body: 'List the items being collected, each with a quantity, description, and collection point. These appear on the PDF and in the item summary shown on the list page.',
+      },
+      {
+        title: 'Signatures',
+        body: 'Signatures for dispatch and receipt may be captured on screen using the signature pad, or left blank if the note is to be signed on paper instead.',
       },
     ],
   },
@@ -162,7 +214,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Lookup Categories',
-        body: "The lookup categories are:\n\n- Product Descriptions \u2014 The types of materials being inspected\n- Product Grades \u2014 Quality grades for materials\n- Storage Modes \u2014 How materials are stored (e.g. baled, loose)\n- Unwanted Materials \u2014 Materials that shouldn't be present\n- Contaminants \u2014 Contaminating substances found during inspection\n- Clients (On Behalf Of) \u2014 The trading companies inspections are carried out for",
+        body: "The lookup categories are:\n\n- Product Descriptions: The types of materials being inspected\n- Product Grades: Quality grades for materials\n- Storage Modes: How materials are stored (e.g. baled, loose)\n- Unwanted Materials: Materials that shouldn't be present\n- Contaminants: Contaminating substances found during inspection\n- Clients (On Behalf Of): The trading companies inspections are carried out for",
       },
       {
         title: 'Report Type Association',
@@ -179,6 +231,10 @@ export const helpTopics: Record<string, HelpTopic> = {
       {
         title: 'Deactivating a Value',
         body: 'Click "Deactivate" to hide a value from dropdown lists without deleting it. Existing reports that use the value are not affected. Click "Activate" to restore it.',
+      },
+      {
+        title: 'Collection Notes (superusers only)',
+        body: 'A "Collection Notes" card at the top of this page lets a superuser set the number for the next new collection note reference (e.g. the 1061 in SBM1061). Use it to carry the sequence on from numbers already used outside the app. Creating a note always advances the stored number automatically, so it will not go backwards on its own, but a superuser can still set it to any positive whole number by hand here.',
       },
     ],
   },

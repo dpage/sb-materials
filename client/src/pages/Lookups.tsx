@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../App';
 import { api } from '../api';
 import type { LookupValue } from '../types';
 import { TYPE_COLORS, TYPE_SHORT } from '../types';
@@ -19,12 +20,17 @@ const REPORT_TYPES = [
 ];
 
 export function Lookups() {
+  const { user } = useAuth();
   const [activeTable, setActiveTable] = useState(TABLES[0]);
   const [values, setValues] = useState<LookupValue[]>([]);
   const [newValue, setNewValue] = useState('');
   const [newType, setNewType] = useState('loading_inspection');
   const [editId, setEditId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
+
+  const [nextNumber, setNextNumber] = useState('');
+  const [nextNumberError, setNextNumberError] = useState('');
+  const [nextNumberSaved, setNextNumberSaved] = useState(false);
 
   const load = () => {
     api.getLookupsAll(activeTable.key).then(setValues);
@@ -33,6 +39,22 @@ export function Lookups() {
   useEffect(() => {
     load();
   }, [activeTable]);
+
+  useEffect(() => {
+    if (!user?.isSuperuser) return;
+    api.getSettings().then((s) => setNextNumber(s.collection_note_next_number || ''));
+  }, [user]);
+
+  const saveNextNumber = async () => {
+    setNextNumberError('');
+    setNextNumberSaved(false);
+    try {
+      await api.updateSettings({ collection_note_next_number: nextNumber });
+      setNextNumberSaved(true);
+    } catch (err: any) {
+      setNextNumberError(err.message || 'Save failed');
+    }
+  };
 
   const add = async () => {
     if (!newValue.trim()) return;
@@ -152,6 +174,50 @@ export function Lookups() {
           .table-tab { padding: 7px 12px; font-size: 13px; }
         }
       `}</style>
+
+      {user?.isSuperuser && (
+        <div className="lookups-card" style={{ marginBottom: 16 }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: '#2d3436' }}>Collection Notes</h3>
+          <p style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 12 }}>
+            The number for the next new collection note reference (e.g. the 1061 in SBM1061). Set this to carry on from
+            the numbers already used outside the app.
+          </p>
+          {nextNumberError && (
+            <div
+              style={{
+                background: '#fdf0ef',
+                border: '1px solid #e74c3c',
+                color: '#c0392b',
+                padding: '8px 12px',
+                borderRadius: 6,
+                marginBottom: 12,
+                fontSize: 13,
+              }}
+            >
+              {nextNumberError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
+            <div className="form-field">
+              <label htmlFor="next-collection-note-number">Next collection note number</label>
+              <input
+                id="next-collection-note-number"
+                type="number"
+                value={nextNumber}
+                onChange={(e) => {
+                  setNextNumber(e.target.value);
+                  setNextNumberSaved(false);
+                }}
+                style={{ padding: '9px 12px', border: '1px solid #dde1e6', borderRadius: 6, fontSize: 14 }}
+              />
+            </div>
+            <button className="add-btn" onClick={saveNextNumber}>
+              Save number
+            </button>
+            {nextNumberSaved && <span style={{ color: '#27ae60', fontSize: 13 }}>Saved</span>}
+          </div>
+        </div>
+      )}
 
       <h2 className="lookups-heading">Lookup Values</h2>
 

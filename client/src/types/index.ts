@@ -2,6 +2,7 @@ export interface User {
   id: number;
   username: string;
   displayName: string;
+  phone: string | null;
   isSuperuser: boolean;
 }
 
@@ -12,6 +13,7 @@ export interface UserRecord {
   is_superuser: number;
   is_active: number;
   created_at: string;
+  phone: string | null;
 }
 
 export interface Customer {
@@ -203,3 +205,62 @@ export const TYPE_SHORT: Record<string, string> = {
   quarterly_pern: 'Quarterly',
   pern_audit: 'PERN',
 };
+
+export interface CollectionNoteItem {
+  id?: number;
+  note_id?: number;
+  quantity: string | null;
+  description: string | null;
+  collection_point: string | null;
+  sort_order?: number;
+}
+
+export interface CollectionNote {
+  id: number;
+  reference: string;
+  customer_id: number;
+  site_id: number | null;
+  collect_from_address: string | null;
+  comments: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  po_number: string | null;
+  weight: string | null;
+  packing_list_no: string | null;
+  collection_date: string | null;
+  transport_company: string | null;
+  dispatched_signature_path: string | null;
+  dispatched_signed_date: string | null;
+  received_signature_path: string | null;
+  received_signed_date: string | null;
+  created_by_id: number | null;
+  created_at: string;
+  updated_at: string;
+  customer_name?: string;
+  site_address?: string | null;
+  items_summary?: string | null;
+  items?: CollectionNoteItem[];
+}
+
+export interface CollectionNoteData {
+  reference: string;
+  customer_id: number;
+  site_id?: number | null;
+  collect_from_address?: string | null;
+  comments?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  po_number?: string | null;
+  weight?: string | null;
+  packing_list_no?: string | null;
+  collection_date?: string | null;
+  transport_company?: string | null;
+  dispatched_signed_date?: string | null;
+  received_signed_date?: string | null;
+  items?: CollectionNoteItem[];
+}
+
+export interface AppSettings {
+  collection_note_prefix?: string;
+  collection_note_next_number?: string;
+}

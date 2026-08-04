@@ -4,6 +4,13 @@ import type Database from 'better-sqlite3';
 import type { Express } from 'express';
 import { createTestDb, createTestApp, loginAsAdmin, createTestCustomerAndSite } from './helpers';
 import { generatePdf } from '../utils/pdf-generator';
+import { loadCollectionNote } from '../utils/collection-note-loader';
+import {
+  generateCollectionNotePdf,
+  collectionNotePdfFilename,
+  collectionNoteItemRows,
+  formatUkDate,
+} from '../utils/collection-note-pdf';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -538,5 +545,148 @@ describe('PDF Generator', () => {
     const buffer = await generatePdf(report, tmpDir);
     expect(buffer).toBeInstanceOf(Buffer);
     fs.rmSync(tmpDir, { recursive: true });
+  });
+});
+
+describe('collection note PDF', () => {
+  let db: Database.Database;
+  let app: Express;
+  let cookie: string;
+  let noteId: number;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    app = createTestApp(db);
+    cookie = await loginAsAdmin(app);
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Acme Recycling Ltd');
+    const created = await request(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({
+        reference: 'SBM1061',
+        customer_id: cust.lastInsertRowid,
+        collect_from_address: 'Acme Recycling Ltd\n1 Test Way\nTestville TE5 7ST',
+        comments: 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD',
+        contact_name: 'Test User',
+        contact_phone: '07700 900123',
+        po_number: 'N/A',
+        weight: '24t',
+        packing_list_no: 'PL-1',
+        collection_date: '2026-08-03',
+        transport_company: 'Test Haulage',
+        items: [
+          { quantity: '1x', description: 'Poly cup reels', collection_point: 'Bay 3' },
+          { quantity: '2x', description: 'Mixed paper bales', collection_point: 'Yard' },
+          { quantity: '3x', description: 'Shrink wrap', collection_point: 'Bay 1' },
+        ],
+      })
+      .expect(200);
+    noteId = created.body.id;
+  });
+
+  it('generates a PDF', async () => {
+    const res = await request(app)
+      .get(`/api/pdf/collection-note/${noteId}`)
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect('Content-Type', 'application/pdf');
+    expect(res.body.length).toBeGreaterThan(1000);
+    expect(res.body.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('names the file for the reference, date, and customer', async () => {
+    const res = await request(app).get(`/api/pdf/collection-note/${noteId}`).set('Cookie', cookie).expect(200);
+    expect(res.headers['content-disposition']).toBe('attachment; filename="SBM1061-2026-08-03-Acme-Recycling-Ltd.pdf"');
+  });
+
+  it('requires authentication', async () => {
+    await request(app).get(`/api/pdf/collection-note/${noteId}`).expect(401);
+  });
+
+  it('returns 404 for an unknown note', async () => {
+    await request(app).get('/api/pdf/collection-note/9999').set('Cookie', cookie).expect(404);
+  });
+
+  it('maps every item row for the pure helper', () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const rows = collectionNoteItemRows(note);
+    expect(rows).toHaveLength(3);
+    expect(rows[2][1]).toBe('Shrink wrap');
+  });
+
+  it('renders every line item', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
+    expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+    // Assert on the text actually reaching the rendered page, not just on the
+    // pure helper: a regression that stops item rows from being pushed into
+    // the table body must fail this test.
+    const text = extractPdfText(buffer);
+    expect(text).toContain('Poly cup reels');
+    expect(text).toContain('Mixed paper bales');
+    expect(text).toContain('Shrink wrap');
+  });
+
+  it('renders the heading, reference, and footer lines', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
+    const text = extractPdfText(buffer);
+    expect(text).toContain('COLLECTION NOTE');
+    expect(text).toContain('SBM1061');
+    expect(text).toContain('NRW Waste brokers registration CBDU027716');
+    expect(text).toContain(
+      'SB Materials UK LTD 1 Deva Way, Wrexham, Wales LL13 9EU Registered in Wales & England No. 10896256',
+    );
+  });
+
+  it('still generates when the note has no items and no signatures', async () => {
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Bare Ltd');
+    const bare = await request(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ reference: 'SBM2', customer_id: cust.lastInsertRowid, collection_date: '2026-08-04' })
+      .expect(200);
+    const res = await request(app).get(`/api/pdf/collection-note/${bare.body.id}`).set('Cookie', cookie).expect(200);
+    expect(res.body.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('generates when a signature file is missing from disk', async () => {
+    db.prepare('UPDATE collection_notes SET dispatched_signature_path = ? WHERE id = ?').run(
+      'nope/missing.png',
+      noteId,
+    );
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
+    expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('sanitises the customer name in the filename', () => {
+    const note = loadCollectionNote(db, noteId)!;
+    expect(collectionNotePdfFilename({ ...note, customer_name: 'A/B & Co. Ltd' })).toBe(
+      'SBM1061-2026-08-03-A-B-Co-Ltd.pdf',
+    );
+  });
+
+  it('sanitises the reference in the filename', () => {
+    // The reference is hand-typed, so a stray quote or slash must not break
+    // the quoted Content-Disposition header the filename is interpolated
+    // into.
+    const note = loadCollectionNote(db, noteId)!;
+    expect(collectionNotePdfFilename({ ...note, reference: 'SBM/1061"' })).toBe(
+      'SBM-1061-2026-08-03-Acme-Recycling-Ltd.pdf',
+    );
+  });
+
+  it('falls back to the created date when there is no collection date', () => {
+    const note = loadCollectionNote(db, noteId)!;
+    expect(collectionNotePdfFilename({ ...note, collection_date: null })).toMatch(
+      /^SBM1061-\d{4}-\d{2}-\d{2}-Acme-Recycling-Ltd\.pdf$/,
+    );
+  });
+
+  it('formats dates the British way', () => {
+    expect(formatUkDate('2026-08-03')).toBe('03/08/2026');
+    expect(formatUkDate(null)).toBe('');
+    expect(formatUkDate('not a date')).toBe('not a date');
   });
 });

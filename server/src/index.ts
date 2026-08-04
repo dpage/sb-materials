@@ -19,6 +19,8 @@ import { lookupRoutes } from './routes/lookups';
 import { reportRoutes } from './routes/reports';
 import { photoRoutes } from './routes/photos';
 import { pdfRoutes } from './routes/pdf';
+import { collectionNoteRoutes } from './routes/collection-notes';
+import { settingsRoutes } from './routes/settings';
 
 // Ensure data directory exists
 if (!fs.existsSync(config.dataDir)) {
@@ -82,6 +84,8 @@ app.use('/api/lookups', lookupRoutes(db));
 app.use('/api/reports', reportRoutes(db));
 app.use('/api/photos', photoRoutes(db));
 app.use('/api/pdf', pdfRoutes(db));
+app.use('/api/collection-notes', collectionNoteRoutes(db));
+app.use('/api/settings', settingsRoutes(db));
 
 // Serve static frontend in production
 const clientDist = path.join(__dirname, '../../client/dist');

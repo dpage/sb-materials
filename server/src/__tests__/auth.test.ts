@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import type Database from 'better-sqlite3';
 import type { Express } from 'express';
-import { createTestDb, createTestApp, loginAsAdmin } from './helpers';
+import { createTestDb, createTestApp, loginAsAdmin, loginAsRegularUser } from './helpers';
 
 describe('Auth Routes', () => {
   let db: Database.Database;
@@ -73,6 +73,24 @@ describe('Auth Routes', () => {
     it('should return 401 when not authenticated', async () => {
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(401);
+    });
+
+    it('should include phone for a non-superuser, since the users API is superuser-only', async () => {
+      // A plain inspector can never call GET /api/users/:id (requireSuperuser
+      // rejects them), so /me is the only place their own phone number can
+      // come from for prefilling forms such as the collection note.
+      const cookie = await loginAsRegularUser(app, db);
+      const res = await request(app).get('/api/auth/me').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body.isSuperuser).toBe(false);
+      expect(res.body.phone).toBe('07700 900123');
+    });
+
+    it('should return a null phone rather than failing when unset', async () => {
+      const cookie = await loginAsAdmin(app);
+      const res = await request(app).get('/api/auth/me').set('Cookie', cookie);
+      expect(res.status).toBe(200);
+      expect(res.body.phone).toBeNull();
     });
   });
 });

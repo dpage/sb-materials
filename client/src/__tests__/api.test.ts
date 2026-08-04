@@ -258,4 +258,89 @@ describe('API Client', () => {
       expect(api.downloadPdf(1)).toBe('/api/pdf/1');
     });
   });
+
+  describe('collection notes', () => {
+    it('should get collection notes with params', async () => {
+      const spy = mockFetch({ data: [], total: 0, page: 1, limit: 25 });
+      await api.getCollectionNotes({ page: '1', search: 'SBM1061' });
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('search=SBM1061'), expect.anything());
+    });
+
+    it('should get a single collection note', async () => {
+      mockFetch({ id: 1, reference: 'SBM1061' });
+      const note = await api.getCollectionNote(1);
+      expect(note.reference).toBe('SBM1061');
+    });
+
+    it('should get the next collection note reference', async () => {
+      const spy = mockFetch({ reference: 'SBM1062', prefix: 'SBM' });
+      const result = await api.getNextCollectionNoteReference();
+      expect(result.reference).toBe('SBM1062');
+      expect(spy).toHaveBeenCalledWith('/api/collection-notes/next-reference', expect.anything());
+    });
+
+    it('should create a collection note', async () => {
+      const spy = mockFetch({ id: 1, reference: 'SBM1061' });
+      await api.createCollectionNote({ reference: 'SBM1061', customer_id: 1 });
+      expect(spy).toHaveBeenCalledWith('/api/collection-notes', expect.objectContaining({ method: 'POST' }));
+    });
+
+    it('should surface a 409 duplicate-reference error', async () => {
+      mockFetch({ error: 'Reference SBM1061 is already in use' }, 409);
+      await expect(api.createCollectionNote({ reference: 'SBM1061', customer_id: 1 })).rejects.toThrow(
+        'already in use',
+      );
+    });
+
+    it('should update a collection note', async () => {
+      const spy = mockFetch({ ok: true });
+      await api.updateCollectionNote(1, { reference: 'SBM1061', customer_id: 1 });
+      expect(spy).toHaveBeenCalledWith('/api/collection-notes/1', expect.objectContaining({ method: 'PUT' }));
+    });
+
+    it('should delete a collection note', async () => {
+      const spy = mockFetch({ ok: true });
+      await api.deleteCollectionNote(1);
+      expect(spy).toHaveBeenCalledWith('/api/collection-notes/1', expect.objectContaining({ method: 'DELETE' }));
+    });
+
+    it('should upload a collection note signature', async () => {
+      const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ dispatched_signature_path: '1/sig.png' }),
+      } as Response);
+
+      const blob = new Blob(['test'], { type: 'image/png' });
+      await api.uploadCollectionNoteSignature(1, 'dispatched', blob);
+      expect(spy).toHaveBeenCalledWith(
+        '/api/collection-notes/1/signature/dispatched',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    it('should throw on collection note signature upload failure', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false } as Response);
+      await expect(api.uploadCollectionNoteSignature(1, 'received', new Blob())).rejects.toThrow(
+        'Signature upload failed',
+      );
+    });
+
+    it('should generate a collection note PDF download URL', () => {
+      expect(api.downloadCollectionNotePdf(1)).toBe('/api/pdf/collection-note/1');
+    });
+  });
+
+  describe('settings', () => {
+    it('should get settings', async () => {
+      mockFetch({ collection_note_prefix: 'SBM', collection_note_next_number: '1062' });
+      const settings = await api.getSettings();
+      expect(settings.collection_note_prefix).toBe('SBM');
+    });
+
+    it('should update settings', async () => {
+      const spy = mockFetch({ ok: true });
+      await api.updateSettings({ collection_note_prefix: 'SBM' });
+      expect(spy).toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PUT' }));
+    });
+  });
 });

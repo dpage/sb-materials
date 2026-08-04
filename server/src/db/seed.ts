@@ -3,9 +3,17 @@ import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
 
 export function seedData(db: Database.Database): void {
-  // Only seed if no users exist
+  // The lookup/user seeding below only ever runs once, on a fresh database,
+  // but ensureSettingDefaults() must run every time this function is
+  // called regardless (it is insert-only, so re-running it is harmless):
+  // it is what actually guarantees the collection note settings exist after
+  // seedData(), rather than that guarantee coming solely from whatever else
+  // happens to call ensureReferenceData() afterwards.
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-  if (userCount.count > 0) return;
+  if (userCount.count > 0) {
+    ensureSettingDefaults(db);
+    return;
+  }
 
   logger.info('Seeding default data...');
 
@@ -94,6 +102,27 @@ export function seedData(db: Database.Database): void {
   }
 
   logger.info('Seed data created. Default login: admin / admin');
+
+  ensureSettingDefaults(db);
+}
+
+/**
+ * Insert-only defaults for the collection note sequence. A superuser may change
+ * the next number from the admin page, so startup must never overwrite it.
+ *
+ * The sequence starts at 2000 because the notes raised by hand before this app
+ * existed had already passed that point, so the first note raised here is
+ * SBM2000 and cannot collide with one of the older documents.
+ */
+export function ensureSettingDefaults(db: Database.Database): void {
+  const defaults: [string, string][] = [
+    ['collection_note_prefix', 'SBM'],
+    ['collection_note_next_number', '2000'],
+  ];
+  const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
+  for (const [key, value] of defaults) {
+    insert.run(key, value);
+  }
 }
 
 export function ensureReferenceData(db: Database.Database): void {
@@ -160,4 +189,6 @@ export function ensureReferenceData(db: Database.Database): void {
     }
   });
   tx();
+
+  ensureSettingDefaults(db);
 }
