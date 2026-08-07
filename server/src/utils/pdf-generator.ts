@@ -29,9 +29,24 @@ const PAGE_MARGINS: [number, number, number, number] = [40, 70, 40, 50];
 // tall portrait photo (a phone screenshot, or a weighbridge ticket shot end to
 // end) overflows the page and vanishes.
 const PHOTO_MAX_WIDTH = 400;
-// Allowance for the caption line and the margins above and below the block.
+// Allowance for the caption line and the margins above and below the block,
+// plus the section heading ("Photos", "Moisture Reading Photos") that sits
+// above the first photo of a section. Budgeting for the heading as well costs
+// the tallest photos a little size, but it means the first one can share the
+// page with its heading instead of being pushed over and leaving a page that
+// is blank but for a title.
 const PHOTO_BLOCK_CHROME = 40;
-const PHOTO_MAX_HEIGHT = PAGE_HEIGHT - PAGE_MARGINS[1] - PAGE_MARGINS[3] - PHOTO_BLOCK_CHROME;
+const SECTION_HEADING_ALLOWANCE = 30;
+const PHOTO_MAX_HEIGHT =
+  PAGE_HEIGHT - PAGE_MARGINS[1] - PAGE_MARGINS[3] - PHOTO_BLOCK_CHROME - SECTION_HEADING_ALLOWANCE;
+
+// The letterhead is drawn in the page header, so it appears on every page of
+// every report. Referencing it through the document's `images` dictionary
+// rather than inlining the data URL is what makes pdfmake embed it once and
+// share it: passing the data URL straight to the image node defeats pdfmake's
+// image cache and re-embeds the whole PNG for each page, which on a twenty-page
+// photo report accounted for the majority of the file.
+const LOGO_IMAGE_KEY = 'sbLogo';
 
 const printer = new PdfPrinter({
   Roboto: {
@@ -174,10 +189,11 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
       subheader: { fontSize: 12, bold: true, color: '#2c3e50' },
     },
     defaultStyle: { fontSize: 10 },
+    images: { [LOGO_IMAGE_KEY]: SB_LOGO_DATA_URL },
     pageMargins: PAGE_MARGINS,
     header: () => ({
       columns: [
-        { image: SB_LOGO_DATA_URL, width: 140, margin: [40, 15, 0, 0] as [number, number, number, number] },
+        { image: LOGO_IMAGE_KEY, width: 140, margin: [40, 15, 0, 0] as [number, number, number, number] },
         {
           stack: [
             { text: 'Stewart Bassett, Director', fontSize: 9, alignment: 'right' as const },

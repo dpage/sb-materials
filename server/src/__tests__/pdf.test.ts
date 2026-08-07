@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3';
 import type { Express } from 'express';
 import { createTestDb, createTestApp, loginAsAdmin, createTestCustomerAndSite } from './helpers';
 import { generatePdf } from '../utils/pdf-generator';
+import { SB_LOGO_DATA_URL } from '../utils/logo';
 import { loadCollectionNote } from '../utils/collection-note-loader';
 import {
   generateCollectionNotePdf,
@@ -50,23 +51,39 @@ function extractPdfText(buf: Buffer): string {
 // to what is actually visible; the draw operators are. Every page draws the
 // letterhead logo once, so `drawn - pages` is the number of report images that
 // made it onto a page.
-function countDrawnImages(buf: Buffer): { drawn: number; pages: number } {
+// How many report images each page paints, in page order. pdfkit writes an
+// image XObject as soon as it is measured, whether or not it ever ends up
+// drawn, so the object table is no guide to what is actually visible; the
+// `/Ixx Do` draw operators in the page content streams are. Every page paints
+// the letterhead logo exactly once, which both identifies a page content
+// stream (fonts and images inflate to something with no draw operators in it)
+// and accounts for the one draw that is not a report photo.
+function photosDrawnPerPage(buf: Buffer): number[] {
+  const perPage: number[] = [];
   let idx = 0;
-  let drawn = 0;
   while ((idx = buf.indexOf('stream', idx)) !== -1) {
     const start = buf.indexOf('\n', idx) + 1;
     const end = buf.indexOf('endstream', start);
     if (end === -1) break;
     try {
       const content = zlib.inflateSync(buf.subarray(start, end)).toString('latin1');
-      drawn += (content.match(/\/I\d+\s+Do/g) || []).length;
+      const draws = (content.match(/\/I\d+\s+Do/g) || []).length;
+      if (draws > 0) perPage.push(draws - 1);
     } catch {
       // not a deflate stream (e.g. an image) - skip
     }
     idx = end + 'endstream'.length;
   }
-  const pages = (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
-  return { drawn, pages };
+  return perPage;
+}
+
+// Count the image XObjects the PDF actually contains. Unlike the draw
+// operators, this counts each embedded image once however many times it is
+// painted, which is what tells us whether the letterhead is being shared
+// across pages or re-embedded on every one of them. A PNG with transparency
+// costs two XObjects (the image and its soft mask); a JPEG costs one.
+function countImageXObjects(buf: Buffer): number {
+  return (buf.toString('latin1').match(/\/Subtype\s*\/Image/g) || []).length;
 }
 
 describe('PDF Routes', () => {
@@ -502,15 +519,17 @@ describe('PDF Generator', () => {
     const photoDir = path.join(tmpDir, '1');
     fs.mkdirSync(photoDir, { recursive: true });
 
-    // Aspect ratios a phone actually produces: a normal 4:3 photo, a 16:9
-    // screenshot, a tall modern phone screenshot, and a long weighbridge
-    // ticket photographed end to end. Scaled to a fixed 400pt width, the
-    // taller ones are taller than the printable area of an A4 page.
+    // Aspect ratios a phone actually produces: a long weighbridge ticket
+    // photographed end to end, a tall modern phone screenshot, a 16:9
+    // screenshot, and a normal 4:3 photo. Scaled to a fixed 400pt width, all
+    // but the last are taller than the printable area of an A4 page. The
+    // tallest comes first deliberately, so that the photo sharing a page with
+    // the "Photos" section heading is the one least able to afford the room.
     const shapes: [number, number][] = [
-      [3000, 4000],
-      [1080, 1920],
-      [1080, 2340],
       [1000, 3000],
+      [1080, 2340],
+      [1080, 1920],
+      [3000, 4000],
     ];
 
     const photos = [];
@@ -539,8 +558,10 @@ describe('PDF Generator', () => {
 
     const buffer = await generatePdf(report as any, tmpDir);
 
-    const { drawn, pages } = countDrawnImages(buffer);
-    expect(drawn - pages).toBe(shapes.length);
+    // A page of report details, and then exactly one photo on each page that
+    // follows. A photo that could not be placed would show up here twice over:
+    // as a missing photo, and as a page carrying none.
+    expect(photosDrawnPerPage(buffer)).toEqual([0, ...shapes.map(() => 1)]);
 
     // The caption travels in the same unbreakable block as the photo, so a
     // dropped photo takes its label with it.
@@ -550,6 +571,56 @@ describe('PDF Generator', () => {
     }
 
     fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('embeds the letterhead logo once, not once per page', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-'));
+    const photoDir = path.join(tmpDir, '1');
+    fs.mkdirSync(photoDir, { recursive: true });
+
+    // Six photos is enough to run the report well past half a dozen pages,
+    // since each one takes a page of its own.
+    const photos = [];
+    for (let i = 0; i < 6; i++) {
+      const name = `p${i}.jpg`;
+      await sharp({ create: { width: 1200, height: 1600, channels: 3, background: { r: 200, g: 60, b: 40 } } })
+        .jpeg()
+        .toFile(path.join(photoDir, name));
+      photos.push({ file_path: `1/${name}`, photo_label: `Photo ${i}`, container_id: null });
+    }
+
+    const report = {
+      id: 1,
+      report_type: 'quarterly_pern',
+      customer_name: 'Test',
+      site_address: 'Test',
+      inspection_date: '2026-08-05',
+      inspector_name: 'Test',
+      status: 'completed',
+      inspection_details: { product_grade: 'OCC' },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos,
+    };
+
+    const buffer = await generatePdf(report as any, tmpDir);
+
+    expect(photosDrawnPerPage(buffer).length).toBeGreaterThan(6);
+
+    // Two XObjects for the logo (it is a PNG with an alpha channel) plus one
+    // per JPEG photo. Re-embedding the logo would make this scale with the
+    // page count instead.
+    expect(countImageXObjects(buffer)).toBe(2 + photos.length);
+
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('keeps the embedded logo small enough not to bloat every report', () => {
+    // The logo is only ever drawn 140pt wide, so it needs a few hundred pixels
+    // across, not a few thousand. Regenerate it with `npm run logo:generate`
+    // if this ever fails after the artwork is replaced.
+    expect(SB_LOGO_DATA_URL.length).toBeLessThan(60_000);
   });
 
   it('embeds moisture-reading photos for a loading inspection', async () => {
