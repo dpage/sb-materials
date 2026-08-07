@@ -44,6 +44,31 @@ function extractPdfText(buf: Buffer): string {
   return out.join('');
 }
 
+// Count `/Ixx Do` image-draw operators across every page content stream, and
+// the pages themselves. pdfkit writes an image XObject as soon as it is
+// measured, whether or not it ends up drawn, so the object table is no guide
+// to what is actually visible; the draw operators are. Every page draws the
+// letterhead logo once, so `drawn - pages` is the number of report images that
+// made it onto a page.
+function countDrawnImages(buf: Buffer): { drawn: number; pages: number } {
+  let idx = 0;
+  let drawn = 0;
+  while ((idx = buf.indexOf('stream', idx)) !== -1) {
+    const start = buf.indexOf('\n', idx) + 1;
+    const end = buf.indexOf('endstream', start);
+    if (end === -1) break;
+    try {
+      const content = zlib.inflateSync(buf.subarray(start, end)).toString('latin1');
+      drawn += (content.match(/\/I\d+\s+Do/g) || []).length;
+    } catch {
+      // not a deflate stream (e.g. an image) - skip
+    }
+    idx = end + 'endstream'.length;
+  }
+  const pages = (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  return { drawn, pages };
+}
+
 describe('PDF Routes', () => {
   let db: Database.Database;
   let app: Express;
@@ -469,6 +494,61 @@ describe('PDF Generator', () => {
     expect(buffer.subarray(0, 5).toString()).toBe('%PDF-');
     // Full-res embedding would be several MB; downscaled it must be well under 1MB.
     expect(buffer.length).toBeLessThan(1_000_000);
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('embeds tall portrait photos rather than dropping them onto blank pages', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-'));
+    const photoDir = path.join(tmpDir, '1');
+    fs.mkdirSync(photoDir, { recursive: true });
+
+    // Aspect ratios a phone actually produces: a normal 4:3 photo, a 16:9
+    // screenshot, a tall modern phone screenshot, and a long weighbridge
+    // ticket photographed end to end. Scaled to a fixed 400pt width, the
+    // taller ones are taller than the printable area of an A4 page.
+    const shapes: [number, number][] = [
+      [3000, 4000],
+      [1080, 1920],
+      [1080, 2340],
+      [1000, 3000],
+    ];
+
+    const photos = [];
+    for (const [w, h] of shapes) {
+      const name = `${w}x${h}.jpg`;
+      await sharp({ create: { width: w, height: h, channels: 3, background: { r: 30, g: 140, b: 200 } } })
+        .jpeg()
+        .toFile(path.join(photoDir, name));
+      photos.push({ file_path: `1/${name}`, photo_label: `${w}x${h}`, container_id: null });
+    }
+
+    const report = {
+      id: 1,
+      report_type: 'quarterly_pern',
+      customer_name: 'Test',
+      site_address: 'Test',
+      inspection_date: '2026-08-05',
+      inspector_name: 'Test',
+      status: 'completed',
+      inspection_details: { product_grade: 'OCC' },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos,
+    };
+
+    const buffer = await generatePdf(report as any, tmpDir);
+
+    const { drawn, pages } = countDrawnImages(buffer);
+    expect(drawn - pages).toBe(shapes.length);
+
+    // The caption travels in the same unbreakable block as the photo, so a
+    // dropped photo takes its label with it.
+    const text = extractPdfText(buffer);
+    for (const [w, h] of shapes) {
+      expect(text).toContain(`${w}x${h}`);
+    }
+
     fs.rmSync(tmpDir, { recursive: true });
   });
 

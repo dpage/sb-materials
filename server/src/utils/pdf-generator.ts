@@ -16,6 +16,23 @@ import {
 
 const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
 
+// A4 portrait in PDF points, and the page margins every report shares.
+const PAGE_HEIGHT = 841.89;
+const PAGE_MARGINS: [number, number, number, number] = [40, 70, 40, 50];
+
+// Each photo is laid out as an unbreakable block so that a caption can never be
+// separated from its image. pdfmake has no way to place an unbreakable block
+// that is taller than the printable area of a page, and rather than complain it
+// silently discards the block and leaves a blank page in its place, so a photo
+// must always be scaled to fit within a single page. Constraining the height as
+// well as the width is what makes that guarantee: sizing on width alone means a
+// tall portrait photo (a phone screenshot, or a weighbridge ticket shot end to
+// end) overflows the page and vanishes.
+const PHOTO_MAX_WIDTH = 400;
+// Allowance for the caption line and the margins above and below the block.
+const PHOTO_BLOCK_CHROME = 40;
+const PHOTO_MAX_HEIGHT = PAGE_HEIGHT - PAGE_MARGINS[1] - PAGE_MARGINS[3] - PHOTO_BLOCK_CHROME;
+
 const printer = new PdfPrinter({
   Roboto: {
     normal: 'Helvetica',
@@ -77,8 +94,15 @@ async function buildPhotoDataMap(report: any, uploadsDir: string): Promise<Map<s
   return map;
 }
 
-// Center an image using a single-cell table (pdfmake's reliable centering method)
-function centeredImage(base64: string, width: number, marginBottom: number = 10): Content {
+// Center an image using a single-cell table (pdfmake's reliable centering
+// method). `fit` scales the image down to sit inside the box while preserving
+// its aspect ratio, so the result is bounded on both axes and never upscaled.
+function centeredImage(
+  base64: string,
+  width: number,
+  marginBottom: number = 10,
+  maxHeight: number = PHOTO_MAX_HEIGHT,
+): Content {
   return {
     table: {
       widths: ['*'],
@@ -86,7 +110,7 @@ function centeredImage(base64: string, width: number, marginBottom: number = 10)
         [
           {
             image: base64,
-            width,
+            fit: [width, maxHeight],
             alignment: 'center' as const,
             border: [false, false, false, false],
             margin: [0, 0, 0, 0] as [number, number, number, number],
@@ -100,7 +124,7 @@ function centeredImage(base64: string, width: number, marginBottom: number = 10)
 }
 
 // Photo block: label + centered image, kept together on one page
-function photoBlock(base64: string, label: string | null, width: number = 400): Content {
+function photoBlock(base64: string, label: string | null, width: number = PHOTO_MAX_WIDTH): Content {
   const items: Content[] = [];
   if (label) {
     items.push({
@@ -150,7 +174,7 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
       subheader: { fontSize: 12, bold: true, color: '#2c3e50' },
     },
     defaultStyle: { fontSize: 10 },
-    pageMargins: [40, 70, 40, 50] as [number, number, number, number],
+    pageMargins: PAGE_MARGINS,
     header: () => ({
       columns: [
         { image: SB_LOGO_DATA_URL, width: 140, margin: [40, 15, 0, 0] as [number, number, number, number] },
