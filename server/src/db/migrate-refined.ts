@@ -3,6 +3,58 @@ import { logger } from '../utils/logger';
 
 const OLD_TYPES = ['inspection_fibre', 'inspection_plastics', 'inspection_metals'];
 
+const TYPED_LOOKUPS = [
+  'lookup_product_descriptions',
+  'lookup_product_grades',
+  'lookup_unwanted_materials',
+  'lookup_contaminants',
+];
+
+/**
+ * Collapse lookup rows that differ only by id.
+ *
+ * The seed inserts each value once per material-split report type, and step 2
+ * above then re-points every one of those types onto loading_inspection, so a
+ * value seeded under both inspection_plastics and inspection_metals arrives
+ * here as two identical rows (three, where it was seeded under all three old
+ * types). That is what put "PET" in the dropdown twice.
+ *
+ * Nothing references a lookup by id: reports and collection notes store the
+ * chosen text, so the surplus rows can simply go. The lowest id is kept, and
+ * it is left active if any of its duplicates was active, because quietly
+ * dropping a value out of every dropdown is a worse outcome than showing one
+ * that somebody had deactivated on only one of its two rows; with a single row
+ * left, deactivating it now actually works.
+ */
+function dedupeLookups(db: Database.Database): void {
+  for (const table of TYPED_LOOKUPS) {
+    // Carry an active duplicate's state onto the row that is about to become
+    // the survivor. Once a group is down to a single row this is a no-op, so
+    // it is safe to run on every startup.
+    db.prepare(
+      `UPDATE ${table} AS keep SET is_active = 1
+        WHERE keep.id IN (SELECT MIN(id) FROM ${table} GROUP BY report_type, value)
+          AND keep.is_active = 0
+          AND EXISTS (
+            SELECT 1 FROM ${table} dup
+             WHERE dup.report_type = keep.report_type
+               AND dup.value = keep.value
+               AND dup.is_active = 1
+          )`,
+    ).run();
+
+    const removed = db
+      .prepare(
+        `DELETE FROM ${table}
+          WHERE id NOT IN (SELECT MIN(id) FROM ${table} GROUP BY report_type, value)`,
+      )
+      .run();
+    if (removed.changes > 0) {
+      logger.info(`Removed ${removed.changes} duplicate row(s) from ${table}`);
+    }
+  }
+}
+
 export function migrateRefined(db: Database.Database): void {
   const tx = db.transaction(() => {
     // 1. Re-point report types on reports
@@ -12,17 +64,14 @@ export function migrateRefined(db: Database.Database): void {
       .run(...OLD_TYPES);
     if (repointed.changes > 0) logger.info(`Re-pointed ${repointed.changes} report(s) to loading_inspection`);
 
-    // 2. Re-point lookup report_type values too (so existing lookups still resolve)
-    for (const table of [
-      'lookup_product_descriptions',
-      'lookup_product_grades',
-      'lookup_unwanted_materials',
-      'lookup_contaminants',
-    ]) {
+    // 2. Re-point lookup report_type values too (so existing lookups still
+    // resolve), then collapse the duplicates that re-pointing creates.
+    for (const table of TYPED_LOOKUPS) {
       db.prepare(`UPDATE ${table} SET report_type = 'loading_inspection' WHERE report_type IN (${placeholders})`).run(
         ...OLD_TYPES,
       );
     }
+    dedupeLookups(db);
 
     // 3. Backfill created_by_id from inspector_id
     db.prepare('UPDATE reports SET created_by_id = inspector_id WHERE created_by_id IS NULL').run();

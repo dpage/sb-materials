@@ -25,7 +25,13 @@ export function seedData(db: Database.Database): void {
     'Administrator',
   );
 
-  // Product descriptions (plastics/metals)
+  // Product descriptions (plastics/metals).
+  //
+  // Values below are seeded once per material-split report type, which is the
+  // shape those types had at the time. migrateRefined() then re-points all of
+  // them onto loading_inspection and collapses the resulting identical rows,
+  // so do not read the repetition here as intentional duplication: dedupeLookups()
+  // in migrate-refined.ts is what keeps a value out of a dropdown twice.
   const productDescs = ['PET', 'HDPE', 'PP', 'LDPE', 'Mixed Plastics', 'Aluminium', 'Steel', 'Mixed Metals'];
   for (const desc of productDescs) {
     db.prepare('INSERT INTO lookup_product_descriptions (report_type, value) VALUES (?, ?)').run(
