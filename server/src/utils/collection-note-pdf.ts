@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { logger } from './logger';
+import { SB_LOGO_DATA_URL } from './logo';
 import type { CollectionNoteRecord } from './collection-note-loader';
 
 // Fixed wording, reproduced verbatim from the collection note the company has
@@ -15,23 +16,35 @@ export const COMMENTS_LABEL = 'COMMENTS OR SPECIAL INSTRUCTIONS:';
 export const DEFAULT_COMMENTS = 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD';
 export const TRANSPORT_COMPANY_LABEL = 'Transport Company';
 export const GOODS_DISPATCHED_LABEL = 'Goods Dispatched';
-export const GOODS_RECEIVED_LABEL = 'Goods Received';
 // The dot leader runs most of the width of its cell, as it does on the original
 // Word document, so that there is physical room to sign across it. It cannot run
 // the whole width: the leader is a single unbreakable run, so pdfmake sizes the
-// column to fit it, and an over-long leader pushes the shared QUANTITY +
-// DESCRIPTION columns past the page margin. At the document's 10pt default font
-// there is 375.28pt available, "Signed" takes 31.13pt, and each leader glyph
-// takes 10pt, so 34 glyphs is the ceiling; 30 leaves a comfortable margin for
-// cell padding and font-metric rounding.
+// column to fit it, and an over-long leader pushes the QUANTITY + DESCRIPTION +
+// NETT WEIGHT columns it spans past the page margin. At the document's 10pt
+// default font those three columns give 395pt, "Signed" takes 31.13pt, and each
+// leader glyph takes 10pt, so 36 glyphs is the ceiling; 30 leaves a comfortable
+// margin for cell padding and font-metric rounding.
 export const SIGNED_RULE = `Signed${'…'.repeat(30)}`;
 export const DATE_LABEL = 'Date;';
 export const WASTE_BROKER_LINE = 'NRW Waste brokers registration CBDU027716';
 export const COMPANY_FOOTER_LINE =
   'SB Materials UK LTD 1 Deva Way, Wrexham, Wales LL13 9EU Registered in Wales & England No. 10896256';
 
-const HEADER_CELLS = ['CONTACT', 'PO NUMBER', 'REFERENCE', 'WEIGHT', 'PACKING LIST NO.', 'DATE OF COLLECTION'];
-const ITEM_HEADER_CELLS = ['QUANTITY', 'DESCRIPTION', 'COLLECTION POINT'];
+const HEADER_CELLS = [
+  'CONTACT',
+  'BUYER REFERENCE',
+  'REFERENCE',
+  'WEIGHT',
+  'MINIMUM WEIGHT TO BE LOADED',
+  'DATE OF COLLECTION',
+];
+const ITEM_HEADER_CELLS = ['QUANTITY', 'DESCRIPTION', 'NETT WEIGHT (KG)', 'COLLECTION POINT'];
+
+// The line-item table's fixed columns. The description column is elastic and
+// takes whatever is left, which at A4 with 45pt margins is 240pt.
+const ITEM_COLUMN_WIDTHS: (number | string)[] = [70, '*', 85, 110];
+
+const LOGO_IMAGE_KEY = 'sbLogo';
 
 const printer = new PdfPrinter({
   Roboto: {
@@ -57,7 +70,12 @@ export function formatUkDate(value: string | null | undefined): string {
  * rendered rows without decoding the PDF byte stream.
  */
 export function collectionNoteItemRows(note: CollectionNoteRecord): string[][] {
-  return (note.items || []).map((item) => [item.quantity ?? '', item.description ?? '', item.collection_point ?? '']);
+  return (note.items || []).map((item) => [
+    item.quantity ?? '',
+    item.description ?? '',
+    item.nett_weight ?? '',
+    item.collection_point ?? '',
+  ]);
 }
 
 /**
@@ -97,12 +115,12 @@ function signatureImage(uploadsDir: string, relPath: string | null): string | nu
 }
 
 /**
- * One of the two signature boxes: the captured signature when there is one, and
- * the original's dotted rule when there is not. Returned as a `TableCell` (not
- * bare `Content`) with `colSpan: 2` so callers can drop it straight into the
- * QUANTITY+DESCRIPTION columns of the shared line-item table; pdfmake requires
- * a matching empty placeholder cell (`{}`) immediately after a colSpan cell in
- * the same row.
+ * The signature box: the captured signature when there is one, and the
+ * original's dotted rule when there is not. Returned as a `TableCell` (not bare
+ * `Content`) with `colSpan: 3` so callers can drop it straight into the
+ * QUANTITY+DESCRIPTION+NETT WEIGHT columns of the shared line-item table;
+ * pdfmake requires matching empty placeholder cells (`{}`) immediately after a
+ * colSpan cell in the same row, one per column spanned beyond the first.
  */
 function signatureCell(label: string, image: string | null): TableCell {
   const stack: Content[] = [{ text: label, margin: [0, 2, 0, 8] as [number, number, number, number] }];
@@ -112,7 +130,7 @@ function signatureCell(label: string, image: string | null): TableCell {
   } else {
     stack.push({ text: SIGNED_RULE, margin: [0, 0, 0, 4] as [number, number, number, number] });
   }
-  return { stack, colSpan: 2 };
+  return { stack, colSpan: 3 };
 }
 
 function dateCell(value: string | null): Content {
@@ -125,10 +143,19 @@ function dateCell(value: string | null): Content {
 export async function generateCollectionNotePdf(note: CollectionNoteRecord, uploadsDir: string): Promise<Buffer> {
   const content: Content[] = [];
 
+  // Letterhead: the logo on the left, the document title ranged right against
+  // it, so the note is recognisably SB Materials' the moment it is handed over.
   content.push({
-    text: COLLECTION_NOTE_TITLE,
-    fontSize: 22,
-    bold: true,
+    columns: [
+      { image: LOGO_IMAGE_KEY, width: 170 },
+      {
+        text: COLLECTION_NOTE_TITLE,
+        fontSize: 20,
+        bold: true,
+        alignment: 'right' as const,
+        margin: [0, 12, 0, 0] as [number, number, number, number],
+      },
+    ],
     margin: [0, 0, 0, 30] as [number, number, number, number],
   });
 
@@ -155,10 +182,10 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
     HEADER_CELLS.map((text) => ({ text, bold: true, alignment: 'center' as const })),
     [
       { text: [note.contact_name, note.contact_phone].filter(Boolean).join('\n') },
-      { text: note.po_number ?? '' },
+      { text: note.buyer_reference ?? '' },
       { text: note.reference },
       { text: note.weight ?? '' },
-      { text: note.packing_list_no ?? '' },
+      { text: note.minimum_weight ?? '' },
       { text: formatUkDate(note.collection_date) },
     ],
   ];
@@ -171,10 +198,10 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
     ITEM_HEADER_CELLS.map((text) => ({ text, bold: true, alignment: 'center' as const })),
   ];
   for (const row of collectionNoteItemRows(note)) {
-    itemBody.push([{ text: row[0] }, { text: row[1], bold: true }, { text: row[2] }]);
+    itemBody.push([{ text: row[0] }, { text: row[1], bold: true }, { text: row[2] }, { text: row[3] }]);
   }
   if (itemBody.length === 1) {
-    itemBody.push([{ text: '' }, { text: '' }, { text: '' }]);
+    itemBody.push([{ text: '' }, { text: '' }, { text: '' }, { text: '' }]);
   }
   itemBody.push([
     { text: '' },
@@ -183,22 +210,21 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
       margin: [0, 0, 0, 20] as [number, number, number, number],
     },
     { text: '' },
+    { text: '' },
   ]);
 
-  // The Goods Dispatched / Goods Received rows are appended to this same
-  // table, rather than emitted as a second table, so the whole document is
-  // one continuous grid with a single right-hand edge: the signature cell
-  // spans the QUANTITY and DESCRIPTION columns (colSpan requires an empty
-  // placeholder cell straight after it), and the date falls in the third
-  // column, which already matches the standalone signature table's own
-  // right-hand width of 130.
+  // The Goods Dispatched row is appended to this same table, rather than
+  // emitted as a second table, so the whole document is one continuous grid
+  // with a single right-hand edge: the signature cell spans the QUANTITY,
+  // DESCRIPTION, and NETT WEIGHT columns (colSpan requires an empty
+  // placeholder cell per further column spanned), and the date falls in the
+  // last column, which already matches the standalone signature table's own
+  // right-hand width.
   const dispatched = signatureImage(uploadsDir, note.dispatched_signature_path);
-  const received = signatureImage(uploadsDir, note.received_signature_path);
-  itemBody.push([signatureCell(GOODS_DISPATCHED_LABEL, dispatched), {}, dateCell(note.dispatched_signed_date)]);
-  itemBody.push([signatureCell(GOODS_RECEIVED_LABEL, received), {}, dateCell(note.received_signed_date)]);
+  itemBody.push([signatureCell(GOODS_DISPATCHED_LABEL, dispatched), {}, {}, dateCell(note.dispatched_signed_date)]);
 
   content.push({
-    table: { widths: [80, '*', 130], headerRows: 1, body: itemBody },
+    table: { widths: ITEM_COLUMN_WIDTHS, headerRows: 1, body: itemBody },
     margin: [0, 0, 0, 30] as [number, number, number, number],
   });
 
@@ -208,6 +234,7 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
   const docDefinition: TDocumentDefinitions = {
     content,
     defaultStyle: { fontSize: 10 },
+    images: { [LOGO_IMAGE_KEY]: SB_LOGO_DATA_URL },
     pageMargins: [45, 45, 45, 45] as [number, number, number, number],
   };
 

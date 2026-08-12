@@ -4,11 +4,21 @@ import SignatureCanvas from 'react-signature-canvas';
 import { api } from '../api';
 import { QuickAddModal } from '../components/QuickAddModal';
 import { useAuth } from '../App';
-import type { Customer, CustomerSite, CollectionNoteItem } from '../types';
+import type { Customer, CustomerSite, CollectionNoteItem, LookupValue } from '../types';
 
 const DEFAULT_COMMENTS = 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD';
 
-const emptyItem = (): CollectionNoteItem => ({ quantity: '', description: '', collection_point: '' });
+// Product descriptions are held per report type, and the collection note draws
+// on the same list the loading inspection uses rather than keeping one of its
+// own, so that a description added in either place shows up in both.
+const PRODUCT_DESCRIPTION_REPORT_TYPE = 'loading_inspection';
+
+const emptyItem = (): CollectionNoteItem => ({
+  quantity: '',
+  description: '',
+  nett_weight: '',
+  collection_point: '',
+});
 
 // Builds the address block a customer or site selection derives for "Collect
 // From": the customer name followed by the relevant address lines. Returns
@@ -25,6 +35,15 @@ function deriveCollectFrom(
   const site = siteId ? sites.find((s) => s.id === siteId) : undefined;
   const addressLines = site ? site.address : customer.address;
   return addressLines ? `${customer.name}\n${addressLines}` : customer.name;
+}
+
+// The description options offered for a line item: the product description
+// lookup, plus whatever the item already holds if that is not in the list.
+// Notes raised before the description became a dropdown carry free text, and
+// selecting nothing must not quietly wipe it.
+function descriptionOptions(lookups: LookupValue[], current: string | null): string[] {
+  const values = lookups.map((l) => l.value);
+  return current && !values.includes(current) ? [...values, current] : values;
 }
 
 export function CollectionNoteEdit() {
@@ -49,23 +68,25 @@ export function CollectionNoteEdit() {
   const [comments, setComments] = useState(isEdit ? '' : DEFAULT_COMMENTS);
   const [contactName, setContactName] = useState(isEdit ? '' : user?.displayName || '');
   const [contactPhone, setContactPhone] = useState(isEdit ? '' : user?.phone || '');
-  const [poNumber, setPoNumber] = useState('');
+  const [buyerReference, setBuyerReference] = useState('');
   const [weight, setWeight] = useState('');
-  const [packingListNo, setPackingListNo] = useState('');
+  const [minimumWeight, setMinimumWeight] = useState('');
   const [collectionDate, setCollectionDate] = useState(isEdit ? '' : new Date().toISOString().slice(0, 10));
   const [transportCompany, setTransportCompany] = useState('');
   const [items, setItems] = useState<CollectionNoteItem[]>([emptyItem()]);
 
   const [dispatchedSignedDate, setDispatchedSignedDate] = useState('');
-  const [receivedSignedDate, setReceivedSignedDate] = useState('');
   const [existingDispatchedSignature, setExistingDispatchedSignature] = useState<string | null>(null);
-  const [existingReceivedSignature, setExistingReceivedSignature] = useState<string | null>(null);
   const dispatchedSigRef = useRef<SignatureCanvas>(null);
-  const receivedSigRef = useRef<SignatureCanvas>(null);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sites, setSites] = useState<CustomerSite[]>([]);
-  const [quickAdd, setQuickAdd] = useState<{ type: 'customer' | 'site' } | null>(null);
+  const [productDescriptions, setProductDescriptions] = useState<LookupValue[]>([]);
+  // A product quick-add remembers which line item asked for it, so the new
+  // description can be selected straight into that row.
+  const [quickAdd, setQuickAdd] = useState<
+    { type: 'customer' | 'site' } | { type: 'product'; itemIndex: number } | null
+  >(null);
 
   const [referenceError, setReferenceError] = useState('');
   const [customerError, setCustomerError] = useState('');
@@ -82,9 +103,10 @@ export function CollectionNoteEdit() {
     api.getNextCollectionNoteReference().then((r) => setReference(r.reference));
   }, [isEdit]);
 
-  // Load customers once.
+  // Load customers and the product description list once.
   useEffect(() => {
     api.getCustomers().then(setCustomers);
+    api.getLookups('lookup_product_descriptions', PRODUCT_DESCRIPTION_REPORT_TYPE).then(setProductDescriptions);
   }, []);
 
   // Load sites whenever the chosen customer changes.
@@ -120,15 +142,13 @@ export function CollectionNoteEdit() {
         setComments(note.comments || '');
         setContactName(note.contact_name || '');
         setContactPhone(note.contact_phone || '');
-        setPoNumber(note.po_number || '');
+        setBuyerReference(note.buyer_reference || '');
         setWeight(note.weight || '');
-        setPackingListNo(note.packing_list_no || '');
+        setMinimumWeight(note.minimum_weight || '');
         setCollectionDate(note.collection_date || '');
         setTransportCompany(note.transport_company || '');
         setDispatchedSignedDate(note.dispatched_signed_date || '');
-        setReceivedSignedDate(note.received_signed_date || '');
         setExistingDispatchedSignature(note.dispatched_signature_path || null);
-        setExistingReceivedSignature(note.received_signature_path || null);
         setItems(note.items && note.items.length > 0 ? note.items : [emptyItem()]);
       })
       .finally(() => setLoading(false));
@@ -166,16 +186,16 @@ export function CollectionNoteEdit() {
         comments: comments || null,
         contact_name: contactName || null,
         contact_phone: contactPhone || null,
-        po_number: poNumber || null,
+        buyer_reference: buyerReference || null,
         weight: weight || null,
-        packing_list_no: packingListNo || null,
+        minimum_weight: minimumWeight || null,
         collection_date: collectionDate || null,
         transport_company: transportCompany || null,
         dispatched_signed_date: dispatchedSignedDate || null,
-        received_signed_date: receivedSignedDate || null,
         items: items.map((it) => ({
           quantity: it.quantity || null,
           description: it.description || null,
+          nett_weight: it.nett_weight || null,
           collection_point: it.collection_point || null,
         })),
       };
@@ -193,10 +213,6 @@ export function CollectionNoteEdit() {
       if (dispatchedSigRef.current && !dispatchedSigRef.current.isEmpty()) {
         const blob = await fetch(dispatchedSigRef.current.toDataURL('image/png')).then((r) => r.blob());
         await api.uploadCollectionNoteSignature(noteId, 'dispatched', blob);
-      }
-      if (receivedSigRef.current && !receivedSigRef.current.isEmpty()) {
-        const blob = await fetch(receivedSigRef.current.toDataURL('image/png')).then((r) => r.blob());
-        await api.uploadCollectionNoteSignature(noteId, 'received', blob);
       }
 
       navigate('/collection-notes');
@@ -322,13 +338,13 @@ export function CollectionNoteEdit() {
               />
             </div>
             <div>
-              <label style={labelStyle} htmlFor="cn-po-number">
-                PO Number
+              <label style={labelStyle} htmlFor="cn-buyer-reference">
+                Buyer Reference
               </label>
               <input
-                id="cn-po-number"
-                value={poNumber}
-                onChange={(e) => setPoNumber(e.target.value)}
+                id="cn-buyer-reference"
+                value={buyerReference}
+                onChange={(e) => setBuyerReference(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -339,13 +355,13 @@ export function CollectionNoteEdit() {
               <input id="cn-weight" value={weight} onChange={(e) => setWeight(e.target.value)} style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle} htmlFor="cn-packing-list-no">
-                Packing List No.
+              <label style={labelStyle} htmlFor="cn-minimum-weight">
+                Minimum Weight to be Loaded
               </label>
               <input
-                id="cn-packing-list-no"
-                value={packingListNo}
-                onChange={(e) => setPackingListNo(e.target.value)}
+                id="cn-minimum-weight"
+                value={minimumWeight}
+                onChange={(e) => setMinimumWeight(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -412,18 +428,46 @@ export function CollectionNoteEdit() {
                   style={inputStyle}
                 />
               </div>
-              <div style={{ flex: 2 }}>
+              <div style={{ flex: 2, minWidth: 200 }}>
                 <label style={labelStyle} htmlFor={`cn-item-desc-${i}`}>
                   Description
                 </label>
+                <div style={inputWithBtnRow}>
+                  <select
+                    id={`cn-item-desc-${i}`}
+                    value={item.description || ''}
+                    onChange={(e) => updateItem(i, 'description', e.target.value)}
+                    style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  >
+                    <option value="">Select description...</option>
+                    {descriptionOptions(productDescriptions, item.description).map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    aria-label="Add product description"
+                    onClick={() => setQuickAdd({ type: 'product', itemIndex: i })}
+                    style={addBtnStyle}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div style={{ flex: '0 0 130px' }}>
+                <label style={labelStyle} htmlFor={`cn-item-nett-weight-${i}`}>
+                  Nett Weight (kg)
+                </label>
                 <input
-                  id={`cn-item-desc-${i}`}
-                  value={item.description || ''}
-                  onChange={(e) => updateItem(i, 'description', e.target.value)}
+                  id={`cn-item-nett-weight-${i}`}
+                  value={item.nett_weight || ''}
+                  onChange={(e) => updateItem(i, 'nett_weight', e.target.value)}
                   style={inputStyle}
                 />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 140 }}>
                 <label style={labelStyle} htmlFor={`cn-item-point-${i}`}>
                   Collection Point
                 </label>
@@ -485,42 +529,6 @@ export function CollectionNoteEdit() {
           </div>
         </Section>
 
-        <Section title="Goods Received">
-          {existingReceivedSignature && (
-            <div style={{ marginBottom: 12 }}>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>Current signature:</p>
-              <img
-                src={api.getPhotoUrl(existingReceivedSignature)}
-                alt="Received signature"
-                style={{ maxWidth: 300, border: '1px solid #dde', borderRadius: 8 }}
-              />
-            </div>
-          )}
-          <div style={sigCanvasWrapStyle}>
-            <SignatureCanvas
-              ref={receivedSigRef}
-              canvasProps={{ width: 500, height: 150, style: { maxWidth: '100%' } }}
-            />
-          </div>
-          <div style={{ marginTop: 8, display: 'flex', gap: 16, alignItems: 'end', flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => receivedSigRef.current?.clear()} style={linkBtnStyle}>
-              Clear
-            </button>
-            <div>
-              <label style={labelStyle} htmlFor="cn-received-date">
-                Goods Received Date
-              </label>
-              <input
-                id="cn-received-date"
-                type="date"
-                value={receivedSignedDate}
-                onChange={(e) => setReceivedSignedDate(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-          </div>
-        </Section>
-
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', padding: '20px 0' }}>
           <button onClick={() => navigate('/collection-notes')} style={linkBtnStyle}>
             Cancel
@@ -553,6 +561,20 @@ export function CollectionNoteEdit() {
           const result = await api.createSite(customerId as number, address);
           setSites((prev) => [...prev, result]);
           setSiteId(result.id);
+        }}
+        onClose={() => setQuickAdd(null)}
+      />
+      <QuickAddModal
+        open={quickAdd?.type === 'product'}
+        title="Add New Product Description"
+        label="Product Description"
+        onSave={async (value) => {
+          const result = await api.createLookup('lookup_product_descriptions', {
+            value,
+            report_type: PRODUCT_DESCRIPTION_REPORT_TYPE,
+          });
+          setProductDescriptions((prev) => [...prev, result]);
+          if (quickAdd?.type === 'product') updateItem(quickAdd.itemIndex, 'description', result.value);
         }}
         onClose={() => setQuickAdd(null)}
       />

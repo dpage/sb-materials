@@ -5,6 +5,7 @@ export interface CollectionNoteItemRow {
   note_id: number;
   quantity: string | null;
   description: string | null;
+  nett_weight: string | null;
   collection_point: string | null;
   sort_order: number;
 }
@@ -18,15 +19,13 @@ export interface CollectionNoteRecord {
   comments: string | null;
   contact_name: string | null;
   contact_phone: string | null;
-  po_number: string | null;
+  buyer_reference: string | null;
   weight: string | null;
-  packing_list_no: string | null;
+  minimum_weight: string | null;
   collection_date: string | null;
   transport_company: string | null;
   dispatched_signature_path: string | null;
   dispatched_signed_date: string | null;
-  received_signature_path: string | null;
-  received_signed_date: string | null;
   created_by_id: number | null;
   created_at: string;
   updated_at: string;

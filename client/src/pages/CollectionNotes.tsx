@@ -26,6 +26,8 @@ export function CollectionNotes() {
   const [order, setOrder] = useState<'ASC' | 'DESC'>('DESC');
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [copyingId, setCopyingId] = useState<number | null>(null);
+  const [copyError, setCopyError] = useState('');
 
   const limit = 25;
 
@@ -64,6 +66,24 @@ export function CollectionNotes() {
     await api.deleteCollectionNote(deleteId);
     setDeleteId(null);
     fetchNotes();
+  };
+
+  // The same load often goes out repeatedly, so a copy is deliberately a
+  // single click that leaves you on the list: the new note takes the next
+  // reference and today's date, and can be opened afterwards if anything needs
+  // changing.
+  const handleCopy = async (id: number) => {
+    if (copyingId !== null) return;
+    setCopyingId(id);
+    setCopyError('');
+    try {
+      await api.duplicateCollectionNote(id);
+      await fetchNotes();
+    } catch (err: any) {
+      setCopyError(err?.message || 'Could not copy the collection note');
+    } finally {
+      setCopyingId(null);
+    }
   };
 
   const handleSort = (field: SortField) => {
@@ -127,7 +147,13 @@ export function CollectionNotes() {
           text-decoration: none; display: inline-block;
         }
         .action-btn.delete { color: #e74c3c; }
+        .action-btn:disabled, .cn-card-action-btn:disabled { opacity: 0.5; cursor: default; }
         .actions-row { display: flex; gap: 6px; }
+
+        .copy-error {
+          background: #fdf0ef; border: 1px solid #e74c3c; color: #c0392b;
+          padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 14px;
+        }
 
         /* Mobile cards */
         .cn-cards { display: none; }
@@ -216,6 +242,8 @@ export function CollectionNotes() {
         </div>
       </div>
 
+      {copyError && <div className="copy-error">{copyError}</div>}
+
       {loading ? (
         <div className="empty-state">Loading...</div>
       ) : notes.length === 0 ? (
@@ -256,6 +284,9 @@ export function CollectionNotes() {
                       <div className="actions-row">
                         <button className="action-btn" onClick={() => navigate(`/collection-notes/${n.id}`)}>
                           Edit
+                        </button>
+                        <button className="action-btn" disabled={copyingId !== null} onClick={() => handleCopy(n.id)}>
+                          {copyingId === n.id ? 'Copying...' : 'Copy'}
                         </button>
                         <a className="action-btn" href={api.downloadCollectionNotePdf(n.id)}>
                           PDF
@@ -304,6 +335,9 @@ export function CollectionNotes() {
                 <div className="cn-card-actions">
                   <button className="cn-card-action-btn" onClick={() => navigate(`/collection-notes/${n.id}`)}>
                     Edit
+                  </button>
+                  <button className="cn-card-action-btn" disabled={copyingId !== null} onClick={() => handleCopy(n.id)}>
+                    {copyingId === n.id ? 'Copying...' : 'Copy'}
                   </button>
                   <a className="cn-card-action-btn" href={api.downloadCollectionNotePdf(n.id)}>
                     PDF

@@ -118,7 +118,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Note Actions',
-        body: 'Each note row has actions:\n\n- Edit: Open the note for editing\n- PDF: Download the note as a formatted PDF, named for its reference, date, and customer\n- Delete: Permanently remove the note (you will be asked to confirm)',
+        body: "Each note row has actions:\n\n- Edit: Open the note for editing\n- Copy: Raise a fresh note carrying the same customer, items, and transport details, but with the next SBM reference and today's collection date. Useful when the same load goes out repeatedly; the copy never carries the original's signature.\n- PDF: Download the note as a formatted PDF, named for its reference, date, and customer\n- Delete: Permanently remove the note (you will be asked to confirm)",
       },
     ],
   },
@@ -140,11 +140,11 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Items',
-        body: 'List the items being collected, each with a quantity, description, and collection point. These appear on the PDF and in the item summary shown on the list page.',
+        body: 'List the items being collected, each with a quantity, description, nett weight in kilogrammes, and collection point. The description is chosen from the shared product description list, and the "+" button beside it adds a new description without leaving the form. These appear on the PDF and in the item summary shown on the list page.',
       },
       {
-        title: 'Signatures',
-        body: 'Signatures for dispatch and receipt may be captured on screen using the signature pad, or left blank if the note is to be signed on paper instead.',
+        title: 'Signature',
+        body: 'The goods dispatched signature may be captured on screen using the signature pad, or left blank if the note is to be signed on paper instead. There is no goods received signature: the note travels with the load and never comes back.',
       },
     ],
   },

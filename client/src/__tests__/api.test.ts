@@ -304,6 +304,16 @@ describe('API Client', () => {
       expect(spy).toHaveBeenCalledWith('/api/collection-notes/1', expect.objectContaining({ method: 'DELETE' }));
     });
 
+    it('should duplicate a collection note', async () => {
+      const spy = mockFetch({ id: 2, reference: 'SBM1062' });
+      const result = await api.duplicateCollectionNote(1);
+      expect(spy).toHaveBeenCalledWith(
+        '/api/collection-notes/1/duplicate',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(result.reference).toBe('SBM1062');
+    });
+
     it('should upload a collection note signature', async () => {
       const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
         ok: true,
@@ -320,7 +330,7 @@ describe('API Client', () => {
 
     it('should throw on collection note signature upload failure', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false } as Response);
-      await expect(api.uploadCollectionNoteSignature(1, 'received', new Blob())).rejects.toThrow(
+      await expect(api.uploadCollectionNoteSignature(1, 'dispatched', new Blob())).rejects.toThrow(
         'Signature upload failed',
       );
     });

@@ -207,8 +207,10 @@ export const api = {
     request<{ id: number; reference: string }>('/collection-notes', { method: 'POST', body: JSON.stringify(data) }),
   updateCollectionNote: (id: number, data: CollectionNoteData) =>
     request<{ ok: boolean }>(`/collection-notes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  duplicateCollectionNote: (id: number) =>
+    request<{ id: number; reference: string }>(`/collection-notes/${id}/duplicate`, { method: 'POST' }),
   deleteCollectionNote: (id: number) => request(`/collection-notes/${id}`, { method: 'DELETE' }),
-  uploadCollectionNoteSignature: async (noteId: number, kind: 'dispatched' | 'received', blob: Blob) => {
+  uploadCollectionNoteSignature: async (noteId: number, kind: 'dispatched', blob: Blob) => {
     const formData = new FormData();
     formData.append('signature', blob, 'signature.png');
     const res = await fetch(`${BASE}/collection-notes/${noteId}/signature/${kind}`, {

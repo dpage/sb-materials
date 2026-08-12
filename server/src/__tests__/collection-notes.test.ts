@@ -157,14 +157,14 @@ describe('collection note routes', () => {
     comments: 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD',
     contact_name: 'Test User',
     contact_phone: '07700 900123',
-    po_number: 'N/A',
+    buyer_reference: 'BR-1',
     weight: '24t',
-    packing_list_no: 'PL-1',
+    minimum_weight: '22t',
     collection_date: '2026-08-03',
     transport_company: 'Test Haulage',
     items: [
-      { quantity: '1x', description: 'Poly cup reels', collection_point: 'Bay 3' },
-      { quantity: '2x', description: 'Mixed paper bales', collection_point: 'Yard' },
+      { quantity: '1x', description: 'Poly cup reels', nett_weight: '1250', collection_point: 'Bay 3' },
+      { quantity: '2x', description: 'Mixed paper bales', nett_weight: '980', collection_point: 'Yard' },
     ],
   });
 
@@ -187,8 +187,11 @@ describe('collection note routes', () => {
       .expect(200);
     expect(fetched.body.customer_name).toBe('Acme Recycling Ltd');
     expect(fetched.body.weight).toBe('24t');
+    expect(fetched.body.buyer_reference).toBe('BR-1');
+    expect(fetched.body.minimum_weight).toBe('22t');
     expect(fetched.body.items).toHaveLength(2);
     expect(fetched.body.items[0].description).toBe('Poly cup reels');
+    expect(fetched.body.items[0].nett_weight).toBe('1250');
     expect(fetched.body.items[1].sort_order).toBe(1);
   });
 
@@ -318,6 +321,68 @@ describe('collection note routes', () => {
       .set('Cookie', cookie)
       .send({ ...validNote(), reference: 'SBM1062' })
       .expect(409);
+  });
+
+  it("duplicates a note with a fresh reference, today's date, and no signature", async () => {
+    setSetting(db, 'collection_note_next_number', '1061');
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({ ...validNote(), dispatched_signed_date: '2026-08-03' })
+      .expect(200);
+    db.prepare('UPDATE collection_notes SET dispatched_signature_path = ? WHERE id = ?').run(
+      'collection-notes/1/sig.png',
+      created.body.id,
+    );
+
+    const copied = await supertest(app)
+      .post(`/api/collection-notes/${created.body.id}/duplicate`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(copied.body.reference).toBe('SBM1062');
+    expect(copied.body.id).not.toBe(created.body.id);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${copied.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.customer_id).toBe(customerId);
+    expect(fetched.body.transport_company).toBe('Test Haulage');
+    expect(fetched.body.buyer_reference).toBe('BR-1');
+    expect(fetched.body.items).toHaveLength(2);
+    expect(fetched.body.items[0].description).toBe('Poly cup reels');
+    expect(fetched.body.items[0].nett_weight).toBe('1250');
+    // A signature belongs to the load it was given for, so it must not travel
+    // with the copy.
+    expect(fetched.body.dispatched_signature_path).toBeNull();
+    expect(fetched.body.dispatched_signed_date).toBeNull();
+    expect(fetched.body.collection_date).toBe(new Date().toISOString().slice(0, 10));
+
+    // The original is untouched, and the sequence has moved on.
+    const original = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(original.body.reference).toBe('SBM1061');
+    const next = await supertest(app).get('/api/collection-notes/next-reference').set('Cookie', cookie).expect(200);
+    expect(next.body.reference).toBe('SBM1063');
+  });
+
+  it('returns 404 when duplicating an unknown note', async () => {
+    await supertest(app).post('/api/collection-notes/9999/duplicate').set('Cookie', cookie).expect(404);
+  });
+
+  it('rejects a received signature upload, since there is no longer such a thing', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send(validNote())
+      .expect(200);
+    await supertest(app)
+      .post(`/api/collection-notes/${created.body.id}/signature/received`)
+      .set('Cookie', cookie)
+      .attach('signature', Buffer.from('fake'), 'sig.png')
+      .expect(400);
   });
 
   it('returns 404 for an unknown note on get, put, and delete', async () => {

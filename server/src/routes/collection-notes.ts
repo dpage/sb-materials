@@ -15,7 +15,9 @@ import { getSetting } from '../utils/settings';
 import { loadCollectionNote } from '../utils/collection-note-loader';
 
 const SIGNATURE_SUBDIR = 'collection-notes';
-const SIGNATURE_KINDS = ['dispatched', 'received'] as const;
+// Only the dispatching signature is captured: the note leaves with the load and
+// never comes back, so a "goods received" signature could never be collected.
+const SIGNATURE_KINDS = ['dispatched'] as const;
 type SignatureKind = (typeof SIGNATURE_KINDS)[number];
 
 function isUniqueViolation(err: unknown): boolean {
@@ -140,10 +142,10 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         .prepare(
           `INSERT INTO collection_notes (
              reference, customer_id, site_id, collect_from_address, comments,
-             contact_name, contact_phone, po_number, weight, packing_list_no,
+             contact_name, contact_phone, buyer_reference, weight, minimum_weight,
              collection_date, transport_company, dispatched_signed_date,
-             received_signed_date, created_by_id
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             created_by_id
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           reference,
@@ -153,13 +155,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
           body.comments ?? null,
           body.contact_name ?? null,
           body.contact_phone ?? null,
-          body.po_number ?? null,
+          body.buyer_reference ?? null,
           body.weight ?? null,
-          body.packing_list_no ?? null,
+          body.minimum_weight ?? null,
           body.collection_date ?? null,
           body.transport_company ?? null,
           body.dispatched_signed_date ?? null,
-          body.received_signed_date ?? null,
           req.session.userId,
         );
 
@@ -203,9 +204,9 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       db.prepare(
         `UPDATE collection_notes SET
            reference = ?, customer_id = ?, site_id = ?, collect_from_address = ?,
-           comments = ?, contact_name = ?, contact_phone = ?, po_number = ?,
-           weight = ?, packing_list_no = ?, collection_date = ?, transport_company = ?,
-           dispatched_signed_date = ?, received_signed_date = ?,
+           comments = ?, contact_name = ?, contact_phone = ?, buyer_reference = ?,
+           weight = ?, minimum_weight = ?, collection_date = ?, transport_company = ?,
+           dispatched_signed_date = ?,
            updated_at = datetime('now')
          WHERE id = ?`,
       ).run(
@@ -216,13 +217,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         body.comments ?? null,
         body.contact_name ?? null,
         body.contact_phone ?? null,
-        body.po_number ?? null,
+        body.buyer_reference ?? null,
         body.weight ?? null,
-        body.packing_list_no ?? null,
+        body.minimum_weight ?? null,
         body.collection_date ?? null,
         body.transport_company ?? null,
         body.dispatched_signed_date ?? null,
-        body.received_signed_date ?? null,
         noteId,
       );
 
@@ -239,6 +239,59 @@ export function collectionNoteRoutes(db: Database.Database): Router {
     } catch (err) {
       if (isUniqueViolation(err)) {
         res.status(409).json({ error: `Reference ${reference} is already in use` });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  // Duplicate a note. The same load often goes out a dozen times over, so the
+  // whole note is copied bar the things that must not be shared: the copy takes
+  // the next reference in the sequence, today's collection date, and no
+  // signature, since a signature belongs to the load it was given for.
+  router.post('/:id/duplicate', (req, res) => {
+    const source = loadCollectionNote(db, parseInt(req.params.id, 10));
+    if (!source) {
+      res.status(404).json({ error: 'Collection note not found' });
+      return;
+    }
+
+    const copy = db.transaction(() => {
+      const reference = allocateNextReference(db);
+      const result = db
+        .prepare(
+          `INSERT INTO collection_notes (
+             reference, customer_id, site_id, collect_from_address, comments,
+             contact_name, contact_phone, buyer_reference, weight, minimum_weight,
+             collection_date, transport_company, created_by_id
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?)`,
+        )
+        .run(
+          reference,
+          source.customer_id,
+          source.site_id,
+          source.collect_from_address,
+          source.comments,
+          source.contact_name,
+          source.contact_phone,
+          source.buyer_reference,
+          source.weight,
+          source.minimum_weight,
+          source.transport_company,
+          req.session.userId,
+        );
+
+      const noteId = result.lastInsertRowid as number;
+      insertItems(db, noteId, source.items);
+      recordReferenceUsed(db, reference);
+      return { id: noteId, reference };
+    });
+
+    try {
+      res.json(copy());
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        res.status(409).json({ error: 'The next reference is already in use; try again' });
         return;
       }
       throw err;
@@ -300,21 +353,29 @@ export function collectionNoteRoutes(db: Database.Database): Router {
 
 function isBlankItem(item: any): boolean {
   const blank = (v: unknown) => v === null || v === undefined || String(v).trim() === '';
-  return blank(item?.quantity) && blank(item?.description) && blank(item?.collection_point);
+  return blank(item?.quantity) && blank(item?.description) && blank(item?.nett_weight) && blank(item?.collection_point);
 }
 
 function insertItems(db: Database.Database, noteId: number, items: any): void {
   if (!Array.isArray(items) || !items.length) return;
   const stmt = db.prepare(
-    'INSERT INTO collection_note_items (note_id, quantity, description, collection_point, sort_order) VALUES (?, ?, ?, ?, ?)',
+    `INSERT INTO collection_note_items (note_id, quantity, description, nett_weight, collection_point, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   );
   // The form always starts with (and can be left with) one blank line item,
-  // so skip rows where quantity, description, and collection point are all
-  // empty rather than storing and later printing an empty PDF table row.
+  // so skip rows where every field is empty rather than storing and later
+  // printing an empty PDF table row.
   let sortOrder = 0;
   for (const item of items) {
     if (isBlankItem(item)) continue;
-    stmt.run(noteId, item?.quantity ?? null, item?.description ?? null, item?.collection_point ?? null, sortOrder);
+    stmt.run(
+      noteId,
+      item?.quantity ?? null,
+      item?.description ?? null,
+      item?.nett_weight ?? null,
+      item?.collection_point ?? null,
+      sortOrder,
+    );
     sortOrder += 1;
   }
 }

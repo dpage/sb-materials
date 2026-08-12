@@ -720,15 +720,15 @@ describe('collection note PDF', () => {
         comments: 'COLLECTING ON BEHALF OF SB MATERIALS UK LTD',
         contact_name: 'Test User',
         contact_phone: '07700 900123',
-        po_number: 'N/A',
+        buyer_reference: 'BR-1',
         weight: '24t',
-        packing_list_no: 'PL-1',
+        minimum_weight: '22t',
         collection_date: '2026-08-03',
         transport_company: 'Test Haulage',
         items: [
-          { quantity: '1x', description: 'Poly cup reels', collection_point: 'Bay 3' },
-          { quantity: '2x', description: 'Mixed paper bales', collection_point: 'Yard' },
-          { quantity: '3x', description: 'Shrink wrap', collection_point: 'Bay 1' },
+          { quantity: '1x', description: 'Poly cup reels', nett_weight: '1250', collection_point: 'Bay 3' },
+          { quantity: '2x', description: 'Mixed paper bales', nett_weight: '980', collection_point: 'Yard' },
+          { quantity: '3x', description: 'Shrink wrap', nett_weight: '640', collection_point: 'Bay 1' },
         ],
       })
       .expect(200);
@@ -763,6 +763,8 @@ describe('collection note PDF', () => {
     const rows = collectionNoteItemRows(note);
     expect(rows).toHaveLength(3);
     expect(rows[2][1]).toBe('Shrink wrap');
+    expect(rows[2][2]).toBe('640');
+    expect(rows[2][3]).toBe('Bay 1');
   });
 
   it('renders every line item', async () => {
@@ -784,10 +786,26 @@ describe('collection note PDF', () => {
     const text = extractPdfText(buffer);
     expect(text).toContain('COLLECTION NOTE');
     expect(text).toContain('SBM1061');
+    expect(text).toContain('BUYER REFERENCE');
+    expect(text).toContain('MINIMUM WEIGHT TO BE LOADED');
+    expect(text).toContain('NETT WEIGHT (KG)');
+    expect(text).toContain('Goods Dispatched');
+    // Goods are never signed for on the returning copy, so that row is gone.
+    expect(text).not.toContain('Goods Received');
+    expect(text).not.toContain('PO NUMBER');
+    expect(text).not.toContain('PACKING LIST');
     expect(text).toContain('NRW Waste brokers registration CBDU027716');
     expect(text).toContain(
       'SB Materials UK LTD 1 Deva Way, Wrexham, Wales LL13 9EU Registered in Wales & England No. 10896256',
     );
+  });
+
+  it('carries the letterhead logo', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
+    // The logo is a PNG with an alpha channel, so it costs two XObjects: the
+    // image and its soft mask.
+    expect(countImageXObjects(buffer)).toBe(2);
   });
 
   it('still generates when the note has no items and no signatures', async () => {

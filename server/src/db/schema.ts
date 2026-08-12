@@ -264,7 +264,13 @@ export function createSchema(db: Database.Database): void {
   // ─── Collection notes ───
   // A collection note is a standalone document rather than a report: it is
   // raised for material being picked up, carries its own SBM reference, and is
-  // signed by both parties at the collection point.
+  // signed at the collection point by whoever dispatches the goods.
+  //
+  // Databases created before the note was reworked also carry
+  // received_signature_path and received_signed_date. Nothing reads them any
+  // more (goods are never signed for on the returning copy in practice), so
+  // they are simply left in place on those databases rather than rebuilt out
+  // of the table, which would mean recreating it wholesale in SQLite.
   db.exec(`
     CREATE TABLE IF NOT EXISTS collection_notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -275,15 +281,13 @@ export function createSchema(db: Database.Database): void {
       comments TEXT,
       contact_name TEXT,
       contact_phone TEXT,
-      po_number TEXT,
+      buyer_reference TEXT,
       weight TEXT,
-      packing_list_no TEXT,
+      minimum_weight TEXT,
       collection_date TEXT,
       transport_company TEXT,
       dispatched_signature_path TEXT,
       dispatched_signed_date TEXT,
-      received_signature_path TEXT,
-      received_signed_date TEXT,
       created_by_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -294,6 +298,7 @@ export function createSchema(db: Database.Database): void {
       note_id INTEGER NOT NULL REFERENCES collection_notes(id) ON DELETE CASCADE,
       quantity TEXT,
       description TEXT,
+      nett_weight TEXT,
       collection_point TEXT,
       sort_order INTEGER DEFAULT 0
     );
@@ -307,8 +312,29 @@ export function createSchema(db: Database.Database): void {
   `);
 
   addColumns('users', [{ name: 'phone', type: 'TEXT' }]);
+  addColumns('collection_note_items', [{ name: 'nett_weight', type: 'TEXT' }]);
+
+  // The two fields the collection note carried under their original Word
+  // document names were renamed once their real use was settled: the PO
+  // number is the buyer's own reference, and what was filled in as a packing
+  // list number is in fact the minimum weight the vehicle must be loaded to.
+  // A rename keeps the data, which a drop-and-add would not.
+  renameColumn(db, 'collection_notes', 'po_number', 'buyer_reference');
+  renameColumn(db, 'collection_notes', 'packing_list_no', 'minimum_weight');
 
   ensureCaseInsensitiveReferenceIndex(db);
+}
+
+/**
+ * Rename a column, idempotently: a database that has already been migrated (or
+ * was created fresh with the new name) is left alone, so this can run on every
+ * startup alongside the other schema top-ups.
+ */
+function renameColumn(db: Database.Database, table: string, from: string, to: string): void {
+  const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+  if (columns.includes(from) && !columns.includes(to)) {
+    db.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
+  }
 }
 
 /**
