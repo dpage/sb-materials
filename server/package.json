@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^13.0.3",
     "better-sqlite3-session-store": "^0.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -30,7 +30,7 @@
     "@types/express": "^5.0.0",
     "@types/express-session": "^1.18.1",
     "@types/multer": "^1.4.12",
-    "@types/better-sqlite3": "^7.6.12",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/pdfmake": "^0.2.9",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
