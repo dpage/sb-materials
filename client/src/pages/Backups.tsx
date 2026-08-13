@@ -37,6 +37,7 @@ export function Backups() {
     hour: 2,
     keep: 14,
   });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [takingBackup, setTakingBackup] = useState(false);
   const [error, setError] = useState('');
@@ -55,6 +56,7 @@ export function Backups() {
           hour: parseInt(appSettings['backup.hour'] ?? '2', 10),
           keep: parseInt(appSettings['backup.keep'] ?? '14', 10),
         });
+        setSettingsLoaded(true);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -218,7 +220,7 @@ export function Backups() {
           </div>
           <button
             onClick={handleSaveSettings}
-            disabled={savingSettings}
+            disabled={savingSettings || !settingsLoaded}
             style={{ padding: '8px 20px', background: '#2980b9', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
           >
             Save schedule
