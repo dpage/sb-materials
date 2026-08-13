@@ -20,6 +20,23 @@ const emptyItem = (): CollectionNoteItem => ({
   collection_point: '',
 });
 
+// The current local date and time as a datetime-local input value
+// (YYYY-MM-DDTHH:MM). Built from local getters rather than toISOString(),
+// which would report UTC and show the wrong wall-clock time to the user.
+function nowForDatetimeLocal(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+// Normalises a stored collection date for the datetime-local input: notes
+// saved before it gained a time component (or duplicated via the server's
+// date-only default) carry a bare YYYY-MM-DD, which the input would refuse
+// to display at all, so default the time to midnight.
+function toDatetimeLocalValue(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00` : value;
+}
+
 // Builds the address block a customer or site selection derives for "Collect
 // From": the customer name followed by the relevant address lines. Returns
 // null when there is nothing to derive (no customer chosen yet).
@@ -70,7 +87,7 @@ export function CollectionNoteEdit() {
   const [contactPhone, setContactPhone] = useState(isEdit ? '' : user?.phone || '');
   const [buyerReference, setBuyerReference] = useState('');
   const [minimumWeight, setMinimumWeight] = useState('');
-  const [collectionDate, setCollectionDate] = useState(isEdit ? '' : new Date().toISOString().slice(0, 10));
+  const [collectionDate, setCollectionDate] = useState(isEdit ? '' : nowForDatetimeLocal());
   const [transportCompany, setTransportCompany] = useState('');
   const [items, setItems] = useState<CollectionNoteItem[]>([emptyItem()]);
 
@@ -143,7 +160,7 @@ export function CollectionNoteEdit() {
         setContactPhone(note.contact_phone || '');
         setBuyerReference(note.buyer_reference || '');
         setMinimumWeight(note.minimum_weight || '');
-        setCollectionDate(note.collection_date || '');
+        setCollectionDate(toDatetimeLocalValue(note.collection_date || ''));
         setTransportCompany(note.transport_company || '');
         setDispatchedSignedDate(note.dispatched_signed_date || '');
         setExistingDispatchedSignature(note.dispatched_signature_path || null);
@@ -317,7 +334,7 @@ export function CollectionNoteEdit() {
               </label>
               <input
                 id="cn-collection-date"
-                type="date"
+                type="datetime-local"
                 value={collectionDate}
                 onChange={(e) => setCollectionDate(e.target.value)}
                 style={inputStyle}

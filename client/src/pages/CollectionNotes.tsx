@@ -6,8 +6,11 @@ import type { CollectionNote, Customer } from '../types';
 
 function formatUkDate(value: string | null): string {
   if (!value) return '';
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(value);
+  if (!match) return value;
+  const [, year, month, day, hour, minute] = match;
+  const date = `${day}/${month}/${year}`;
+  return hour !== undefined ? `${date} ${hour}:${minute}` : date;
 }
 
 type SortField = 'collection_date' | 'reference' | 'created_at' | 'customer_name';

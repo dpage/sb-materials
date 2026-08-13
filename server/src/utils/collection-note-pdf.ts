@@ -59,13 +59,17 @@ const printer = new PdfPrinter({
 });
 
 /**
- * Render an ISO date as dd/mm/yyyy. Anything unrecognised passes through
- * untouched rather than becoming "Invalid Date".
+ * Render an ISO date, with an optional HH:MM time, as dd/mm/yyyy [HH:MM].
+ * Anything unrecognised passes through untouched rather than becoming
+ * "Invalid Date".
  */
 export function formatUkDate(value: string | null | undefined): string {
   if (!value) return '';
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(value.trim());
+  if (!match) return value;
+  const [, year, month, day, hour, minute] = match;
+  const date = `${day}/${month}/${year}`;
+  return hour !== undefined ? `${date} ${hour}:${minute}` : date;
 }
 
 /**

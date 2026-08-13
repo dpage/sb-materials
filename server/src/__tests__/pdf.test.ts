@@ -871,6 +871,7 @@ describe('collection note PDF', () => {
 
   it('formats dates the British way', () => {
     expect(formatUkDate('2026-08-03')).toBe('03/08/2026');
+    expect(formatUkDate('2026-08-03T14:30')).toBe('03/08/2026 14:30');
     expect(formatUkDate(null)).toBe('');
     expect(formatUkDate('not a date')).toBe('not a date');
   });
