@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import os from 'os';
@@ -242,6 +242,100 @@ describe('applySwap and recoverInterruptedRestore', () => {
     expect(fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8')).toBe('old-db');
     expect(fs.readFileSync(path.join(dataDir, 'uploads', '1', 'photo.jpg'), 'utf-8')).toBe('old-photo');
     expect(fs.existsSync(paths.asideDir)).toBe(false);
+  });
+
+  function retiredAsideDirs(): string[] {
+    return fs
+      .readdirSync(dataDir)
+      .filter((entry) => entry.startsWith('.restore-aside-'))
+      .map((entry) => path.join(dataDir, entry));
+  }
+
+  it('retires set-aside items it did not supersede rather than deleting the whole directory', () => {
+    seedCurrentState();
+    const paths = restorePaths(dataDir);
+
+    // An earlier restore died between moving the original database's write-ahead
+    // log aside and putting it back, and its staging directory has since been
+    // lost, so the only copy of that log is the one in the aside directory. A
+    // later, unrelated restore then stages nothing but uploads.
+    fs.mkdirSync(paths.asideDir, { recursive: true });
+    fs.writeFileSync(path.join(paths.asideDir, 'sb-materials.db-wal'), 'stranded-wal');
+    fs.mkdirSync(path.join(paths.stagingDir, 'uploads', '2'), { recursive: true });
+    fs.writeFileSync(path.join(paths.stagingDir, 'uploads', '2', 'photo.jpg'), 'new-photo');
+
+    applySwap(paths);
+
+    expect(fs.readFileSync(path.join(dataDir, 'uploads', '2', 'photo.jpg'), 'utf-8')).toBe('new-photo');
+    expect(fs.existsSync(paths.asideDir)).toBe(false);
+    const retired = retiredAsideDirs();
+    expect(retired).toHaveLength(1);
+    // The uploads this call really did supersede are gone; the stranded log is not.
+    expect(fs.readdirSync(retired[0])).toEqual(['sb-materials.db-wal']);
+    expect(fs.readFileSync(path.join(retired[0], 'sb-materials.db-wal'), 'utf-8')).toBe('stranded-wal');
+  });
+
+  it('preserves the set-aside originals when nothing this run did superseded them', () => {
+    // The nightmare: uploads/ was moved aside by a crashed restore, the staging
+    // directory is gone, and something else has recreated an empty uploads/
+    // before recovery ran. The photos in the aside directory are the only copy
+    // in existence and must survive.
+    fs.writeFileSync(path.join(dataDir, 'sb-materials.db'), 'db');
+    fs.mkdirSync(path.join(dataDir, 'uploads'), { recursive: true });
+    const paths = restorePaths(dataDir);
+    fs.mkdirSync(path.join(paths.asideDir, 'uploads', '1'), { recursive: true });
+    fs.writeFileSync(path.join(paths.asideDir, 'uploads', '1', 'photo.jpg'), 'only-copy');
+
+    applySwap(paths);
+
+    const retired = retiredAsideDirs();
+    expect(retired).toHaveLength(1);
+    expect(fs.readFileSync(path.join(retired[0], 'uploads', '1', 'photo.jpg'), 'utf-8')).toBe('only-copy');
+  });
+
+  it('clears sessions.db even when it finds nothing left to swap', () => {
+    seedCurrentState();
+    fs.writeFileSync(path.join(dataDir, 'sessions.db-wal'), 'sessions-wal');
+    const paths = restorePaths(dataDir);
+
+    applySwap(paths);
+
+    expect(fs.existsSync(path.join(dataDir, 'sessions.db'))).toBe(false);
+    expect(fs.existsSync(path.join(dataDir, 'sessions.db-wal'))).toBe(false);
+  });
+
+  it('flushes the staged database to disk before renaming it into place', async () => {
+    seedCurrentState();
+    const paths = await seedStaging();
+    const stagedDb = path.join(paths.stagingDir, 'sb-materials.db');
+
+    // Track which descriptors belong to the staged database, then check that one
+    // of them was fsynced: nothing else forces those contents out before the
+    // rename makes them durably visible.
+    const realOpenSync = fs.openSync;
+    const stagedDbFds = new Set<number>();
+    const fsyncedFds: number[] = [];
+    const openSpy = vi.spyOn(fs, 'openSync').mockImplementation(((target: fs.PathLike, ...rest: unknown[]) => {
+      const fd = (realOpenSync as (...args: unknown[]) => number)(target, ...rest);
+      if (String(target) === stagedDb) stagedDbFds.add(fd);
+      return fd;
+    }) as typeof fs.openSync);
+    const realFsyncSync = fs.fsyncSync;
+    const fsyncSpy = vi.spyOn(fs, 'fsyncSync').mockImplementation((fd: number) => {
+      fsyncedFds.push(fd);
+      realFsyncSync(fd);
+    });
+
+    try {
+      applySwap(paths);
+    } finally {
+      openSpy.mockRestore();
+      fsyncSpy.mockRestore();
+    }
+
+    expect(stagedDbFds.size).toBeGreaterThan(0);
+    expect(fsyncedFds.some((fd) => stagedDbFds.has(fd))).toBe(true);
+    expect(fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8')).toBe('new-db');
   });
 
   it('recoverInterruptedRestore is a no-op when there is no marker', () => {

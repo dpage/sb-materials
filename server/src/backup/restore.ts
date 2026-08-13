@@ -173,6 +173,59 @@ export function clearMarker(markerPath: string): void {
 }
 
 /**
+ * Flush a file's contents to disk. `tar` writes the extracted files through the
+ * page cache without ever fsyncing them, so without this a power cut shortly
+ * after the swap could leave a durable rename pointing at a file whose data
+ * blocks were never written, and recovery would see a database that is present
+ * and therefore, as far as it can tell, already restored.
+ */
+function syncFile(filePath: string): void {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    fs.fsyncSync(fd);
+  } catch {
+    /* best effort only */
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* best effort only */
+      }
+    }
+  }
+}
+
+/**
+ * Retire the set-aside directory. If this run has already removed everything it
+ * could show was superseded, whatever is left came from some earlier run that
+ * never finished and might be the only surviving copy, so rather than delete it
+ * the whole directory is renamed out of the way under a timestamped name and
+ * left for a human to look at. An empty directory is simply removed.
+ *
+ * The rename also gets the leftovers out of the path of the next restore, which
+ * would otherwise treat the set-aside directory as its own and overwrite them.
+ */
+function retireAsideDir(asideDir: string): string | null {
+  try {
+    fs.rmdirSync(asideDir);
+    return null;
+  } catch {
+    /* absent, or not empty: fall through and deal with the leftovers */
+  }
+  if (!fs.existsSync(asideDir)) return null;
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  for (let attempt = 0; ; attempt += 1) {
+    const target = `${asideDir}-${stamp}${attempt === 0 ? '' : `-${attempt}`}`;
+    if (fs.existsSync(target)) continue;
+    fs.renameSync(asideDir, target);
+    return target;
+  }
+}
+
+/**
  * Move `src` out of the way to `dest`, discarding anything already sitting at
  * `dest`. Only ever called when the staged replacement for `src` is still
  * waiting to be swapped in, which means anything at `dest` is a superseded
@@ -202,16 +255,30 @@ function moveBack(src: string, dest: string): void {
  *   - Staged copy present: the swap for that item has not happened yet, so the
  *     live copy is still the original and is moved aside before the staged copy
  *     is renamed into place.
- *   - Staged copy absent and a live copy present: that item is already done.
- *     Nothing is moved, which matters because the set-aside originals are
- *     deleted at the end of this function; moving a completed swap's result
- *     aside again would destroy the restored data.
+ *   - Staged copy absent and a live copy present: that item is already done, so
+ *     nothing is moved. Moving a completed swap's result aside again would put
+ *     the restored data somewhere the next run would treat as discardable.
  *   - Staged copy absent and no live copy, but a set-aside original: the swap
  *     was interrupted between the two renames and the staged copy has since
  *     been lost, so roll the original back rather than leave a hole.
  *
  * Because `rename` is atomic, an item is always in exactly one of those states,
  * never halfway between two of them.
+ *
+ * CONTRACT, and it is not a soft one: nothing else may create, move or restore
+ * either the database or the uploads directory inside `dataDir` before this has
+ * run to completion. The classification above reads "no staged copy but a live
+ * copy" as "already swapped", so anything that recreates `sb-materials.db` or
+ * `uploads/` ahead of time (a stray `mkdirSync` for the uploads directory being
+ * the obvious candidate) makes an interrupted restore look finished and strands
+ * the originals. In practice that means `recoverInterruptedRestore` must be the
+ * very first thing the process does with the data directory, ahead of any
+ * directory creation, any migration and any database connection. As a second
+ * line of defence this function never deletes the set-aside directory wholesale:
+ * it removes only those originals whose replacement it has itself carried out,
+ * and retires anything else to a timestamped `.restore-aside-<when>` directory,
+ * so a misordered caller costs some stale files left behind for a human to sort
+ * out rather than the only copy of the data.
  */
 export function applySwap(paths: RestorePaths): void {
   const { dataDir, stagingDir, asideDir } = paths;
@@ -225,13 +292,19 @@ export function applySwap(paths: RestorePaths): void {
 
   const dbPending = fs.existsSync(stagedDb);
   const uploadsPending = fs.existsSync(stagedUploads);
-  const anyPending = dbPending || uploadsPending;
+  let dbSwapped = false;
+  let uploadsSwapped = false;
 
-  if (anyPending) {
+  if (dbPending || uploadsPending) {
     fs.mkdirSync(asideDir, { recursive: true });
   }
 
   if (dbPending) {
+    // `tar` extracted this file through the page cache without ever flushing
+    // it, and the rename below lands it on a path `moveAside` has just vacated
+    // rather than over an existing file, so nothing else is going to force the
+    // contents out for us: flush them now, whilst the originals are still here.
+    syncFile(stagedDb);
     moveAside(liveDb, asideDb);
     // The restored database is a checkpointed copy, so the live write-ahead log
     // and shared-memory files belong to the database being replaced and must go
@@ -240,6 +313,7 @@ export function applySwap(paths: RestorePaths): void {
       moveAside(path.join(dataDir, sidecar), path.join(asideDir, sidecar));
     }
     fs.renameSync(stagedDb, liveDb);
+    dbSwapped = true;
   } else if (!fs.existsSync(liveDb)) {
     moveBack(asideDb, liveDb);
     for (const sidecar of DB_SIDECARS) {
@@ -250,30 +324,54 @@ export function applySwap(paths: RestorePaths): void {
   if (uploadsPending) {
     moveAside(liveUploads, asideUploads);
     fs.renameSync(stagedUploads, liveUploads);
+    uploadsSwapped = true;
   } else if (!fs.existsSync(liveUploads)) {
     moveBack(asideUploads, liveUploads);
   }
 
-  if (anyPending) {
-    // Sessions are tied to the database that has just been replaced, so
-    // everybody is logged out rather than left holding a stale session.
-    for (const sessionFile of SESSION_FILES) {
-      fs.rmSync(path.join(dataDir, sessionFile), { force: true });
-    }
+  // Sessions are tied to the database that has just been replaced, so everybody
+  // is logged out rather than left holding a stale session. Done unconditionally
+  // on every call, including one that finds nothing left to do: a crash between
+  // the last rename and this point would otherwise leave pre-restore sessions
+  // authenticated against restored data, and the cost of being over-eager is at
+  // worst one unnecessary login.
+  for (const sessionFile of SESSION_FILES) {
+    fs.rmSync(path.join(dataDir, sessionFile), { force: true });
   }
 
   syncDir(dataDir);
-  fs.rmSync(asideDir, { recursive: true, force: true });
+
+  // Discard only the originals this call has itself superseded, by performing
+  // the swap that replaced them. Anything else in the set-aside directory came
+  // from an earlier run that never finished, and may be the last copy of it in
+  // existence, so it is retired to a timestamped directory instead of being
+  // deleted; a wholesale delete here is how the only copy of somebody's photos
+  // goes missing.
+  if (dbSwapped) {
+    fs.rmSync(asideDb, { force: true });
+    for (const sidecar of DB_SIDECARS) {
+      fs.rmSync(path.join(asideDir, sidecar), { force: true });
+    }
+  }
+  if (uploadsSwapped) {
+    fs.rmSync(asideUploads, { recursive: true, force: true });
+  }
+  retireAsideDir(asideDir);
   fs.rmSync(stagingDir, { recursive: true, force: true });
   syncDir(dataDir);
 }
 
 /**
- * Called at startup, before anything opens the database. A marker means a
- * restore was in flight when the process last stopped, so the swap is re-run to
- * convergence; the marker's contents are deliberately not trusted, since the
- * paths are derived from `dataDir` and the swap has to cope with an unreadable
- * marker just as safely as with a readable one.
+ * Called at startup, and it must be called before anything else so much as
+ * looks at the data directory: not merely before the database is opened, but
+ * before any code creates the uploads directory, runs a migration or otherwise
+ * puts a file where `applySwap` expects to find either a hole or an original.
+ * See the contract on `applySwap` for why that ordering matters.
+ *
+ * A marker means a restore was in flight when the process last stopped, so the
+ * swap is re-run to convergence; the marker's contents are deliberately not
+ * trusted, since the paths are derived from `dataDir` and the swap has to cope
+ * with an unreadable marker just as safely as with a readable one.
  */
 export function recoverInterruptedRestore(dataDir: string): 'none' | 'completed' {
   const paths = restorePaths(dataDir);
