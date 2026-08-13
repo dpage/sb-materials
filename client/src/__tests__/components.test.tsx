@@ -77,4 +77,33 @@ describe('ConfirmDialog', () => {
     );
     expect(screen.getByRole('button', { name: 'Take Backup' })).not.toBeDisabled();
   });
+
+  it('disables both buttons whilst busy, even with the required text already typed', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <ConfirmDialog
+        open={true}
+        title="Restore"
+        message="This will replace all current data."
+        confirmLabel="Restoring…"
+        requireTypedConfirmation="RESTORE"
+        busy={true}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'RESTORE' } });
+
+    const confirmBtn = screen.getByRole('button', { name: 'Restoring…' });
+    expect(confirmBtn).toBeDisabled();
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancelBtn).toBeDisabled();
+
+    fireEvent.click(confirmBtn);
+    fireEvent.click(cancelBtn);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 });

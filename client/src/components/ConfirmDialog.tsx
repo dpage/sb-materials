@@ -8,6 +8,9 @@ interface Props {
   onCancel: () => void;
   confirmLabel?: string;
   requireTypedConfirmation?: string;
+  // True whilst onConfirm's action is in flight, so a request that takes a
+  // moment (a restore, say) doesn't leave the dialog looking inert.
+  busy?: boolean;
 }
 
 export function ConfirmDialog({
@@ -18,6 +21,7 @@ export function ConfirmDialog({
   onCancel,
   confirmLabel = 'Delete',
   requireTypedConfirmation,
+  busy = false,
 }: Props) {
   const [typedValue, setTypedValue] = useState('');
 
@@ -27,7 +31,7 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  const confirmDisabled = !!requireTypedConfirmation && typedValue !== requireTypedConfirmation;
+  const confirmDisabled = busy || (!!requireTypedConfirmation && typedValue !== requireTypedConfirmation);
 
   return (
     <div
@@ -75,7 +79,7 @@ export function ConfirmDialog({
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} style={btnStyle}>
+          <button onClick={onCancel} disabled={busy} style={{ ...btnStyle, cursor: busy ? 'not-allowed' : 'pointer' }}>
             Cancel
           </button>
           <button

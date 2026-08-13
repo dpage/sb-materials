@@ -82,6 +82,7 @@ export function Backups() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [takingBackup, setTakingBackup] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState('');
   const [restoreTarget, setRestoreTarget] = useState<Backup | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Backup | null>(null);
@@ -150,6 +151,7 @@ export function Backups() {
 
   const handleConfirmRestore = async () => {
     if (!restoreTarget) return;
+    setRestoring(true);
     try {
       await api.restoreBackup(restoreTarget.filename);
       setRestoreTarget(null);
@@ -157,11 +159,14 @@ export function Backups() {
     } catch (err: any) {
       setError(err.message);
       setRestoreTarget(null);
+    } finally {
+      setRestoring(false);
     }
   };
 
   const handleConfirmUploadRestore = async () => {
     if (!uploadRestoreFile) return;
+    setRestoring(true);
     try {
       await api.uploadAndRestoreBackup(uploadRestoreFile);
       setUploadRestoreFile(null);
@@ -169,6 +174,8 @@ export function Backups() {
     } catch (err: any) {
       setError(err.message);
       setUploadRestoreFile(null);
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -406,8 +413,9 @@ export function Backups() {
             ? `This replaces all current reports, collection notes, customers and photos with the contents of the backup taken ${formatDate(restoreTarget.createdAt)} (${restoreTarget.reportCount ?? '?'} reports, ${restoreTarget.photoCount ?? '?'} photos, ${restoreTarget.collectionNoteCount ?? '?'} collection notes). The current data is snapshotted first, and the application will restart.`
             : ''
         }
-        confirmLabel="Restore"
+        confirmLabel={restoring ? 'Restoring…' : 'Restore'}
         requireTypedConfirmation={RESTORE_CONFIRMATION_TEXT}
+        busy={restoring}
         onConfirm={handleConfirmRestore}
         onCancel={() => setRestoreTarget(null)}
       />
@@ -432,8 +440,9 @@ export function Backups() {
             ? `This uploads "${uploadRestoreFile.name}" (${formatSize(uploadRestoreFile.size)}), validates it, replaces all current data with its contents, and restarts the application. The current data is snapshotted first.`
             : ''
         }
-        confirmLabel="Restore"
+        confirmLabel={restoring ? 'Restoring…' : 'Restore'}
         requireTypedConfirmation={RESTORE_CONFIRMATION_TEXT}
+        busy={restoring}
         onConfirm={handleConfirmUploadRestore}
         onCancel={() => setUploadRestoreFile(null)}
       />

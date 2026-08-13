@@ -1638,6 +1638,37 @@ describe('Backups Page', () => {
     await waitFor(() => expect(screen.getByText(/Restoring backup/)).toBeInTheDocument());
   });
 
+  it('greys out the restore confirm button whilst the request is in flight', async () => {
+    let resolveRestore: (value: { ok: boolean; manifest: unknown }) => void;
+    (api.restoreBackup as any).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRestore = resolve;
+      }),
+    );
+    (global as any).fetch = vi.fn().mockRejectedValue(new Error('connection refused'));
+
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Restore'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'RESTORE' } });
+    const restoreButtons = screen.getAllByRole('button', { name: 'Restore' });
+    fireEvent.click(restoreButtons[restoreButtons.length - 1]);
+
+    await waitFor(() => expect(api.restoreBackup).toHaveBeenCalled());
+
+    const busyButton = await screen.findByRole('button', { name: 'Restoring…' });
+    expect(busyButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    resolveRestore!({ ok: true, manifest: {} });
+    await waitFor(() => expect(screen.getByText(/Restoring backup/)).toBeInTheDocument());
+  });
+
   it('should confirm before deleting a backup', async () => {
     (api.deleteBackup as any).mockResolvedValue({ ok: true });
     render(
