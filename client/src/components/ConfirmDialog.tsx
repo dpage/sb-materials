@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface Props {
   open: boolean;
@@ -6,10 +6,28 @@ interface Props {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmLabel?: string;
+  requireTypedConfirmation?: string;
 }
 
-export function ConfirmDialog({ open, title, message, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmLabel = 'Delete',
+  requireTypedConfirmation,
+}: Props) {
+  const [typedValue, setTypedValue] = useState('');
+
+  useEffect(() => {
+    if (open) setTypedValue('');
+  }, [open]);
+
   if (!open) return null;
+
+  const confirmDisabled = !!requireTypedConfirmation && typedValue !== requireTypedConfirmation;
 
   return (
     <div
@@ -36,13 +54,35 @@ export function ConfirmDialog({ open, title, message, onConfirm, onCancel }: Pro
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ marginBottom: 12 }}>{title}</h3>
-        <p style={{ marginBottom: 20, color: '#666' }}>{message}</p>
+        <p style={{ marginBottom: requireTypedConfirmation ? 12 : 20, color: '#666' }}>{message}</p>
+        {requireTypedConfirmation && (
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 13, color: '#666', marginBottom: 6 }}>
+              Type <strong>{requireTypedConfirmation}</strong> to confirm
+            </label>
+            <input
+              type="text"
+              value={typedValue}
+              onChange={(e) => setTypedValue(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onCancel} style={btnStyle}>
             Cancel
           </button>
-          <button onClick={onConfirm} style={{ ...btnStyle, background: '#e74c3c', color: '#fff' }}>
-            Delete
+          <button
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+            style={{
+              ...btnStyle,
+              background: confirmDisabled ? '#f5a9a1' : '#e74c3c',
+              color: '#fff',
+              cursor: confirmDisabled ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {confirmLabel}
           </button>
         </div>
       </div>
