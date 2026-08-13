@@ -56,4 +56,45 @@ describe('settings routes', () => {
       .send({ collection_note_next_number: 'abc' })
       .expect(400);
   });
+
+  it('accepts valid backup settings', async () => {
+    const cookie = await loginAsAdmin(app);
+    const res = await supertest(app)
+      .put('/api/settings')
+      .set('Cookie', cookie)
+      .send({ 'backup.enabled': 'true', 'backup.hour': '3', 'backup.keep': '7' });
+    expect(res.status).toBe(200);
+
+    const getRes = await supertest(app).get('/api/settings').set('Cookie', cookie);
+    expect(getRes.body['backup.enabled']).toBe('true');
+    expect(getRes.body['backup.hour']).toBe('3');
+    expect(getRes.body['backup.keep']).toBe('7');
+  });
+
+  it('rejects a backup hour outside 0-23', async () => {
+    const cookie = await loginAsAdmin(app);
+    const res = await supertest(app).put('/api/settings').set('Cookie', cookie).send({ 'backup.hour': '24' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-integer backup keep count', async () => {
+    const cookie = await loginAsAdmin(app);
+    const res = await supertest(app).put('/api/settings').set('Cookie', cookie).send({ 'backup.keep': '0' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a backup enabled value that is not true or false', async () => {
+    const cookie = await loginAsAdmin(app);
+    const res = await supertest(app).put('/api/settings').set('Cookie', cookie).send({ 'backup.enabled': 'maybe' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects backup.last_run as a write target since it is not writable', async () => {
+    const cookie = await loginAsAdmin(app);
+    const res = await supertest(app)
+      .put('/api/settings')
+      .set('Cookie', cookie)
+      .send({ 'backup.last_run': '2026-01-01T00:00:00.000Z' });
+    expect(res.status).toBe(400);
+  });
 });

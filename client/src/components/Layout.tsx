@@ -26,6 +26,8 @@ export function Layout() {
       setTopic('users');
     } else if (path === '/lookups') {
       setTopic('lookups');
+    } else if (path === '/backups') {
+      setTopic('backups');
     } else {
       setTopic('reports');
     }
@@ -87,6 +89,11 @@ export function Layout() {
             {user?.isSuperuser && (
               <NavLink to="/users" style={({ isActive }) => navStyle(isActive)}>
                 Users
+              </NavLink>
+            )}
+            {user?.isSuperuser && (
+              <NavLink to="/backups" style={({ isActive }) => navStyle(isActive)}>
+                Backups
               </NavLink>
             )}
           </nav>
@@ -186,6 +193,11 @@ export function Layout() {
           {user?.isSuperuser && (
             <NavLink to="/users" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
               Users
+            </NavLink>
+          )}
+          {user?.isSuperuser && (
+            <NavLink to="/backups" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
+              Backups
             </NavLink>
           )}
         </nav>

@@ -21,6 +21,51 @@ import { photoRoutes } from './routes/photos';
 import { pdfRoutes } from './routes/pdf';
 import { collectionNoteRoutes } from './routes/collection-notes';
 import { settingsRoutes } from './routes/settings';
+import { backupRoutes } from './routes/backups';
+import { BackupCoordinator } from './backup/scheduler';
+import { recoverInterruptedRestore } from './backup/restore';
+
+// Complete any restore that was interrupted by a crash. This MUST run before
+// anything else touches the data directory: applySwap's crash-recovery logic
+// classifies each item (the database, uploads/) by whether a staged copy is
+// still present versus already swapped in, and that classification is only
+// valid if nothing else has created or recreated sb-materials.db or uploads/
+// first. Creating an empty uploads/ (or opening/creating the database) ahead
+// of this call would make an interrupted restore look "already complete" and
+// cause applySwap's final cleanup to delete the one remaining copy of the
+// data. recoverInterruptedRestore is safe to call even when config.dataDir
+// itself does not exist yet (it just finds no marker and returns 'none').
+//
+// A throw from here would otherwise become an uncaught top-level exception, and
+// since restore depends on the unit being configured `Restart=always`, that
+// would be a boot loop printing a bare stack trace with nothing to say that a
+// restore is stuck halfway. Recovering from a failed recovery is not something
+// to be clever about: say plainly what is wrong and where, and stop.
+try {
+  const recovery = recoverInterruptedRestore(config.dataDir);
+  if (recovery.status === 'completed') {
+    // Note that this is the ordinary path, not an exceptional one: every
+    // restore applies its swap at the next startup, so this line appears after
+    // each one and should read as routine to whoever is watching the logs.
+    logger.info('Applied a pending restore');
+    if (recovery.quarantinedAt) {
+      logger.error(
+        `Restore recovery quarantined pre-existing data at ${recovery.quarantinedAt} rather than deleting it, ` +
+          'because it could not confirm the data had been superseded. It may be the only remaining copy: see ' +
+          'BACKUP-RESTORE-DESIGN.md for what this means and how to recover it, and delete the directory once ' +
+          'you are satisfied it is not needed.',
+      );
+    }
+  }
+} catch (err) {
+  logger.error(`Failed to complete a pending restore in ${config.dataDir}:`, err);
+  logger.error(
+    'The data directory is in a half-restored state and the application will not start until it is sorted out ' +
+      'by hand. See BACKUP-RESTORE-DESIGN.md; the pre-restore snapshot in the backups directory holds the data ' +
+      'as it was before the restore began.',
+  );
+  process.exit(1);
+}
 
 // Ensure data directory exists
 if (!fs.existsSync(config.dataDir)) {
@@ -28,6 +73,9 @@ if (!fs.existsSync(config.dataDir)) {
 }
 if (!fs.existsSync(config.uploadsDir)) {
   fs.mkdirSync(config.uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(config.backupsDir)) {
+  fs.mkdirSync(config.backupsDir, { recursive: true });
 }
 
 // Initialize database
@@ -86,6 +134,27 @@ app.use('/api/photos', photoRoutes(db));
 app.use('/api/pdf', pdfRoutes(db));
 app.use('/api/collection-notes', collectionNoteRoutes(db));
 app.use('/api/settings', settingsRoutes(db));
+
+const backupCoordinator = new BackupCoordinator(db, config.backupsDir, config.uploadsDir);
+app.use(
+  '/api/backups',
+  backupRoutes(db, {
+    dataDir: config.dataDir,
+    backupsDir: config.backupsDir,
+    uploadsDir: config.uploadsDir,
+    coordinator: backupCoordinator,
+    closeAndRestart: () => {
+      db.close();
+      sessionDb.close();
+      process.exit(0);
+    },
+  }),
+);
+
+const BACKUP_TICK_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(() => {
+  backupCoordinator.tick().catch((err) => logger.error('Scheduled backup failed:', err));
+}, BACKUP_TICK_INTERVAL_MS);
 
 // Serve static frontend in production
 const clientDist = path.join(__dirname, '../../client/dist');

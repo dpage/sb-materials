@@ -15,6 +15,7 @@ A web application for SB Materials — a company providing inspection and auditi
 - **Configurable Lookups** — Manage product descriptions, grades, storage modes, contaminants, and unwanted materials
 - **User Management** — Multi-user support with superuser roles for administration
 - **Search, Filter & Sort** — Quickly find reports by customer, date, status, and more
+- **Backup & Restore** — Scheduled and on-demand backups of the database and photos, with retention, download, and restore from an on-disk or uploaded archive
 
 ## Tech Stack
 
@@ -84,6 +85,12 @@ A web application for SB Materials — a company providing inspection and auditi
 
 An example Nginx configuration is provided in `nginx.conf.example`. It proxies all traffic to the Express server and handles SSL termination. Adjust `server_name`, certificate paths, and upstream port to match your environment.
 
+## Running as a systemd Service
+
+An example systemd unit is provided in `sb-materials.service.example`, running `node server/dist/index.js` (the `npm start` entrypoint) from the deployment directory. Copy it to `/etc/systemd/system/sb-materials.service`, adjust the user, paths and `EnvironmentFile` to match your environment, then `systemctl daemon-reload && systemctl enable --now sb-materials`.
+
+The unit **must** keep `Restart=always`. A restore stages the new data, records a marker and then exits the process deliberately, leaving the swap itself to be applied by the next process to start; if the service is not restarted automatically, a restore stops the application rather than completing it, and it stays stopped until somebody starts it by hand. The same directive is what brings the application back after a crash, so there is no reason to remove it in any case.
+
 ## Project Structure
 
 ```
@@ -98,6 +105,7 @@ sb-materials/
       db/              # Schema and seed data
       routes/          # API routes (auth, users, customers, lookups, reports, photos, pdf)
   nginx.conf.example   # Example Nginx reverse proxy config
+  sb-materials.service.example  # Example systemd unit
   package.json         # Workspace root
 ```
 

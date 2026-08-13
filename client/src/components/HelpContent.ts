@@ -238,4 +238,34 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
     ],
   },
+
+  backups: {
+    heading: 'Backups',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Backups page is available to superusers only. It lists the backup archives the application has taken, lets you take one on demand, and lets you restore or download any of them.',
+      },
+      {
+        title: 'Schedule',
+        body: 'A backup is taken automatically once a day at the configured hour. Turn it off, change the hour, or change how many archives are kept with the schedule controls. The most recent archives (of each kind) are always kept; older ones are pruned automatically.',
+      },
+      {
+        title: 'Taking a Backup Now',
+        body: 'Click "Take backup now" to create an archive immediately, in addition to the scheduled ones.',
+      },
+      {
+        title: 'Restoring',
+        body: 'Restoring replaces all current reports, customers and photos with the contents of the chosen archive. A snapshot of the current data is taken automatically before the swap, so a restore can itself be undone by restoring that snapshot. You must type RESTORE to confirm, since this is destructive. The application restarts as part of a restore, and you will be returned to the login page once it is back.',
+      },
+      {
+        title: 'Uploading a Backup to Restore',
+        body: 'Use "Upload and restore" to restore from an archive downloaded earlier, for example after moving to new hardware. The archive is validated before anything is changed; an archive that does not match this version\'s database structure is rejected.',
+      },
+      {
+        title: 'Downloading and Deleting',
+        body: 'Click "Download" to save an archive off the server, for an off-box copy. Click "Delete" to remove an archive you no longer need; this only removes the archive file, not the data it contains.',
+      },
+    ],
+  },
 };
