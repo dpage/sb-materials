@@ -48,7 +48,15 @@ describe('computeSchemaFingerprint', () => {
     createSchema(db);
     expect(computeSchemaFingerprint(db)).toEqual({
       app_settings: ['key', 'value'],
-      collection_note_items: ['collection_point', 'description', 'id', 'nett_weight', 'note_id', 'quantity', 'sort_order'],
+      collection_note_items: [
+        'collection_point',
+        'description',
+        'id',
+        'nett_weight',
+        'note_id',
+        'quantity',
+        'sort_order',
+      ],
       collection_notes: [
         'buyer_reference',
         'collect_from_address',
