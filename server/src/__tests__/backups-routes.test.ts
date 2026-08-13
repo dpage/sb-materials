@@ -200,6 +200,7 @@ describe('Backup Routes', () => {
 
       const res = await request(app).post(`/api/backups/${badArchive.filename}/restore`).set('Cookie', cookie);
       expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/schema version/);
       expect(closeAndRestart).not.toHaveBeenCalled();
 
       const paths = restorePaths(dataDir);

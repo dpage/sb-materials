@@ -58,10 +58,27 @@ describe('validateArchive', () => {
     expect(manifest.kind).toBe('manual');
   });
 
-  it('treats an archive with no recorded schema version as the oldest possible, and accepts it', async () => {
+  it('accepts an archive carrying columns this build no longer defines, with no recorded schema version — the actual production incident', async () => {
+    // Reproduces the real shape of the archive that failed in production, not
+    // just its missing field: production's collection_notes table had carried
+    // three columns (received_signature_path, received_signed_date, weight)
+    // since before the commit that dropped them from CREATE TABLE, because the
+    // migrations here are additive-only and nothing ever ran a compensating
+    // DROP COLUMN. A strict structural comparison rejected restoring that
+    // archive into a freshly-seeded database that had never had those columns,
+    // even though the app's own boot-time migrations already tolerate exactly
+    // that drift for any live database. Reinstating the old structural
+    // comparison here must fail this test.
+    db.exec(`
+      ALTER TABLE collection_notes ADD COLUMN weight TEXT;
+      ALTER TABLE collection_notes ADD COLUMN received_signature_path TEXT;
+      ALTER TABLE collection_notes ADD COLUMN received_signed_date TEXT;
+    `);
+    const vestigial = await createArchive({ db, backupsDir, uploadsDir, kind: 'manual' });
+
     const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-restore-no-version-'));
     const tar = await import('tar');
-    await tar.extract({ file: archivePath, cwd: extractDir });
+    await tar.extract({ file: vestigial.path, cwd: extractDir });
     const manifestPath = path.join(extractDir, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
     delete manifest.dbSchemaVersion;
@@ -69,13 +86,6 @@ describe('validateArchive', () => {
     const rebuilt = path.join(tmpDir, 'no-schema-version.tar.gz');
     await tar.create({ gzip: true, file: rebuilt, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
 
-    // This is exactly the shape of a real archive taken before dbSchemaVersion
-    // existed: production's collection_notes table had carried three columns
-    // (received_signature_path, received_signed_date, weight) since before the
-    // schema-drop that removed them from CREATE TABLE, and a strict structural
-    // comparison rejected restoring it into a freshly-seeded database that had
-    // never had those columns — even though the app's own boot-time migrations
-    // already tolerate exactly that kind of drift for any live database.
     await expect(validateArchive(rebuilt, DB_SCHEMA_VERSION, scratchRoot)).resolves.toMatchObject({ kind: 'manual' });
     fs.rmSync(extractDir, { recursive: true, force: true });
   });
@@ -91,9 +101,33 @@ describe('validateArchive', () => {
   });
 
   it('rejects an archive that requires a newer schema version than this build supports', async () => {
-    await expect(validateArchive(archivePath, DB_SCHEMA_VERSION - 1, scratchRoot)).rejects.toThrow(
-      RestoreValidationError,
-    );
+    const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-restore-future-version-'));
+    const tar = await import('tar');
+    await tar.extract({ file: archivePath, cwd: extractDir });
+    const manifestPath = path.join(extractDir, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    manifest.dbSchemaVersion = DB_SCHEMA_VERSION + 1;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const rebuilt = path.join(tmpDir, 'future-schema-version.tar.gz');
+    await tar.create({ gzip: true, file: rebuilt, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
+
+    await expect(validateArchive(rebuilt, DB_SCHEMA_VERSION, scratchRoot)).rejects.toThrow(RestoreValidationError);
+    fs.rmSync(extractDir, { recursive: true, force: true });
+  });
+
+  it('rejects an archive whose recorded schema version is not a valid non-negative integer', async () => {
+    const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-restore-bad-version-'));
+    const tar = await import('tar');
+    await tar.extract({ file: archivePath, cwd: extractDir });
+    const manifestPath = path.join(extractDir, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    manifest.dbSchemaVersion = 'not-a-number';
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const rebuilt = path.join(tmpDir, 'invalid-schema-version.tar.gz');
+    await tar.create({ gzip: true, file: rebuilt, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
+
+    await expect(validateArchive(rebuilt, DB_SCHEMA_VERSION, scratchRoot)).rejects.toThrow(RestoreValidationError);
+    fs.rmSync(extractDir, { recursive: true, force: true });
   });
 
   it('rejects a truncated archive', async () => {

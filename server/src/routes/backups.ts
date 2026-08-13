@@ -64,7 +64,7 @@ function asyncRoute<P extends Record<string, string> = Record<string, never>>(
   };
 }
 
-export function backupRoutes(db: Database.Database, deps: BackupRouteDeps): Router {
+export function backupRoutes(_db: Database.Database, deps: BackupRouteDeps): Router {
   const router = Router();
   router.use(requireSuperuser);
 

@@ -140,23 +140,33 @@ The sequence is:
    valid SQLite database, that its SHA-256 matches the manifest, and that its
    database schema version (`dbSchemaVersion` in the manifest) is not higher
    than this build's own `DB_SCHEMA_VERSION`. That last check is deliberately
-   one-directional: an *older* archive is always accepted, because the app's
-   own boot-time migrations (`createSchema`) already tolerate that drift for
-   any live database, restore or not, and the swap below always ends with a
-   restart that runs them. An archive with no recorded version at all — taken
-   before this field existed — is treated as version 0, the oldest possible,
-   and is likewise always accepted. Only an archive from a build *newer* than
-   this one is refused, since this build's migrations were written without
-   knowledge of whatever schema change that newer build made. (An earlier
-   version of this check compared the full table/column shape for exact
-   equality instead, and it was too strict: a production database's
+   one-directional: an *older* archive is accepted, because the app's own
+   boot-time migrations (`createSchema`) are written to tolerate that drift
+   for any live database, restore or not, and the swap below always ends with
+   a restart that runs them. An archive with no recorded version at all —
+   taken before this field existed — is treated as version 0, the oldest
+   possible, and is likewise accepted. Only an archive from a build *newer*
+   than this one is refused outright, since this build's migrations were
+   written without knowledge of whatever schema change that newer build made.
+   (An earlier version of this check compared the full table/column shape for
+   exact equality instead, and it was too strict: a production database's
    `collection_notes` table had carried three columns — `weight`,
    `received_signature_path`, `received_signed_date` — since before the
    commit that dropped them from `CREATE TABLE`, because the migrations here
    are additive-only and nothing ever ran a compensating `DROP COLUMN`, so a
    fresh database never had them at all. That harmless, already-tolerated
    drift was enough to block a completely safe restore.) Anything that fails
-   validation is rejected before a single existing file is touched.
+   this validation is rejected before a single existing file is touched.
+
+   "Accepted" here is a promise about *this validation step*, not a guarantee
+   that every future migration is risk-free — that responsibility sits with
+   whoever writes the migration (see the comment on `DB_SCHEMA_VERSION`), and
+   at least one existing migration (`ensureCaseInsensitiveReferenceIndex`)
+   already throws on a database whose data collides in a way it cannot
+   resolve, which happens after the swap has completed. That failure mode
+   predates this check and is not new here, but it means "older is safe" is
+   a design intent this codebase is expected to uphold, not a property the
+   validation step can itself prove.
 2. **Snapshot.** Take a full backup of the current state, tagged `pre-restore`,
    so that restoring the wrong archive is recoverable rather than terminal.
 3. **Stage.** Extract the archive into `${DATA_DIR}/.restore-staging/`.
@@ -227,10 +237,9 @@ validation, including rejection of a truncated archive, one with a corrupt
 database, one with a mismatched checksum and one with an unknown format
 version; acceptance of an older (or unversioned) database schema and rejection
 of a newer one than this build supports; the filename resolution, including
-traversal attempts; retention
-pruning, confirming it keeps the newest N and never prunes a `pre-restore`
-archive; and the scheduler's due-time logic across simulated restart and
-missed-window boundaries.
+traversal attempts; retention pruning, confirming it keeps the newest N and
+never prunes a `pre-restore` archive; and the scheduler's due-time logic
+across simulated restart and missed-window boundaries.
 
 Route tests follow the existing `server/src/__tests__/helpers.ts` pattern and
 cover authorisation on every endpoint, since a non-superuser reaching any of

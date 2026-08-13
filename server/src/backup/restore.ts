@@ -118,7 +118,20 @@ export async function validateArchive(
     // any other archive from before this build's migrations existed. Only an
     // archive from code *newer* than this build is refused: this build's
     // migrations were written without knowledge of whatever that code added.
-    const archiveSchemaVersion = manifest.dbSchemaVersion ?? 0;
+    // Anything else (a non-numeric, negative or fractional value) means the
+    // manifest is malformed rather than merely old, and is rejected outright
+    // rather than silently treated as compatible — dbSha256 covers only the
+    // database member, not this file, so a corrupted manifest is exactly the
+    // input this has to be defensive against.
+    const rawSchemaVersion = manifest.dbSchemaVersion;
+    let archiveSchemaVersion: number;
+    if (rawSchemaVersion === undefined) {
+      archiveSchemaVersion = 0;
+    } else if (typeof rawSchemaVersion === 'number' && Number.isInteger(rawSchemaVersion) && rawSchemaVersion >= 0) {
+      archiveSchemaVersion = rawSchemaVersion;
+    } else {
+      throw new RestoreValidationError('Archive manifest records an invalid database schema version');
+    }
     if (archiveSchemaVersion > currentSchemaVersion) {
       throw new RestoreValidationError(
         `Archive requires database schema version ${archiveSchemaVersion}, but this application only supports up to version ${currentSchemaVersion}. Upgrade the application before restoring this archive.`,
