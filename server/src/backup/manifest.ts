@@ -10,5 +10,6 @@ export interface BackupManifest {
   schemaFingerprint: Record<string, string[]>;
   reportCount: number;
   photoCount: number;
+  collectionNoteCount: number;
   dbSha256: string;
 }

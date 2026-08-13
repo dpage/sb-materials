@@ -1551,6 +1551,7 @@ describe('Backups Page', () => {
         sizeBytes: 5242880,
         reportCount: 42,
         photoCount: 210,
+        collectionNoteCount: 7,
       },
     ]);
     (api.getSettings as any).mockResolvedValue({
@@ -1568,7 +1569,7 @@ describe('Backups Page', () => {
     );
     await waitFor(() => {
       expect(screen.getByText('scheduled')).toBeInTheDocument();
-      expect(screen.getByText('42 reports, 210 photos')).toBeInTheDocument();
+      expect(screen.getByText('42 reports, 210 photos, 7 collection notes')).toBeInTheDocument();
     });
   });
 

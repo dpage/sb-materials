@@ -14,6 +14,14 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('en-GB');
 }
 
+// collectionNoteCount is absent (null) on an archive taken before this field
+// existed, so it's reported separately rather than folded into the same "or
+// nothing at all" gate as reports/photos.
+function formatContents(b: Pick<Backup, 'reportCount' | 'photoCount' | 'collectionNoteCount'>): string {
+  const base = `${b.reportCount} reports, ${b.photoCount} photos`;
+  return b.collectionNoteCount !== null ? `${base}, ${b.collectionNoteCount} collection notes` : base;
+}
+
 const RESTORE_CONFIRMATION_TEXT = 'RESTORE';
 
 // The server answers the restore request before it exits, and stays alive for
@@ -370,9 +378,7 @@ export function Backups() {
                 <td style={tdStyle}>{formatDate(b.createdAt)}</td>
                 <td style={tdStyle}>{b.kind}</td>
                 <td style={tdStyle}>{formatSize(b.sizeBytes)}</td>
-                <td style={tdStyle}>
-                  {b.reportCount !== null ? `${b.reportCount} reports, ${b.photoCount} photos` : '—'}
-                </td>
+                <td style={tdStyle}>{b.reportCount !== null ? formatContents(b) : '—'}</td>
                 <td style={tdStyle}>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <a href={api.downloadBackupUrl(b.filename)} style={smallBtnStyle}>
@@ -397,7 +403,7 @@ export function Backups() {
         title="Restore backup"
         message={
           restoreTarget
-            ? `This replaces all current reports, customers and photos with the contents of the backup taken ${formatDate(restoreTarget.createdAt)} (${restoreTarget.reportCount ?? '?'} reports, ${restoreTarget.photoCount ?? '?'} photos). The current data is snapshotted first, and the application will restart.`
+            ? `This replaces all current reports, collection notes, customers and photos with the contents of the backup taken ${formatDate(restoreTarget.createdAt)} (${restoreTarget.reportCount ?? '?'} reports, ${restoreTarget.photoCount ?? '?'} photos, ${restoreTarget.collectionNoteCount ?? '?'} collection notes). The current data is snapshotted first, and the application will restart.`
             : ''
         }
         confirmLabel="Restore"

@@ -79,6 +79,7 @@ export async function createArchive(params: {
 
     const reportCount = (db.prepare('SELECT COUNT(*) as n FROM reports').get() as { n: number }).n;
     const photoCount = (db.prepare('SELECT COUNT(*) as n FROM report_photos').get() as { n: number }).n;
+    const collectionNoteCount = (db.prepare('SELECT COUNT(*) as n FROM collection_notes').get() as { n: number }).n;
 
     const manifest: BackupManifest = {
       formatVersion: BACKUP_FORMAT_VERSION,
@@ -88,6 +89,7 @@ export async function createArchive(params: {
       schemaFingerprint: computeSchemaFingerprint(db),
       reportCount,
       photoCount,
+      collectionNoteCount,
       dbSha256: sha256File(dbStagingPath),
     };
     fs.writeFileSync(path.join(stagingRoot, 'manifest.json'), JSON.stringify(manifest, null, 2));
@@ -114,6 +116,7 @@ export interface ArchiveListing {
   sizeBytes: number;
   reportCount: number | null;
   photoCount: number | null;
+  collectionNoteCount: number | null;
 }
 
 /**
@@ -149,6 +152,7 @@ export function listArchives(backupsDir: string): ArchiveListing[] {
       sizeBytes: stat.size,
       reportCount: manifest?.reportCount ?? null,
       photoCount: manifest?.photoCount ?? null,
+      collectionNoteCount: manifest?.collectionNoteCount ?? null,
     });
   }
 

@@ -35,7 +35,7 @@ Each tarball contains three things:
 
 - `manifest.json`, holding the format version, the application version, the
   creation timestamp, the kind, a schema fingerprint (the list of tables with
-  their columns), the report and photo counts, and a SHA-256 of the database
+  their columns), the report, photo and collection note counts, and a SHA-256 of the database
   file. The fingerprint is what lets a restore refuse an archive taken against
   a schema the running code cannot read, and the counts give the UI something
   human-meaningful to show before someone commits to a restore.
@@ -59,7 +59,7 @@ backups page does not have to open the archives: `tar` cannot read a single
 member without streaming the whole gzip stream to EOF, so with a fortnight of
 retained archives, a single list request would otherwise read several gigabytes
 off disk and evict the page cache. An archive with no readable sidecar still
-lists, simply without its report and photo counts.
+lists, simply without its report, photo and collection note counts.
 
 Archive creation and extraction use the `tar` npm package, streaming to and
 from disk, which avoids shelling out to a system binary and keeps behaviour
@@ -192,9 +192,10 @@ input; and the schedule controls for enabled, hour and retention count.
 
 Restore goes through the existing `ConfirmDialog` component but with a typed
 confirmation rather than a plain acknowledgement, and the dialog shows what the
-manifest says the archive contains (its date, and its report and photo counts)
-so that the decision is made against the archive's actual contents rather than
-against a filename. Once a restore is accepted the page switches to a
+manifest says the archive contains (its date, and its report, photo and
+collection note counts) so that the decision is made against the archive's
+actual contents rather than against a filename. Once a restore is accepted
+the page switches to a
 full-screen overlay explaining that the application is restarting, polls until
 the server answers again, and then sends the user to the login page, since the
 session store has been cleared by then.

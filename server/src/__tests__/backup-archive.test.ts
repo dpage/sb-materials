@@ -153,6 +153,7 @@ describe('createArchive / listArchives / pruneRetention', () => {
     expect(listing).toHaveLength(1);
     expect(listing[0].reportCount).toBe(manifest.reportCount);
     expect(listing[0].photoCount).toBe(manifest.photoCount);
+    expect(listing[0].collectionNoteCount).toBe(manifest.collectionNoteCount);
     expect(listing[0].sizeBytes).toBe(sizeBefore);
   });
 
@@ -164,6 +165,7 @@ describe('createArchive / listArchives / pruneRetention', () => {
     expect(listing).toHaveLength(1);
     expect(listing[0].reportCount).toBeNull();
     expect(listing[0].photoCount).toBeNull();
+    expect(listing[0].collectionNoteCount).toBeNull();
   });
 
   it('does not list a sidecar as though it were an archive in its own right', async () => {

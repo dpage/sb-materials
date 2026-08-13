@@ -256,7 +256,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Restoring',
-        body: 'Restoring replaces all current reports, customers and photos with the contents of the chosen archive. A snapshot of the current data is taken automatically before the swap, so a restore can itself be undone by restoring that snapshot. You must type RESTORE to confirm, since this is destructive. The application restarts as part of a restore, and you will be returned to the login page once it is back.',
+        body: 'Restoring replaces all current reports, collection notes, customers and photos with the contents of the chosen archive. A snapshot of the current data is taken automatically before the swap, so a restore can itself be undone by restoring that snapshot. You must type RESTORE to confirm, since this is destructive. The application restarts as part of a restore, and you will be returned to the login page once it is back.',
       },
       {
         title: 'Uploading a Backup to Restore',

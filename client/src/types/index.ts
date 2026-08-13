@@ -271,4 +271,5 @@ export interface Backup {
   sizeBytes: number;
   reportCount: number | null;
   photoCount: number | null;
+  collectionNoteCount: number | null;
 }
