@@ -69,7 +69,6 @@ export function CollectionNoteEdit() {
   const [contactName, setContactName] = useState(isEdit ? '' : user?.displayName || '');
   const [contactPhone, setContactPhone] = useState(isEdit ? '' : user?.phone || '');
   const [buyerReference, setBuyerReference] = useState('');
-  const [weight, setWeight] = useState('');
   const [minimumWeight, setMinimumWeight] = useState('');
   const [collectionDate, setCollectionDate] = useState(isEdit ? '' : new Date().toISOString().slice(0, 10));
   const [transportCompany, setTransportCompany] = useState('');
@@ -143,7 +142,6 @@ export function CollectionNoteEdit() {
         setContactName(note.contact_name || '');
         setContactPhone(note.contact_phone || '');
         setBuyerReference(note.buyer_reference || '');
-        setWeight(note.weight || '');
         setMinimumWeight(note.minimum_weight || '');
         setCollectionDate(note.collection_date || '');
         setTransportCompany(note.transport_company || '');
@@ -187,7 +185,6 @@ export function CollectionNoteEdit() {
         contact_name: contactName || null,
         contact_phone: contactPhone || null,
         buyer_reference: buyerReference || null,
-        weight: weight || null,
         minimum_weight: minimumWeight || null,
         collection_date: collectionDate || null,
         transport_company: transportCompany || null,
@@ -347,12 +344,6 @@ export function CollectionNoteEdit() {
                 onChange={(e) => setBuyerReference(e.target.value)}
                 style={inputStyle}
               />
-            </div>
-            <div>
-              <label style={labelStyle} htmlFor="cn-weight">
-                Weight
-              </label>
-              <input id="cn-weight" value={weight} onChange={(e) => setWeight(e.target.value)} style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle} htmlFor="cn-minimum-weight">

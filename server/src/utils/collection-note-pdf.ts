@@ -30,11 +30,14 @@ export const WASTE_BROKER_LINE = 'NRW Waste brokers registration CBDU027716';
 export const COMPANY_FOOTER_LINE =
   'SB Materials UK LTD 1 Deva Way, Wrexham, Wales LL13 9EU Registered in Wales & England No. 10896256';
 
-const HEADER_CELLS = [
+// Exported so a test can assert on the columns themselves: the bare "WEIGHT"
+// column that used to sit beside the minimum is gone, and the rendered text
+// alone cannot distinguish its absence from the columns that still mention a
+// weight.
+export const HEADER_CELLS = [
   'CONTACT',
   'BUYER REFERENCE',
   'REFERENCE',
-  'WEIGHT',
   'MINIMUM WEIGHT TO BE LOADED',
   'DATE OF COLLECTION',
 ];
@@ -184,13 +187,12 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
       { text: [note.contact_name, note.contact_phone].filter(Boolean).join('\n') },
       { text: note.buyer_reference ?? '' },
       { text: note.reference },
-      { text: note.weight ?? '' },
       { text: note.minimum_weight ?? '' },
       { text: formatUkDate(note.collection_date) },
     ],
   ];
   content.push({
-    table: { widths: ['*', '*', '*', '*', '*', '*'], headerRows: 1, body: detailBody },
+    table: { widths: ['*', '*', '*', '*', '*'], headerRows: 1, body: detailBody },
     margin: [0, 0, 0, 20] as [number, number, number, number],
   });
 
@@ -203,14 +205,19 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
   if (itemBody.length === 1) {
     itemBody.push([{ text: '' }, { text: '' }, { text: '' }, { text: '' }]);
   }
+  // The transport company is a property of the collection, not of any one line
+  // item, so it gets a full-width row of its own beneath the items: a bold
+  // heading over the value, spanning every column, rather than the stray cell
+  // in the middle of the item grid that made it read as another item.
   itemBody.push([
-    { text: '' },
     {
-      text: `${TRANSPORT_COMPANY_LABEL}\n${note.transport_company ?? ''}`,
-      margin: [0, 0, 0, 20] as [number, number, number, number],
+      stack: [
+        { text: TRANSPORT_COMPANY_LABEL, bold: true, margin: [0, 2, 0, 2] as [number, number, number, number] },
+        { text: note.transport_company ?? '', margin: [0, 0, 0, 4] as [number, number, number, number] },
+      ],
+      colSpan: ITEM_COLUMN_WIDTHS.length,
     },
-    { text: '' },
-    { text: '' },
+    ...Array.from({ length: ITEM_COLUMN_WIDTHS.length - 1 }, () => ({}) as TableCell),
   ]);
 
   // The Goods Dispatched row is appended to this same table, rather than

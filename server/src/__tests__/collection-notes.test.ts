@@ -158,7 +158,6 @@ describe('collection note routes', () => {
     contact_name: 'Test User',
     contact_phone: '07700 900123',
     buyer_reference: 'BR-1',
-    weight: '24t',
     minimum_weight: '22t',
     collection_date: '2026-08-03',
     transport_company: 'Test Haulage',
@@ -186,7 +185,6 @@ describe('collection note routes', () => {
       .set('Cookie', cookie)
       .expect(200);
     expect(fetched.body.customer_name).toBe('Acme Recycling Ltd');
-    expect(fetched.body.weight).toBe('24t');
     expect(fetched.body.buyer_reference).toBe('BR-1');
     expect(fetched.body.minimum_weight).toBe('22t');
     expect(fetched.body.items).toHaveLength(2);
@@ -250,7 +248,7 @@ describe('collection note routes', () => {
       .set('Cookie', cookie)
       .send({
         ...validNote(),
-        weight: '26t',
+        minimum_weight: '26t',
         items: [{ quantity: '5x', description: 'Shrink wrap', collection_point: 'Bay 1' }],
       })
       .expect(200);
@@ -259,7 +257,7 @@ describe('collection note routes', () => {
       .get(`/api/collection-notes/${created.body.id}`)
       .set('Cookie', cookie)
       .expect(200);
-    expect(fetched.body.weight).toBe('26t');
+    expect(fetched.body.minimum_weight).toBe('26t');
     expect(fetched.body.items).toHaveLength(1);
     expect(fetched.body.items[0].description).toBe('Shrink wrap');
   });

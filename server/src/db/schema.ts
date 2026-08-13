@@ -267,10 +267,12 @@ export function createSchema(db: Database.Database): void {
   // signed at the collection point by whoever dispatches the goods.
   //
   // Databases created before the note was reworked also carry
-  // received_signature_path and received_signed_date. Nothing reads them any
-  // more (goods are never signed for on the returning copy in practice), so
-  // they are simply left in place on those databases rather than rebuilt out
-  // of the table, which would mean recreating it wholesale in SQLite.
+  // received_signature_path, received_signed_date, and weight. Nothing reads
+  // them any more (goods are never signed for on the returning copy in
+  // practice, and the only weight that matters is the minimum the vehicle must
+  // be loaded to), so they are simply left in place on those databases rather
+  // than rebuilt out of the table, which would mean recreating it wholesale in
+  // SQLite.
   db.exec(`
     CREATE TABLE IF NOT EXISTS collection_notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -282,7 +284,6 @@ export function createSchema(db: Database.Database): void {
       contact_name TEXT,
       contact_phone TEXT,
       buyer_reference TEXT,
-      weight TEXT,
       minimum_weight TEXT,
       collection_date TEXT,
       transport_company TEXT,

@@ -226,7 +226,6 @@ export interface CollectionNote {
   contact_name: string | null;
   contact_phone: string | null;
   buyer_reference: string | null;
-  weight: string | null;
   minimum_weight: string | null;
   collection_date: string | null;
   transport_company: string | null;
@@ -250,7 +249,6 @@ export interface CollectionNoteData {
   contact_name?: string | null;
   contact_phone?: string | null;
   buyer_reference?: string | null;
-  weight?: string | null;
   minimum_weight?: string | null;
   collection_date?: string | null;
   transport_company?: string | null;

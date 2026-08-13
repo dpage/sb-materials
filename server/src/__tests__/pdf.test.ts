@@ -11,6 +11,7 @@ import {
   collectionNotePdfFilename,
   collectionNoteItemRows,
   formatUkDate,
+  HEADER_CELLS,
 } from '../utils/collection-note-pdf';
 import os from 'os';
 import fs from 'fs';
@@ -721,7 +722,6 @@ describe('collection note PDF', () => {
         contact_name: 'Test User',
         contact_phone: '07700 900123',
         buyer_reference: 'BR-1',
-        weight: '24t',
         minimum_weight: '22t',
         collection_date: '2026-08-03',
         transport_company: 'Test Haulage',
@@ -788,6 +788,11 @@ describe('collection note PDF', () => {
     expect(text).toContain('SBM1061');
     expect(text).toContain('BUYER REFERENCE');
     expect(text).toContain('MINIMUM WEIGHT TO BE LOADED');
+    // The bare "WEIGHT" column that sat beside the minimum is gone. Asserted on
+    // the columns rather than the rendered text, which still legitimately
+    // mentions a weight twice over.
+    expect(HEADER_CELLS).not.toContain('WEIGHT');
+    expect(HEADER_CELLS).toHaveLength(5);
     expect(text).toContain('NETT WEIGHT (KG)');
     expect(text).toContain('Goods Dispatched');
     // Goods are never signed for on the returning copy, so that row is gone.
@@ -798,6 +803,17 @@ describe('collection note PDF', () => {
     expect(text).toContain(
       'SB Materials UK LTD 1 Deva Way, Wrexham, Wales LL13 9EU Registered in Wales & England No. 10896256',
     );
+  });
+
+  it('gives the transport company a row of its own rather than an item row', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
+    const text = extractPdfText(buffer);
+    expect(text).toContain('Transport Company');
+    expect(text).toContain('Test Haulage');
+    // It belongs to the collection, not to any line item, so it must never be
+    // one of the rows collectionNoteItemRows() produces.
+    expect(collectionNoteItemRows(note).flat()).not.toContain('Test Haulage');
   });
 
   it('carries the letterhead logo', async () => {

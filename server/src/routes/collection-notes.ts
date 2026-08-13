@@ -142,10 +142,10 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         .prepare(
           `INSERT INTO collection_notes (
              reference, customer_id, site_id, collect_from_address, comments,
-             contact_name, contact_phone, buyer_reference, weight, minimum_weight,
+             contact_name, contact_phone, buyer_reference, minimum_weight,
              collection_date, transport_company, dispatched_signed_date,
              created_by_id
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           reference,
@@ -156,7 +156,6 @@ export function collectionNoteRoutes(db: Database.Database): Router {
           body.contact_name ?? null,
           body.contact_phone ?? null,
           body.buyer_reference ?? null,
-          body.weight ?? null,
           body.minimum_weight ?? null,
           body.collection_date ?? null,
           body.transport_company ?? null,
@@ -205,7 +204,7 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         `UPDATE collection_notes SET
            reference = ?, customer_id = ?, site_id = ?, collect_from_address = ?,
            comments = ?, contact_name = ?, contact_phone = ?, buyer_reference = ?,
-           weight = ?, minimum_weight = ?, collection_date = ?, transport_company = ?,
+           minimum_weight = ?, collection_date = ?, transport_company = ?,
            dispatched_signed_date = ?,
            updated_at = datetime('now')
          WHERE id = ?`,
@@ -218,7 +217,6 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         body.contact_name ?? null,
         body.contact_phone ?? null,
         body.buyer_reference ?? null,
-        body.weight ?? null,
         body.minimum_weight ?? null,
         body.collection_date ?? null,
         body.transport_company ?? null,
@@ -262,9 +260,9 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         .prepare(
           `INSERT INTO collection_notes (
              reference, customer_id, site_id, collect_from_address, comments,
-             contact_name, contact_phone, buyer_reference, weight, minimum_weight,
+             contact_name, contact_phone, buyer_reference, minimum_weight,
              collection_date, transport_company, created_by_id
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?)`,
         )
         .run(
           reference,
@@ -275,7 +273,6 @@ export function collectionNoteRoutes(db: Database.Database): Router {
           source.contact_name,
           source.contact_phone,
           source.buyer_reference,
-          source.weight,
           source.minimum_weight,
           source.transport_company,
           req.session.userId,
