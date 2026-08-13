@@ -259,4 +259,16 @@ export interface CollectionNoteData {
 export interface AppSettings {
   collection_note_prefix?: string;
   collection_note_next_number?: string;
+  'backup.enabled'?: string;
+  'backup.hour'?: string;
+  'backup.keep'?: string;
+}
+
+export interface Backup {
+  filename: string;
+  kind: 'scheduled' | 'manual' | 'pre-restore';
+  createdAt: string;
+  sizeBytes: number;
+  reportCount: number | null;
+  photoCount: number | null;
 }

@@ -14,6 +14,7 @@ import type {
   CollectionNote,
   CollectionNoteData,
   AppSettings,
+  Backup,
 } from '../types';
 
 const BASE = '/api';
@@ -226,4 +227,29 @@ export const api = {
   // Settings
   getSettings: () => request<AppSettings>('/settings'),
   updateSettings: (data: AppSettings) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Backups
+  getBackups: () => request<Backup[]>('/backups'),
+  takeBackupNow: () => request<{ filename: string }>('/backups', { method: 'POST', body: '{}' }),
+  downloadBackupUrl: (filename: string) => `${BASE}/backups/${encodeURIComponent(filename)}/download`,
+  deleteBackup: (filename: string) => request(`/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+  restoreBackup: (filename: string) =>
+    request<{ ok: boolean; manifest: unknown }>(`/backups/${encodeURIComponent(filename)}/restore`, {
+      method: 'POST',
+      body: '{}',
+    }),
+  uploadAndRestoreBackup: async (file: File) => {
+    const formData = new FormData();
+    formData.append('archive', file);
+    const res = await fetch(`${BASE}/backups/restore/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error || res.statusText);
+    }
+    return res.json() as Promise<{ ok: boolean; manifest: unknown }>;
+  },
 };
