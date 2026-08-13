@@ -104,11 +104,38 @@ describe('Backup Routes', () => {
     expect((await request(app).get('/api/backups').set('Cookie', cookie)).body).toEqual([]);
   });
 
+  it('DELETE removes the manifest sidecar along with the archive', async () => {
+    const postRes = await request(app).post('/api/backups').set('Cookie', cookie);
+    const filename = postRes.body.filename;
+    expect(fs.existsSync(path.join(backupsDir, `${filename}.manifest.json`))).toBe(true);
+
+    await request(app).delete(`/api/backups/${filename}`).set('Cookie', cookie).expect(200);
+
+    expect(fs.readdirSync(backupsDir)).toEqual([]);
+  });
+
   it('DELETE returns 404 for a filename that is not in the directory listing, refusing traversal attempts', async () => {
     const res = await request(app)
       .delete('/api/backups/' + encodeURIComponent('../../etc/passwd'))
       .set('Cookie', cookie);
     expect(res.status).toBe(404);
+  });
+
+  it('refuses to resolve anything in the backups directory that is not an archive', async () => {
+    // A staging directory of the sort createArchive holds open whilst building an
+    // archive, and a manifest sidecar: neither should be reachable as :file, and
+    // in particular DELETE must not take fs.unlinkSync to a directory.
+    fs.mkdirSync(path.join(backupsDir, '.building-abc123'), { recursive: true });
+    const postRes = await request(app).post('/api/backups').set('Cookie', cookie);
+    const sidecar = `${postRes.body.filename}.manifest.json`;
+
+    for (const name of ['.building-abc123', sidecar]) {
+      expect((await request(app).delete(`/api/backups/${name}`).set('Cookie', cookie)).status).toBe(404);
+      expect((await request(app).get(`/api/backups/${name}/download`).set('Cookie', cookie)).status).toBe(404);
+      expect((await request(app).post(`/api/backups/${name}/restore`).set('Cookie', cookie)).status).toBe(404);
+    }
+    expect(fs.existsSync(path.join(backupsDir, '.building-abc123'))).toBe(true);
+    expect(fs.existsSync(path.join(backupsDir, sidecar))).toBe(true);
   });
 
   it('GET download streams an existing archive and 404s for an unknown one', async () => {
@@ -204,6 +231,24 @@ describe('Backup Routes', () => {
       expect(res.status).toBe(200);
       await new Promise((resolve) => setImmediate(resolve));
       expect(closeAndRestart).toHaveBeenCalled();
+    });
+
+    it('keeps all of its scratch space under the data directory, and cleans it up', async () => {
+      const postRes = await request(app).post('/api/backups').set('Cookie', cookie);
+      const archiveBytes = fs.readFileSync(path.join(backupsDir, postRes.body.filename));
+
+      const res = await request(app)
+        .post('/api/backups/restore/upload')
+        .set('Cookie', cookie)
+        .attach('archive', archiveBytes, 'upload.tar.gz');
+      expect(res.status).toBe(200);
+
+      // The uploaded archive, the validation extract and the scratch copy of the
+      // source all go here rather than into os.tmpdir(), which under a unit with
+      // PrivateTmp=yes is a tmpfs far smaller than the volume sized for the data.
+      const scratchDir = restorePaths(dataDir).scratchDir;
+      expect(fs.existsSync(scratchDir)).toBe(true);
+      expect(fs.readdirSync(scratchDir)).toEqual([]);
     });
 
     it('returns 500, not a crash, when an unexpected error occurs after the pre-restore snapshot', async () => {
