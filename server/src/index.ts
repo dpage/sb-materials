@@ -21,6 +21,24 @@ import { photoRoutes } from './routes/photos';
 import { pdfRoutes } from './routes/pdf';
 import { collectionNoteRoutes } from './routes/collection-notes';
 import { settingsRoutes } from './routes/settings';
+import { backupRoutes } from './routes/backups';
+import { BackupCoordinator } from './backup/scheduler';
+import { recoverInterruptedRestore } from './backup/restore';
+
+// Complete any restore that was interrupted by a crash. This MUST run before
+// anything else touches the data directory: applySwap's crash-recovery logic
+// classifies each item (the database, uploads/) by whether a staged copy is
+// still present versus already swapped in, and that classification is only
+// valid if nothing else has created or recreated sb-materials.db or uploads/
+// first. Creating an empty uploads/ (or opening/creating the database) ahead
+// of this call would make an interrupted restore look "already complete" and
+// cause applySwap's final cleanup to delete the one remaining copy of the
+// data. recoverInterruptedRestore is safe to call even when config.dataDir
+// itself does not exist yet (it just finds no marker and returns 'none').
+const restoreRecovery = recoverInterruptedRestore(config.dataDir);
+if (restoreRecovery === 'completed') {
+  logger.info('Completed a restore that was interrupted by a previous shutdown');
+}
 
 // Ensure data directory exists
 if (!fs.existsSync(config.dataDir)) {
@@ -28,6 +46,9 @@ if (!fs.existsSync(config.dataDir)) {
 }
 if (!fs.existsSync(config.uploadsDir)) {
   fs.mkdirSync(config.uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(config.backupsDir)) {
+  fs.mkdirSync(config.backupsDir, { recursive: true });
 }
 
 // Initialize database
@@ -86,6 +107,27 @@ app.use('/api/photos', photoRoutes(db));
 app.use('/api/pdf', pdfRoutes(db));
 app.use('/api/collection-notes', collectionNoteRoutes(db));
 app.use('/api/settings', settingsRoutes(db));
+
+const backupCoordinator = new BackupCoordinator(db, config.backupsDir, config.uploadsDir);
+app.use(
+  '/api/backups',
+  backupRoutes(db, {
+    dataDir: config.dataDir,
+    backupsDir: config.backupsDir,
+    uploadsDir: config.uploadsDir,
+    coordinator: backupCoordinator,
+    closeAndRestart: () => {
+      db.close();
+      sessionDb.close();
+      process.exit(0);
+    },
+  }),
+);
+
+const BACKUP_TICK_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(() => {
+  backupCoordinator.tick().catch((err) => logger.error('Scheduled backup failed:', err));
+}, BACKUP_TICK_INTERVAL_MS);
 
 // Serve static frontend in production
 const clientDist = path.join(__dirname, '../../client/dist');
