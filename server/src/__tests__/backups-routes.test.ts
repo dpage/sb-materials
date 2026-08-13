@@ -11,7 +11,7 @@ import { seedData } from '../db/seed';
 import { authRoutes } from '../routes/auth';
 import { backupRoutes } from '../routes/backups';
 import { BackupCoordinator, BACKUP_KEEP_SETTING } from '../backup/scheduler';
-import { createArchive, computeSchemaFingerprint } from '../backup/archive';
+import { createArchive } from '../backup/archive';
 import { restorePaths, readMarker } from '../backup/restore';
 import { setSetting } from '../utils/settings';
 
