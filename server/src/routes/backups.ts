@@ -157,7 +157,9 @@ async function performRestore(
 
   if (fs.existsSync(paths.markerPath)) {
     if (cleanupSourceAfter) fs.rmSync(archivePath, { force: true });
-    res.status(409).json({ error: 'A previous restore did not finish cleanly; restart the service before trying again' });
+    res
+      .status(409)
+      .json({ error: 'A previous restore did not finish cleanly; restart the service before trying again' });
     return;
   }
 

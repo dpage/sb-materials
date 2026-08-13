@@ -91,7 +91,10 @@ describe('settings routes', () => {
 
   it('rejects backup.last_run as a write target since it is not writable', async () => {
     const cookie = await loginAsAdmin(app);
-    const res = await supertest(app).put('/api/settings').set('Cookie', cookie).send({ 'backup.last_run': '2026-01-01T00:00:00.000Z' });
+    const res = await supertest(app)
+      .put('/api/settings')
+      .set('Cookie', cookie)
+      .send({ 'backup.last_run': '2026-01-01T00:00:00.000Z' });
     expect(res.status).toBe(400);
   });
 });

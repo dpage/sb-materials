@@ -7,7 +7,13 @@ import { BACKUP_ENABLED_SETTING, BACKUP_HOUR_SETTING, BACKUP_KEEP_SETTING } from
 
 // Only these keys may be written through the API, so a stray request cannot
 // invent settings the app never reads.
-const WRITABLE_SETTINGS = [NEXT_NUMBER_SETTING, PREFIX_SETTING, BACKUP_ENABLED_SETTING, BACKUP_HOUR_SETTING, BACKUP_KEEP_SETTING];
+const WRITABLE_SETTINGS = [
+  NEXT_NUMBER_SETTING,
+  PREFIX_SETTING,
+  BACKUP_ENABLED_SETTING,
+  BACKUP_HOUR_SETTING,
+  BACKUP_KEEP_SETTING,
+];
 
 export function settingsRoutes(db: Database.Database): Router {
   const router = Router();

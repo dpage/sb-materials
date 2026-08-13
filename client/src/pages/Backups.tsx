@@ -177,7 +177,17 @@ export function Backups() {
 
   if (restarting) {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+        }}
+      >
         <div style={{ textAlign: 'center', maxWidth: 460, padding: 20 }}>
           <h2>Restoring backup&hellip;</h2>
           {restartTimedOut ? (
@@ -198,18 +208,46 @@ export function Backups() {
   return (
     <div>
       {error && (
-        <div style={{ background: '#fdf0ef', border: '1px solid #e74c3c', color: '#c0392b', padding: '8px 12px', borderRadius: 6, marginBottom: 16, fontSize: 13 }}>
+        <div
+          style={{
+            background: '#fdf0ef',
+            border: '1px solid #e74c3c',
+            color: '#c0392b',
+            padding: '8px 12px',
+            borderRadius: 6,
+            marginBottom: 16,
+            fontSize: 13,
+          }}
+        >
           {error}
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+          flexWrap: 'wrap',
+          gap: 12,
+        }}
+      >
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#2d3436' }}>Backups</h2>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={handleTakeBackupNow}
             disabled={takingBackup}
-            style={{ padding: '10px 22px', background: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: takingBackup ? 'not-allowed' : 'pointer' }}
+            style={{
+              padding: '10px 22px',
+              background: '#27ae60',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: takingBackup ? 'not-allowed' : 'pointer',
+            }}
           >
             {takingBackup ? 'Taking backup…' : 'Take backup now'}
           </button>
@@ -226,14 +264,31 @@ export function Backups() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            style={{ padding: '10px 22px', background: '#fff', border: '1px solid #dde1e6', color: '#2d3436', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}
+            style={{
+              padding: '10px 22px',
+              background: '#fff',
+              border: '1px solid #dde1e6',
+              color: '#2d3436',
+              borderRadius: 8,
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
           >
             Upload and restore
           </button>
         </div>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 10, padding: 20, marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 10,
+          padding: 20,
+          marginBottom: 16,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+        }}
+      >
         <h3 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 600, color: '#2d3436' }}>Schedule</h3>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
@@ -268,14 +323,25 @@ export function Backups() {
           <button
             onClick={handleSaveSettings}
             disabled={savingSettings || !settingsLoaded}
-            style={{ padding: '8px 20px', background: '#2980b9', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+            style={{
+              padding: '8px 20px',
+              background: '#2980b9',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+            }}
           >
             Save schedule
           </button>
         </div>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+      <div
+        style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden' }}
+      >
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>

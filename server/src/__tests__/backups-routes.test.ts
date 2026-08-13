@@ -69,10 +69,14 @@ describe('Backup Routes', () => {
 
     it('rejects a non-superuser at every endpoint', async () => {
       const bcrypt = await import('bcryptjs');
-      db.prepare(
-        'INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, 0)',
-      ).run('regular', bcrypt.hashSync('password123', 10), 'Regular User');
-      const loginRes = await request(app).post('/api/auth/login').send({ username: 'regular', password: 'password123' });
+      db.prepare('INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES (?, ?, ?, 0)').run(
+        'regular',
+        bcrypt.hashSync('password123', 10),
+        'Regular User',
+      );
+      const loginRes = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'regular', password: 'password123' });
       const regularCookie = Array.isArray(loginRes.headers['set-cookie'])
         ? loginRes.headers['set-cookie'][0]
         : loginRes.headers['set-cookie'];
@@ -200,12 +204,14 @@ describe('Backup Routes', () => {
       manifest.schemaFingerprint = { not_a_real_table: ['id'] };
       fs.writeFileSync(manifestPath, JSON.stringify(manifest));
       fs.unlinkSync(badArchive.path);
-      await tar.create({ gzip: true, file: badArchive.path, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
+      await tar.create({ gzip: true, file: badArchive.path, cwd: extractDir }, [
+        'manifest.json',
+        'sb-materials.db',
+        'uploads',
+      ]);
       fs.rmSync(extractDir, { recursive: true, force: true });
 
-      const res = await request(app)
-        .post(`/api/backups/${badArchive.filename}/restore`)
-        .set('Cookie', cookie);
+      const res = await request(app).post(`/api/backups/${badArchive.filename}/restore`).set('Cookie', cookie);
       expect(res.status).toBe(400);
       expect(closeAndRestart).not.toHaveBeenCalled();
 

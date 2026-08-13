@@ -24,11 +24,11 @@ describe('isBackupDue', () => {
     expect(isBackupDue(null, 2, new Date('2026-08-13T01:00:00Z'))).toBe(false);
   });
 
-  it('is not due again the same day once last run is after today\'s due-time', () => {
+  it("is not due again the same day once last run is after today's due-time", () => {
     expect(isBackupDue('2026-08-13T02:05:00Z', 2, new Date('2026-08-13T03:00:00Z'))).toBe(false);
   });
 
-  it('is due again the next day even if last run was after yesterday\'s due-time', () => {
+  it("is due again the next day even if last run was after yesterday's due-time", () => {
     expect(isBackupDue('2026-08-13T02:05:00Z', 2, new Date('2026-08-14T03:00:00Z'))).toBe(true);
   });
 

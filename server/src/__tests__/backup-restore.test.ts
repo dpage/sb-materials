@@ -64,14 +64,18 @@ describe('validateArchive', () => {
   });
 
   it('rejects an archive with a schema fingerprint mismatch', async () => {
-    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(RestoreValidationError);
+    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(
+      RestoreValidationError,
+    );
   });
 
   it('rejects a truncated archive', async () => {
     const truncated = path.join(tmpDir, 'truncated.tar.gz');
     const full = fs.readFileSync(archivePath);
     fs.writeFileSync(truncated, full.subarray(0, Math.floor(full.length / 2)));
-    await expect(validateArchive(truncated, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(RestoreValidationError);
+    await expect(validateArchive(truncated, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(
+      RestoreValidationError,
+    );
   });
 
   it('rejects an archive whose database checksum does not match the manifest', async () => {
@@ -82,7 +86,9 @@ describe('validateArchive', () => {
     const tampered = path.join(tmpDir, 'tampered.tar.gz');
     await tar.create({ gzip: true, file: tampered, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
 
-    await expect(validateArchive(tampered, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(RestoreValidationError);
+    await expect(validateArchive(tampered, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(
+      RestoreValidationError,
+    );
     fs.rmSync(extractDir, { recursive: true, force: true });
   });
 
@@ -97,7 +103,9 @@ describe('validateArchive', () => {
     const rebuilt = path.join(tmpDir, 'future-version.tar.gz');
     await tar.create({ gzip: true, file: rebuilt, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
 
-    await expect(validateArchive(rebuilt, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(RestoreValidationError);
+    await expect(validateArchive(rebuilt, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(
+      RestoreValidationError,
+    );
     fs.rmSync(extractDir, { recursive: true, force: true });
   });
 
@@ -107,7 +115,9 @@ describe('validateArchive', () => {
     fs.writeFileSync(path.join(dataDir, 'sb-materials.db'), 'original');
     const before = fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8');
 
-    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(RestoreValidationError);
+    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(
+      RestoreValidationError,
+    );
 
     expect(fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8')).toBe(before);
     expect(fs.existsSync(path.join(dataDir, '.restore-staging'))).toBe(false);
@@ -420,7 +430,10 @@ describe('marker read/write/clear', () => {
     expect(readMarker(paths.markerPath)).toBeNull();
 
     writeMarker(paths.markerPath, { stagingDir: paths.stagingDir, createdAt: '2026-08-13T00:00:00.000Z' });
-    expect(readMarker(paths.markerPath)).toEqual({ stagingDir: paths.stagingDir, createdAt: '2026-08-13T00:00:00.000Z' });
+    expect(readMarker(paths.markerPath)).toEqual({
+      stagingDir: paths.stagingDir,
+      createdAt: '2026-08-13T00:00:00.000Z',
+    });
 
     clearMarker(paths.markerPath);
     expect(readMarker(paths.markerPath)).toBeNull();

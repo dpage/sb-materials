@@ -64,7 +64,13 @@ export function ConfirmDialog({
               type="text"
               value={typedValue}
               onChange={(e) => setTypedValue(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, boxSizing: 'border-box' }}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                border: '1px solid #ddd',
+                borderRadius: 6,
+                boxSizing: 'border-box',
+              }}
             />
           </div>
         )}

@@ -84,7 +84,11 @@ describe('createArchive / listArchives / pruneRetention', () => {
   });
 
   it('creates a tar.gz containing manifest.json, sb-materials.db and uploads/', async () => {
-    const { filename, path: archivePath, manifest } = await createArchive({
+    const {
+      filename,
+      path: archivePath,
+      manifest,
+    } = await createArchive({
       db,
       backupsDir,
       uploadsDir,

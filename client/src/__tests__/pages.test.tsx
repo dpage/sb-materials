@@ -1631,7 +1631,9 @@ describe('Backups Page', () => {
     const restoreButtons = screen.getAllByRole('button', { name: 'Restore' });
     fireEvent.click(restoreButtons[restoreButtons.length - 1]);
 
-    await waitFor(() => expect(api.restoreBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'));
+    await waitFor(() =>
+      expect(api.restoreBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'),
+    );
     await waitFor(() => expect(screen.getByText(/Restoring backup/)).toBeInTheDocument());
   });
 
@@ -1655,9 +1657,7 @@ describe('Backups Page', () => {
     const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
     fireEvent.click(deleteButtons[deleteButtons.length - 1]);
 
-    await waitFor(() =>
-      expect(api.deleteBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'),
-    );
+    await waitFor(() => expect(api.deleteBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'));
   });
 
   it('should not delete a backup when the confirmation is cancelled', async () => {

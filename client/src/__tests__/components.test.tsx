@@ -66,7 +66,14 @@ describe('ConfirmDialog', () => {
 
   it('uses a custom confirm label when provided, without requiring typed text', () => {
     render(
-      <ConfirmDialog open={true} title="Take backup" message="Proceed?" confirmLabel="Take Backup" onConfirm={() => {}} onCancel={() => {}} />,
+      <ConfirmDialog
+        open={true}
+        title="Take backup"
+        message="Proceed?"
+        confirmLabel="Take Backup"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
     );
     expect(screen.getByRole('button', { name: 'Take Backup' })).not.toBeDisabled();
   });
