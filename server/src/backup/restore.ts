@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import * as tar from 'tar';
@@ -12,6 +11,7 @@ export interface RestorePaths {
   dataDir: string;
   stagingDir: string;
   asideDir: string;
+  scratchDir: string;
   markerPath: string;
 }
 
@@ -25,8 +25,26 @@ export function restorePaths(dataDir: string): RestorePaths {
     dataDir,
     stagingDir: path.join(dataDir, '.restore-staging'),
     asideDir: path.join(dataDir, '.restore-aside'),
+    scratchDir: path.join(dataDir, '.restore-tmp'),
     markerPath: path.join(dataDir, '.restore-marker.json'),
   };
+}
+
+/**
+ * Create a uniquely named temporary directory beneath `scratchRoot`, creating
+ * the root itself if need be.
+ *
+ * Restore's scratch space deliberately lives under `DATA_DIR` rather than in
+ * `os.tmpdir()`. Peak usage is roughly the uncompressed size of an archive (the
+ * database plus the entire photo tree), and a systemd unit with
+ * `PrivateTmp=yes` gets a private tmpfs sized as a fraction of RAM, so putting
+ * it in the system temporary directory means a restore can run out of space
+ * long before the volume the administrator actually sized for this data does,
+ * and surface as an opaque 500.
+ */
+export function createScratchDir(scratchRoot: string, prefix: string): string {
+  fs.mkdirSync(scratchRoot, { recursive: true });
+  return fs.mkdtempSync(path.join(scratchRoot, prefix));
 }
 
 async function extractArchive(archivePath: string, destDir: string): Promise<void> {
@@ -41,8 +59,9 @@ function sha256File(filePath: string): string {
 export async function validateArchive(
   archivePath: string,
   currentSchemaFingerprint: Record<string, string[]>,
+  scratchRoot: string,
 ): Promise<BackupManifest> {
-  const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-restore-validate-'));
+  const scratchDir = createScratchDir(scratchRoot, 'validate-');
   try {
     try {
       await extractArchive(archivePath, scratchDir);
@@ -279,8 +298,13 @@ function moveBack(src: string, dest: string): void {
  * and retires anything else to a timestamped `.restore-aside-<when>` directory,
  * so a misordered caller costs some stale files left behind for a human to sort
  * out rather than the only copy of the data.
+ *
+ * Returns the path of that quarantine directory when one was created, so the
+ * caller can say so out loud: files nobody knows about are files nobody
+ * recovers, and this is precisely the situation the design takes the most
+ * trouble to protect.
  */
-export function applySwap(paths: RestorePaths): void {
+export function applySwap(paths: RestorePaths): { quarantinedAt: string | null } {
   const { dataDir, stagingDir, asideDir } = paths;
 
   const stagedDb = path.join(stagingDir, DB_FILE);
@@ -356,9 +380,11 @@ export function applySwap(paths: RestorePaths): void {
   if (uploadsSwapped) {
     fs.rmSync(asideUploads, { recursive: true, force: true });
   }
-  retireAsideDir(asideDir);
+  const quarantinedAt = retireAsideDir(asideDir);
   fs.rmSync(stagingDir, { recursive: true, force: true });
   syncDir(dataDir);
+
+  return { quarantinedAt };
 }
 
 /**
@@ -372,12 +398,22 @@ export function applySwap(paths: RestorePaths): void {
  * swap is re-run to convergence; the marker's contents are deliberately not
  * trusted, since the paths are derived from `dataDir` and the swap has to cope
  * with an unreadable marker just as safely as with a readable one.
+ *
+ * `quarantinedAt`, when set, names a directory holding data the swap declined to
+ * delete because it could not show it had been superseded. It is reported back
+ * so that the caller can log it prominently rather than leaving a directory of
+ * possibly irreplaceable photos sitting silently in the data directory.
  */
-export function recoverInterruptedRestore(dataDir: string): 'none' | 'completed' {
-  const paths = restorePaths(dataDir);
-  if (!fs.existsSync(paths.markerPath)) return 'none';
+export type RestoreRecovery = { status: 'none' } | { status: 'completed'; quarantinedAt: string | null };
 
-  applySwap(paths);
+export function recoverInterruptedRestore(dataDir: string): RestoreRecovery {
+  const paths = restorePaths(dataDir);
+  if (!fs.existsSync(paths.markerPath)) return { status: 'none' };
+
+  const { quarantinedAt } = applySwap(paths);
   clearMarker(paths.markerPath);
-  return 'completed';
+  // Any scratch space left behind by the restore that wrote the marker is dead
+  // weight once the swap has been applied, and can be large.
+  fs.rmSync(paths.scratchDir, { recursive: true, force: true });
+  return { status: 'completed', quarantinedAt };
 }

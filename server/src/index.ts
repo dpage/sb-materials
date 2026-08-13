@@ -35,9 +35,36 @@ import { recoverInterruptedRestore } from './backup/restore';
 // cause applySwap's final cleanup to delete the one remaining copy of the
 // data. recoverInterruptedRestore is safe to call even when config.dataDir
 // itself does not exist yet (it just finds no marker and returns 'none').
-const restoreRecovery = recoverInterruptedRestore(config.dataDir);
-if (restoreRecovery === 'completed') {
-  logger.info('Completed a restore that was interrupted by a previous shutdown');
+//
+// A throw from here would otherwise become an uncaught top-level exception, and
+// since restore depends on the unit being configured `Restart=always`, that
+// would be a boot loop printing a bare stack trace with nothing to say that a
+// restore is stuck halfway. Recovering from a failed recovery is not something
+// to be clever about: say plainly what is wrong and where, and stop.
+try {
+  const recovery = recoverInterruptedRestore(config.dataDir);
+  if (recovery.status === 'completed') {
+    // Note that this is the ordinary path, not an exceptional one: every
+    // restore applies its swap at the next startup, so this line appears after
+    // each one and should read as routine to whoever is watching the logs.
+    logger.info('Applied a pending restore');
+    if (recovery.quarantinedAt) {
+      logger.error(
+        `Restore recovery quarantined pre-existing data at ${recovery.quarantinedAt} rather than deleting it, ` +
+          'because it could not confirm the data had been superseded. It may be the only remaining copy: see ' +
+          'BACKUP-RESTORE-DESIGN.md for what this means and how to recover it, and delete the directory once ' +
+          'you are satisfied it is not needed.',
+      );
+    }
+  }
+} catch (err) {
+  logger.error(`Failed to complete a pending restore in ${config.dataDir}:`, err);
+  logger.error(
+    'The data directory is in a half-restored state and the application will not start until it is sorted out ' +
+      'by hand. See BACKUP-RESTORE-DESIGN.md; the pre-restore snapshot in the backups directory holds the data ' +
+      'as it was before the restore began.',
+  );
+  process.exit(1);
 }
 
 // Ensure data directory exists
