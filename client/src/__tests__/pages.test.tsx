@@ -1635,7 +1635,7 @@ describe('Backups Page', () => {
     await waitFor(() => expect(screen.getByText(/Restoring backup/)).toBeInTheDocument());
   });
 
-  it('should delete a backup', async () => {
+  it('should confirm before deleting a backup', async () => {
     (api.deleteBackup as any).mockResolvedValue({ ok: true });
     render(
       <TestWrapper>
@@ -1645,9 +1645,34 @@ describe('Backups Page', () => {
     await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Delete'));
+
+    // The dialog is open and nothing has been deleted yet.
+    expect(screen.getByText('Delete backup')).toBeInTheDocument();
+    expect(api.deleteBackup).not.toHaveBeenCalled();
+
+    // The row's own "Delete" trigger is still in the DOM alongside the dialog's
+    // confirm button, which is the last one rendered.
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+
     await waitFor(() =>
       expect(api.deleteBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'),
     );
+  });
+
+  it('should not delete a backup when the confirmation is cancelled', async () => {
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByText('Delete backup')).not.toBeInTheDocument();
+    expect(api.deleteBackup).not.toHaveBeenCalled();
   });
 
   it('should save schedule settings', async () => {

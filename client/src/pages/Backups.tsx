@@ -6,7 +6,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 function formatDate(iso: string): string {
@@ -15,17 +16,45 @@ function formatDate(iso: string): string {
 
 const RESTORE_CONFIRMATION_TEXT = 'RESTORE';
 
-async function pollUntilServerIsBack(): Promise<void> {
-  // The server process exits and is restarted by systemd, so during the gap
-  // fetch itself rejects; once it resolves (any status), the server is back.
-  for (;;) {
+// The server answers the restore request before it exits, and stays alive for
+// at least another turn of the event loop after that, so polling immediately
+// would find the old process still answering and send the browser to a login
+// page served by a process that is about to vanish. Waiting first, and then
+// preferring to have actually seen the server go, keeps that from happening.
+const RESTART_INITIAL_DELAY_MS = 2000;
+const RESTART_POLL_INTERVAL_MS = 1500;
+// If nothing has ever caught the server down by the time this has elapsed, it
+// restarted faster than the polling could notice, so a success is taken at face
+// value rather than waiting for a gap that has already been and gone.
+const RESTART_DOWNTIME_GRACE_MS = 10000;
+// And an escape hatch, so a service that never comes back leaves the operator
+// with a message rather than a spinner polling until the tab is closed.
+const RESTART_TIMEOUT_MS = 3 * 60 * 1000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Resolves true once the server is answering again, or false on giving up. */
+async function pollUntilServerIsBack(): Promise<boolean> {
+  await delay(RESTART_INITIAL_DELAY_MS);
+
+  const startedAt = Date.now();
+  let sawServerDown = false;
+
+  while (Date.now() - startedAt < RESTART_TIMEOUT_MS) {
     try {
+      // During the gap fetch itself rejects; once it resolves, whatever the
+      // status, something is listening again.
       await fetch('/api/auth/me', { credentials: 'include' });
-      return;
+      if (sawServerDown || Date.now() - startedAt >= RESTART_DOWNTIME_GRACE_MS) return true;
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      sawServerDown = true;
     }
+    await delay(RESTART_POLL_INTERVAL_MS);
   }
+
+  return false;
 }
 
 export function Backups() {
@@ -42,8 +71,10 @@ export function Backups() {
   const [takingBackup, setTakingBackup] = useState(false);
   const [error, setError] = useState('');
   const [restoreTarget, setRestoreTarget] = useState<Backup | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Backup | null>(null);
   const [uploadRestoreFile, setUploadRestoreFile] = useState<File | null>(null);
   const [restarting, setRestarting] = useState(false);
+  const [restartTimedOut, setRestartTimedOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -81,7 +112,10 @@ export function Backups() {
     }
   };
 
-  const handleDelete = async (filename: string) => {
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const filename = deleteTarget.filename;
+    setDeleteTarget(null);
     try {
       await api.deleteBackup(filename);
       load();
@@ -92,8 +126,12 @@ export function Backups() {
 
   const beginRestart = () => {
     setRestarting(true);
-    pollUntilServerIsBack().then(() => {
-      window.location.href = '/login';
+    pollUntilServerIsBack().then((isBack) => {
+      if (isBack) {
+        window.location.href = '/login';
+      } else {
+        setRestartTimedOut(true);
+      }
     });
   };
 
@@ -140,9 +178,18 @@ export function Backups() {
   if (restarting) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', maxWidth: 460, padding: 20 }}>
           <h2>Restoring backup&hellip;</h2>
-          <p style={{ color: '#666' }}>The application is restarting. This page will return to the login screen automatically.</p>
+          {restartTimedOut ? (
+            <p style={{ color: '#c0392b' }}>
+              The application is taking longer than expected to restart — check the server. The restore itself has
+              already been staged, so it will be applied as soon as the service comes back up.
+            </p>
+          ) : (
+            <p style={{ color: '#666' }}>
+              The application is restarting. This page will return to the login screen automatically.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -198,7 +245,7 @@ export function Backups() {
             <span>Enabled</span>
           </label>
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 500 }}>Hour (0-23)</label>
+            <label style={{ display: 'block', marginBottom: 4, fontSize: 13, fontWeight: 500 }}>Hour (0-23, UTC)</label>
             <input
               type="number"
               min={0}
@@ -263,7 +310,7 @@ export function Backups() {
                     <button onClick={() => setRestoreTarget(b)} style={smallBtnStyle}>
                       Restore
                     </button>
-                    <button onClick={() => handleDelete(b.filename)} style={smallBtnStyle}>
+                    <button onClick={() => setDeleteTarget(b)} style={smallBtnStyle}>
                       Delete
                     </button>
                   </div>
@@ -286,6 +333,18 @@ export function Backups() {
         requireTypedConfirmation={RESTORE_CONFIRMATION_TEXT}
         onConfirm={handleConfirmRestore}
         onCancel={() => setRestoreTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete backup"
+        message={
+          deleteTarget
+            ? `Delete the backup taken ${formatDate(deleteTarget.createdAt)}? The archive file is removed from the server and cannot be recovered.`
+            : ''
+        }
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
 
       <ConfirmDialog
