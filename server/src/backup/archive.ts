@@ -8,6 +8,29 @@ import { config } from '../config';
 
 const FILENAME_RE = /^sb-materials-(scheduled|manual|pre-restore)-(\d{8})-(\d{6})\.tar\.gz$/;
 
+/**
+ * True if `filename` is the name of a real archive, as opposed to anything else
+ * that might be sitting in the backups directory: a `.building-*` staging
+ * directory mid-creation, a `.manifest.json` sidecar, or a stray file somebody
+ * dropped there by hand. Callers that resolve a user-supplied name against the
+ * directory listing use this so that only genuine archives can ever be reached.
+ */
+export function isArchiveFilename(filename: string): boolean {
+  return FILENAME_RE.test(filename);
+}
+
+/**
+ * The sidecar holding a copy of an archive's manifest, written next to the
+ * archive at creation time. Listing the backups page reads these rather than
+ * decompressing every archive to recover a few hundred bytes of JSON from the
+ * first tar member: `tar.list` streams the whole gzip stream to EOF regardless
+ * of the filter, so with a fortnight of retained archives on disk a single list
+ * request would otherwise read several gigabytes and evict the page cache.
+ */
+export function manifestSidecarPath(archivePath: string): string {
+  return `${archivePath}.manifest.json`;
+}
+
 export function computeSchemaFingerprint(db: Database.Database): Record<string, string[]> {
   const tables = db
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
@@ -73,6 +96,11 @@ export async function createArchive(params: {
     const destPath = path.join(backupsDir, filename);
     await tar.create({ gzip: true, file: destPath, cwd: stagingRoot }, ['manifest.json', 'sb-materials.db', 'uploads']);
 
+    // Written from the in-memory manifest rather than read back out of the tar,
+    // and written after the archive itself so that a sidecar always implies a
+    // complete archive rather than the other way round.
+    fs.writeFileSync(manifestSidecarPath(destPath), JSON.stringify(manifest, null, 2));
+
     return { filename, path: destPath, manifest };
   } finally {
     fs.rmSync(stagingRoot, { recursive: true, force: true });
@@ -88,31 +116,20 @@ export interface ArchiveListing {
   photoCount: number | null;
 }
 
-async function readManifestFromArchive(archivePath: string): Promise<BackupManifest | null> {
-  let manifest: BackupManifest | null = null;
+/**
+ * Read an archive's manifest from its sidecar. A missing or unreadable sidecar
+ * is not an error: the listing simply degrades to unknown counts, exactly as it
+ * already does for an archive whose contents cannot be read.
+ */
+function readManifestSidecar(archivePath: string): BackupManifest | null {
   try {
-    await tar.list({
-      file: archivePath,
-      filter: (entryPath) => entryPath === 'manifest.json',
-      onReadEntry: (entry) => {
-        const chunks: Buffer[] = [];
-        entry.on('data', (chunk) => chunks.push(chunk));
-        entry.on('end', () => {
-          try {
-            manifest = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
-          } catch {
-            manifest = null;
-          }
-        });
-      },
-    });
+    return JSON.parse(fs.readFileSync(manifestSidecarPath(archivePath), 'utf-8')) as BackupManifest;
   } catch {
     return null;
   }
-  return manifest;
 }
 
-export async function listArchives(backupsDir: string): Promise<ArchiveListing[]> {
+export function listArchives(backupsDir: string): ArchiveListing[] {
   if (!fs.existsSync(backupsDir)) return [];
 
   const out: ArchiveListing[] = [];
@@ -123,7 +140,7 @@ export async function listArchives(backupsDir: string): Promise<ArchiveListing[]
     const createdAt = `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}T${hms.slice(0, 2)}:${hms.slice(2, 4)}:${hms.slice(4, 6)}Z`;
     const archivePath = path.join(backupsDir, filename);
     const stat = fs.statSync(archivePath);
-    const manifest = await readManifestFromArchive(archivePath);
+    const manifest = readManifestSidecar(archivePath);
 
     out.push({
       filename,
@@ -155,7 +172,11 @@ export function pruneRetention(backupsDir: string, keep: number): string[] {
 
   const pruneGroup = (group: typeof all, limit: number) => {
     for (const archive of group.slice(limit)) {
-      fs.unlinkSync(path.join(backupsDir, archive.filename));
+      const archivePath = path.join(backupsDir, archive.filename);
+      fs.unlinkSync(archivePath);
+      // The sidecar goes with the archive it describes, or the backups directory
+      // slowly fills up with orphaned manifests for archives that no longer exist.
+      fs.rmSync(manifestSidecarPath(archivePath), { force: true });
       removed.push(archive.filename);
     }
   };

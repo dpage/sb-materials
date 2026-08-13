@@ -12,6 +12,8 @@ import {
   createArchive,
   listArchives,
   pruneRetention,
+  manifestSidecarPath,
+  isArchiveFilename,
 } from '../backup/archive';
 
 describe('computeSchemaFingerprint', () => {
@@ -42,6 +44,17 @@ describe('archiveFilename', () => {
     expect(archiveFilename('scheduled', date)).toBe('sb-materials-scheduled-20260813-140509.tar.gz');
     expect(archiveFilename('manual', date)).toBe('sb-materials-manual-20260813-140509.tar.gz');
     expect(archiveFilename('pre-restore', date)).toBe('sb-materials-pre-restore-20260813-140509.tar.gz');
+  });
+});
+
+describe('isArchiveFilename', () => {
+  it('accepts genuine archive names and rejects everything else', () => {
+    expect(isArchiveFilename('sb-materials-scheduled-20260813-140509.tar.gz')).toBe(true);
+    expect(isArchiveFilename('sb-materials-pre-restore-20260813-140509.tar.gz')).toBe(true);
+    // A sidecar, a staging directory mid-creation, and a traversal attempt.
+    expect(isArchiveFilename('sb-materials-manual-20260813-140509.tar.gz.manifest.json')).toBe(false);
+    expect(isArchiveFilename('.building-a1b2c3')).toBe(false);
+    expect(isArchiveFilename('../../etc/passwd')).toBe(false);
   });
 });
 
@@ -103,7 +116,7 @@ describe('createArchive / listArchives / pruneRetention', () => {
     await createArchive({ db, backupsDir, uploadsDir, kind: 'manual', now: new Date('2026-08-13T10:00:00.000Z') });
     await createArchive({ db, backupsDir, uploadsDir, kind: 'scheduled', now: new Date('2026-08-14T02:00:00.000Z') });
 
-    const listing = await listArchives(backupsDir);
+    const listing = listArchives(backupsDir);
     expect(listing).toHaveLength(2);
     expect(listing[0].kind).toBe('scheduled');
     expect(listing[0].createdAt.startsWith('2026-08-14')).toBe(true);
@@ -111,8 +124,47 @@ describe('createArchive / listArchives / pruneRetention', () => {
     expect(listing[1].kind).toBe('manual');
   });
 
-  it('returns an empty list when the backups directory does not exist yet', async () => {
-    expect(await listArchives(path.join(tmpDir, 'does-not-exist'))).toEqual([]);
+  it('returns an empty list when the backups directory does not exist yet', () => {
+    expect(listArchives(path.join(tmpDir, 'does-not-exist'))).toEqual([]);
+  });
+
+  it('writes a manifest sidecar alongside the archive', async () => {
+    const { path: archivePath, manifest } = await createArchive({ db, backupsDir, uploadsDir, kind: 'manual' });
+
+    const sidecarPath = manifestSidecarPath(archivePath);
+    expect(sidecarPath).toBe(`${archivePath}.manifest.json`);
+    expect(JSON.parse(fs.readFileSync(sidecarPath, 'utf-8'))).toEqual(manifest);
+  });
+
+  it('takes the listing counts from the sidecar without reading the archive itself', async () => {
+    const { path: archivePath, manifest } = await createArchive({ db, backupsDir, uploadsDir, kind: 'manual' });
+
+    // Destroy the tar entirely, keeping only its size. Anything that decompressed
+    // it to recover the manifest would now come back with null counts (or throw),
+    // so counts surviving this proves the listing never opened it.
+    const sizeBefore = fs.statSync(archivePath).size;
+    fs.writeFileSync(archivePath, Buffer.alloc(sizeBefore, 0));
+
+    const listing = listArchives(backupsDir);
+    expect(listing).toHaveLength(1);
+    expect(listing[0].reportCount).toBe(manifest.reportCount);
+    expect(listing[0].photoCount).toBe(manifest.photoCount);
+    expect(listing[0].sizeBytes).toBe(sizeBefore);
+  });
+
+  it('degrades to unknown counts for an archive with no sidecar', async () => {
+    const { path: archivePath } = await createArchive({ db, backupsDir, uploadsDir, kind: 'manual' });
+    fs.rmSync(manifestSidecarPath(archivePath));
+
+    const listing = listArchives(backupsDir);
+    expect(listing).toHaveLength(1);
+    expect(listing[0].reportCount).toBeNull();
+    expect(listing[0].photoCount).toBeNull();
+  });
+
+  it('does not list a sidecar as though it were an archive in its own right', async () => {
+    await createArchive({ db, backupsDir, uploadsDir, kind: 'manual' });
+    expect(listArchives(backupsDir)).toHaveLength(1);
   });
 
   it('prunes scheduled/manual archives to the newest N, leaving pre-restore alone', async () => {
@@ -130,7 +182,7 @@ describe('createArchive / listArchives / pruneRetention', () => {
     const removed = pruneRetention(backupsDir, 2);
     expect(removed).toHaveLength(3);
 
-    const remaining = await listArchives(backupsDir);
+    const remaining = listArchives(backupsDir);
     const scheduled = remaining.filter((a) => a.kind === 'scheduled');
     const preRestore = remaining.filter((a) => a.kind === 'pre-restore');
     expect(scheduled).toHaveLength(2);
@@ -149,7 +201,36 @@ describe('createArchive / listArchives / pruneRetention', () => {
     }
 
     pruneRetention(backupsDir, 14);
-    const remaining = await listArchives(backupsDir);
+    const remaining = listArchives(backupsDir);
     expect(remaining).toHaveLength(3);
+  });
+
+  it('removes each pruned archive together with its manifest sidecar', async () => {
+    const created = [];
+    for (let i = 0; i < 3; i++) {
+      created.push(
+        await createArchive({
+          db,
+          backupsDir,
+          uploadsDir,
+          kind: 'scheduled',
+          now: new Date(Date.UTC(2026, 0, i + 1, 2, 0, 0)),
+        }),
+      );
+    }
+
+    const removed = pruneRetention(backupsDir, 1);
+    expect(removed).toEqual([created[1].filename, created[0].filename]);
+
+    for (const pruned of [created[0], created[1]]) {
+      expect(fs.existsSync(pruned.path)).toBe(false);
+      expect(fs.existsSync(manifestSidecarPath(pruned.path))).toBe(false);
+    }
+    expect(fs.existsSync(manifestSidecarPath(created[2].path))).toBe(true);
+
+    // Nothing orphaned: exactly one archive and its one sidecar are left.
+    expect(fs.readdirSync(backupsDir).sort()).toEqual(
+      [created[2].filename, `${created[2].filename}.manifest.json`].sort(),
+    );
   });
 });
