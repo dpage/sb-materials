@@ -44,10 +44,15 @@ async function pollUntilServerIsBack(): Promise<boolean> {
 
   while (Date.now() - startedAt < RESTART_TIMEOUT_MS) {
     try {
-      // During the gap fetch itself rejects; once it resolves, whatever the
-      // status, something is listening again.
-      await fetch('/api/auth/me', { credentials: 'include' });
-      if (sawServerDown || Date.now() - startedAt >= RESTART_DOWNTIME_GRACE_MS) return true;
+      // Talking directly to the app, a dead server makes fetch itself reject.
+      // Behind nginx (the documented deployment), a dead upstream instead
+      // resolves with a 502/503/504, so a 5xx counts as "still down" too.
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.status >= 500) {
+        sawServerDown = true;
+      } else if (sawServerDown || Date.now() - startedAt >= RESTART_DOWNTIME_GRACE_MS) {
+        return true;
+      }
     } catch {
       sawServerDown = true;
     }
