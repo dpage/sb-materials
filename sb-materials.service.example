@@ -1,0 +1,36 @@
+[Unit]
+Description=SB Materials inspection reporting application
+After=network.target
+
+[Service]
+Type=simple
+User=sbmaterials
+Group=sbmaterials
+WorkingDirectory=/opt/sb-materials
+ExecStart=/usr/bin/node server/dist/index.js
+
+# PORT, DATA_DIR, SESSION_SECRET and ALLOWED_ORIGINS, as per .env.default.
+# Set DATA_DIR to an absolute path here rather than the relative default.
+EnvironmentFile=/opt/sb-materials/.env
+
+# REQUIRED by the backup and restore feature, not merely a nicety. A restore
+# stages the new data, records a marker and then exits the process; the swap
+# itself is applied by the next process to start, against a data directory
+# nothing else is holding open. Without an automatic restart, a restore stops
+# the application instead of completing, and it stays stopped until somebody
+# notices and starts it by hand. See BACKUP-RESTORE-DESIGN.md.
+Restart=always
+RestartSec=2
+
+# The uploaded archive, the validation extract and the scratch copy taken during
+# a restore all live under DATA_DIR rather than /tmp, so PrivateTmp is safe to
+# enable here; it does mean, though, that DATA_DIR needs room for roughly one
+# uncompressed archive on top of the archives themselves.
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/var/lib/sb-materials
+
+[Install]
+WantedBy=multi-user.target

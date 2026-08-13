@@ -52,6 +52,15 @@ Each tarball contains three things:
 pointless, and at worst leaves somebody logged in as a user ID that the
 restored database defines as a different person.
 
+Alongside each `.tar.gz` sits a `<archive>.tar.gz.manifest.json` sidecar holding
+a copy of that same manifest, written straight from memory at creation time and
+deleted with the archive it describes. It exists purely so that listing the
+backups page does not have to open the archives: `tar` cannot read a single
+member without streaming the whole gzip stream to EOF, so with a fortnight of
+retained archives, a single list request would otherwise read several gigabytes
+off disk and evict the page cache. An archive with no readable sidecar still
+lists, simply without its report and photo counts.
+
 Archive creation and extraction use the `tar` npm package, streaming to and
 from disk, which avoids shelling out to a system binary and keeps behaviour
 consistent between the developer machines and the deployment host.
@@ -110,6 +119,14 @@ listing rather than by sanitising the string and joining it to a path, which
 closes off directory traversal by construction instead of by vigilance.
 Uploads are received through multer, as photos already are, and written to a
 temporary file rather than buffered in memory, since these archives are large.
+All of restore's scratch space (the uploaded file, the extraction used for
+validation, and the copy of an on-disk archive taken before the pre-restore
+snapshot's pruning can reach it) lives in `${DATA_DIR}/.restore-tmp/` rather
+than in the system temporary directory. Peak usage is roughly one uncompressed
+archive, and a unit running with `PrivateTmp=yes` gets a private tmpfs sized
+against RAM, so using `/tmp` would mean a restore could fail with `ENOSPC`, and
+an opaque 500, long before the volume the administrator sized for this data was
+anywhere near full.
 
 ## Restore
 
@@ -128,16 +145,34 @@ The sequence is:
 5. **Respond.** Return 200 to the browser whilst the app is still healthy, so
    the client can show its own "restarting" state rather than seeing a dropped
    connection and guessing.
-6. **Swap.** Close both database handles, move the current `sb-materials.db*`
-   and `uploads/` aside, move the staged files into place, delete
-   `sessions.db`, then `process.exit(0)`.
-7. **Restart.** systemd brings the service back up against the restored data.
+6. **Exit.** Close both database handles and `process.exit(0)`, once the
+   response has actually been flushed to the socket. Note that nothing is
+   swapped here.
+7. **Restart.** systemd brings the service back up, and the swap happens there:
+   before anything else touches the data directory, startup finds the marker,
+   moves the current `sb-materials.db*` and `uploads/` aside, moves the staged
+   files into place, deletes `sessions.db`, and clears the marker.
 
-The marker file written at step four is what makes this safe against a power
-cut or an OOM kill in the middle of step six. On startup the application checks
-for it before anything else, and either completes the interrupted swap or rolls
-it back to the pre-restore state, so an interrupted restore leaves a working
-application rather than a half-populated data directory.
+That is a change from the obvious sequencing, in which the swap happens inline
+before the exit and the startup check exists only to clean up after a crash, and
+it is worth being explicit about why. Doing the swap only at startup means there
+is exactly one code path that ever moves live data, and it is exercised by every
+single restore rather than by the rare interrupted one; the crash-recovery path
+is no longer a rarely-run branch that has to be right the first time it matters.
+It also means the swap always runs against a data directory that no live process
+is holding open, rather than one whose database handles were closed moments ago.
+Every restore is, in effect, treated as an interrupted restore recovered on
+boot.
+
+The marker file written at step four is what makes this safe against a power cut
+or an OOM kill: the swap is idempotent and driven entirely by what is on disk,
+so it converges whether it is being run for the first time or resumed partway
+through, and an interrupted restore leaves a working application rather than a
+half-populated data directory. Where the swap cannot show that a set-aside
+original has been superseded, it renames the leftovers to a timestamped
+`.restore-aside-<when>` directory rather than deleting them, and logs that it has
+done so, on the grounds that stale files needing a human are a far better outcome
+than a deleted last copy.
 
 Exiting the process and letting systemd restart, rather than swapping the
 database connection in place, is a deliberate simplification. Every route
@@ -192,7 +227,10 @@ confirming before the feature is deployed.
 The systemd unit `sb-materials.service` must be configured with
 `Restart=always`. Restore relies on the process exiting and being brought back
 up; if the restart policy is not set, a restore will stop the application
-rather than complete.
+rather than complete. `sb-materials.service.example` in this repository is a
+unit with that directive and an explanation of why it is there, and the README
+says the same in its deployment section, so that this cannot be missed by
+somebody who never reads this document.
 
 The nginx configuration currently caps request bodies at 75M, which was sized
 for photo uploads. An uploaded backup archive contains the entire photo tree
