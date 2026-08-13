@@ -13,6 +13,7 @@ import { Users } from './pages/Users';
 import { Lookups } from './pages/Lookups';
 import { CollectionNotes } from './pages/CollectionNotes';
 import { CollectionNoteEdit } from './pages/CollectionNoteEdit';
+import { Backups } from './pages/Backups';
 
 interface AuthContextType {
   user: User | null;
@@ -86,6 +87,7 @@ export function App() {
               <Route path="customers" element={<Customers />} />
               <Route path="users" element={<Users />} />
               <Route path="lookups" element={<Lookups />} />
+              <Route path="backups" element={<Backups />} />
             </Route>
           </Routes>
           <HelpPanel />

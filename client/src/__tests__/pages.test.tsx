@@ -40,6 +40,12 @@ vi.mock('../api', () => ({
     downloadPdf: vi.fn((id: number) => `/api/pdf/${id}`),
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
+    getBackups: vi.fn(),
+    takeBackupNow: vi.fn(),
+    downloadBackupUrl: vi.fn((f: string) => `/api/backups/${f}/download`),
+    deleteBackup: vi.fn(),
+    restoreBackup: vi.fn(),
+    uploadAndRestoreBackup: vi.fn(),
   },
 }));
 
@@ -49,6 +55,7 @@ import { Reports } from '../pages/Reports';
 import { Customers } from '../pages/Customers';
 import { Users } from '../pages/Users';
 import { Lookups } from '../pages/Lookups';
+import { Backups } from '../pages/Backups';
 import { QuickAddModal } from '../components/QuickAddModal';
 import { HelpPanel } from '../components/HelpPanel';
 import { Layout } from '../components/Layout';
@@ -1534,6 +1541,133 @@ describe('Lookups Page', () => {
   });
 });
 
+describe('Backups Page', () => {
+  beforeEach(() => {
+    (api.getBackups as any).mockResolvedValue([
+      {
+        filename: 'sb-materials-scheduled-20260813-020000.tar.gz',
+        kind: 'scheduled',
+        createdAt: '2026-08-13T02:00:00.000Z',
+        sizeBytes: 5242880,
+        reportCount: 42,
+        photoCount: 210,
+      },
+    ]);
+    (api.getSettings as any).mockResolvedValue({
+      'backup.enabled': 'true',
+      'backup.hour': '2',
+      'backup.keep': '14',
+    });
+  });
+
+  it('should render the backup list once loaded', async () => {
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('scheduled')).toBeInTheDocument();
+      expect(screen.getByText('42 reports, 210 photos')).toBeInTheDocument();
+    });
+  });
+
+  it('should show access denied for non-superusers', () => {
+    mockAuth.user = { id: 2, username: 'regular', displayName: 'Regular User', isSuperuser: false } as any;
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    expect(screen.getByText('Access denied')).toBeInTheDocument();
+  });
+
+  it('should take a backup on demand', async () => {
+    (api.takeBackupNow as any).mockResolvedValue({ filename: 'sb-materials-manual-20260813-150000.tar.gz' });
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Take backup now'));
+    await waitFor(() => expect(api.takeBackupNow).toHaveBeenCalled());
+  });
+
+  it('should require typing RESTORE before confirming a restore', async () => {
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Restore'));
+    // The row's own "Restore" trigger button is still in the DOM alongside the dialog's
+    // confirm button once the dialog opens, so getByRole would be ambiguous; the dialog's
+    // confirm button is the last one rendered.
+    const restoreButtons = screen.getAllByRole('button', { name: 'Restore' });
+    const confirmBtn = restoreButtons[restoreButtons.length - 1];
+    expect(confirmBtn).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'RESTORE' } });
+    expect(confirmBtn).not.toBeDisabled();
+  });
+
+  it('should call restoreBackup and show the restarting overlay on confirm', async () => {
+    (api.restoreBackup as any).mockResolvedValue({ ok: true, manifest: {} });
+    (global as any).fetch = vi.fn().mockRejectedValue(new Error('connection refused'));
+
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Restore'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'RESTORE' } });
+    const restoreButtons = screen.getAllByRole('button', { name: 'Restore' });
+    fireEvent.click(restoreButtons[restoreButtons.length - 1]);
+
+    await waitFor(() => expect(api.restoreBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'));
+    await waitFor(() => expect(screen.getByText(/Restoring backup/)).toBeInTheDocument());
+  });
+
+  it('should delete a backup', async () => {
+    (api.deleteBackup as any).mockResolvedValue({ ok: true });
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Delete'));
+    await waitFor(() =>
+      expect(api.deleteBackup).toHaveBeenCalledWith('sb-materials-scheduled-20260813-020000.tar.gz'),
+    );
+  });
+
+  it('should save schedule settings', async () => {
+    (api.updateSettings as any).mockResolvedValue({ ok: true });
+    render(
+      <TestWrapper>
+        <Backups />
+      </TestWrapper>,
+    );
+    await waitFor(() => expect(screen.getByText('scheduled')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Save schedule'));
+    await waitFor(() =>
+      expect(api.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ 'backup.enabled': 'true', 'backup.hour': '2', 'backup.keep': '14' }),
+      ),
+    );
+  });
+});
+
 describe('QuickAddModal', () => {
   it('should render when open', () => {
     render(
@@ -1686,6 +1820,19 @@ describe('Layout', () => {
     );
 
     expect(screen.getAllByText('Users').length).toBeGreaterThan(0);
+  });
+
+  it('should show Backups link for superuser', () => {
+    render(
+      <TestWrapper>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<div>Content</div>} />
+          </Route>
+        </Routes>
+      </TestWrapper>,
+    );
+    expect(screen.getAllByText('Backups').length).toBeGreaterThan(0);
   });
 
   it('should show logout button', () => {
