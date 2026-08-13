@@ -3,9 +3,9 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { createSchema } from '../db/schema';
+import { createSchema, DB_SCHEMA_VERSION } from '../db/schema';
 import { seedData } from '../db/seed';
-import { createArchive, computeSchemaFingerprint } from '../backup/archive';
+import { createArchive } from '../backup/archive';
 import {
   validateArchive,
   stageArchive,
@@ -48,23 +48,50 @@ describe('validateArchive', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('accepts a well-formed archive against a matching schema fingerprint', async () => {
-    const manifest = await validateArchive(archivePath, computeSchemaFingerprint(db), scratchRoot);
+  it('accepts a well-formed archive against a schema version this build supports', async () => {
+    const manifest = await validateArchive(archivePath, DB_SCHEMA_VERSION, scratchRoot);
     expect(manifest.kind).toBe('manual');
   });
 
+  it('accepts an archive recorded against an older schema version, leaving it to the boot-time migrations', async () => {
+    const manifest = await validateArchive(archivePath, DB_SCHEMA_VERSION + 5, scratchRoot);
+    expect(manifest.kind).toBe('manual');
+  });
+
+  it('treats an archive with no recorded schema version as the oldest possible, and accepts it', async () => {
+    const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-restore-no-version-'));
+    const tar = await import('tar');
+    await tar.extract({ file: archivePath, cwd: extractDir });
+    const manifestPath = path.join(extractDir, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    delete manifest.dbSchemaVersion;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const rebuilt = path.join(tmpDir, 'no-schema-version.tar.gz');
+    await tar.create({ gzip: true, file: rebuilt, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
+
+    // This is exactly the shape of a real archive taken before dbSchemaVersion
+    // existed: production's collection_notes table had carried three columns
+    // (received_signature_path, received_signed_date, weight) since before the
+    // schema-drop that removed them from CREATE TABLE, and a strict structural
+    // comparison rejected restoring it into a freshly-seeded database that had
+    // never had those columns — even though the app's own boot-time migrations
+    // already tolerate exactly that kind of drift for any live database.
+    await expect(validateArchive(rebuilt, DB_SCHEMA_VERSION, scratchRoot)).resolves.toMatchObject({ kind: 'manual' });
+    fs.rmSync(extractDir, { recursive: true, force: true });
+  });
+
   it('extracts beneath the given scratch root and leaves nothing behind, whether it passes or fails', async () => {
-    await validateArchive(archivePath, computeSchemaFingerprint(db), scratchRoot);
+    await validateArchive(archivePath, DB_SCHEMA_VERSION, scratchRoot);
     expect(fs.readdirSync(scratchRoot)).toEqual([]);
 
-    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(
+    await expect(validateArchive(archivePath, DB_SCHEMA_VERSION - 1, scratchRoot)).rejects.toThrow(
       RestoreValidationError,
     );
     expect(fs.readdirSync(scratchRoot)).toEqual([]);
   });
 
-  it('rejects an archive with a schema fingerprint mismatch', async () => {
-    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(
+  it('rejects an archive that requires a newer schema version than this build supports', async () => {
+    await expect(validateArchive(archivePath, DB_SCHEMA_VERSION - 1, scratchRoot)).rejects.toThrow(
       RestoreValidationError,
     );
   });
@@ -73,9 +100,7 @@ describe('validateArchive', () => {
     const truncated = path.join(tmpDir, 'truncated.tar.gz');
     const full = fs.readFileSync(archivePath);
     fs.writeFileSync(truncated, full.subarray(0, Math.floor(full.length / 2)));
-    await expect(validateArchive(truncated, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(
-      RestoreValidationError,
-    );
+    await expect(validateArchive(truncated, DB_SCHEMA_VERSION, scratchRoot)).rejects.toThrow(RestoreValidationError);
   });
 
   it('rejects an archive whose database checksum does not match the manifest', async () => {
@@ -86,9 +111,7 @@ describe('validateArchive', () => {
     const tampered = path.join(tmpDir, 'tampered.tar.gz');
     await tar.create({ gzip: true, file: tampered, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
 
-    await expect(validateArchive(tampered, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(
-      RestoreValidationError,
-    );
+    await expect(validateArchive(tampered, DB_SCHEMA_VERSION, scratchRoot)).rejects.toThrow(RestoreValidationError);
     fs.rmSync(extractDir, { recursive: true, force: true });
   });
 
@@ -103,9 +126,7 @@ describe('validateArchive', () => {
     const rebuilt = path.join(tmpDir, 'future-version.tar.gz');
     await tar.create({ gzip: true, file: rebuilt, cwd: extractDir }, ['manifest.json', 'sb-materials.db', 'uploads']);
 
-    await expect(validateArchive(rebuilt, computeSchemaFingerprint(db), scratchRoot)).rejects.toThrow(
-      RestoreValidationError,
-    );
+    await expect(validateArchive(rebuilt, DB_SCHEMA_VERSION, scratchRoot)).rejects.toThrow(RestoreValidationError);
     fs.rmSync(extractDir, { recursive: true, force: true });
   });
 
@@ -115,7 +136,7 @@ describe('validateArchive', () => {
     fs.writeFileSync(path.join(dataDir, 'sb-materials.db'), 'original');
     const before = fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8');
 
-    await expect(validateArchive(archivePath, { unrelated_table: ['id'] }, scratchRoot)).rejects.toThrow(
+    await expect(validateArchive(archivePath, DB_SCHEMA_VERSION - 1, scratchRoot)).rejects.toThrow(
       RestoreValidationError,
     );
 

@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 import { requireSuperuser } from '../middleware/auth';
-import { listArchives, computeSchemaFingerprint, isArchiveFilename, manifestSidecarPath } from '../backup/archive';
+import { listArchives, isArchiveFilename, manifestSidecarPath } from '../backup/archive';
 import {
   validateArchive,
   stageArchive,
@@ -15,6 +15,7 @@ import {
   RestoreValidationError,
 } from '../backup/restore';
 import { BackupCoordinator } from '../backup/scheduler';
+import { DB_SCHEMA_VERSION } from '../db/schema';
 import { logger } from '../utils/logger';
 
 export interface BackupRouteDeps {
@@ -127,7 +128,7 @@ export function backupRoutes(db: Database.Database, deps: BackupRouteDeps): Rout
         res.status(404).json({ error: 'Archive not found' });
         return;
       }
-      await performRestore(db, deps, path.join(deps.backupsDir, match), res);
+      await performRestore(deps, path.join(deps.backupsDir, match), res);
     }),
   );
 
@@ -139,7 +140,7 @@ export function backupRoutes(db: Database.Database, deps: BackupRouteDeps): Rout
         res.status(400).json({ error: 'No archive uploaded' });
         return;
       }
-      await performRestore(db, deps, req.file.path, res, true);
+      await performRestore(deps, req.file.path, res, true);
     }),
   );
 
@@ -147,7 +148,6 @@ export function backupRoutes(db: Database.Database, deps: BackupRouteDeps): Rout
 }
 
 async function performRestore(
-  db: Database.Database,
   deps: BackupRouteDeps,
   archivePath: string,
   res: Response,
@@ -165,7 +165,7 @@ async function performRestore(
 
   let scratchDir: string | null = null;
   try {
-    const manifest = await validateArchive(archivePath, computeSchemaFingerprint(db), paths.scratchDir);
+    const manifest = await validateArchive(archivePath, DB_SCHEMA_VERSION, paths.scratchDir);
 
     // Copy the archive to a scratch location outside `backupsDir` before taking
     // the pre-restore snapshot below. `takeBackupNow` unconditionally prunes

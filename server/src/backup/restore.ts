@@ -58,7 +58,7 @@ function sha256File(filePath: string): string {
 
 export async function validateArchive(
   archivePath: string,
-  currentSchemaFingerprint: Record<string, string[]>,
+  currentSchemaVersion: number,
   scratchRoot: string,
 ): Promise<BackupManifest> {
   const scratchDir = createScratchDir(scratchRoot, 'validate-');
@@ -113,9 +113,15 @@ export async function validateArchive(
       throw new RestoreValidationError('The database in the archive failed an integrity check');
     }
 
-    if (JSON.stringify(manifest.schemaFingerprint) !== JSON.stringify(currentSchemaFingerprint)) {
+    // An archive with no recorded version predates this check entirely and is
+    // treated as the oldest possible schema (0) — always restorable, same as
+    // any other archive from before this build's migrations existed. Only an
+    // archive from code *newer* than this build is refused: this build's
+    // migrations were written without knowledge of whatever that code added.
+    const archiveSchemaVersion = manifest.dbSchemaVersion ?? 0;
+    if (archiveSchemaVersion > currentSchemaVersion) {
       throw new RestoreValidationError(
-        'The archive was taken against a different database schema and cannot be restored by this version of the application',
+        `Archive requires database schema version ${archiveSchemaVersion}, but this application only supports up to version ${currentSchemaVersion}. Upgrade the application before restoring this archive.`,
       );
     }
 

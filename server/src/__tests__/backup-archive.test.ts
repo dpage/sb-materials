@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as tar from 'tar';
-import { createSchema } from '../db/schema';
+import { createSchema, DB_SCHEMA_VERSION } from '../db/schema';
 import { seedData } from '../db/seed';
 import {
   computeSchemaFingerprint,
@@ -100,6 +100,7 @@ describe('createArchive / listArchives / pruneRetention', () => {
     expect(fs.existsSync(archivePath)).toBe(true);
     expect(manifest.formatVersion).toBe(1);
     expect(manifest.kind).toBe('manual');
+    expect(manifest.dbSchemaVersion).toBe(DB_SCHEMA_VERSION);
 
     const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-backup-extract-'));
     await tar.extract({ file: archivePath, cwd: extractDir });

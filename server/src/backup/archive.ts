@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import * as tar from 'tar';
 import { BACKUP_FORMAT_VERSION, BackupKind, BackupManifest } from './manifest';
 import { config } from '../config';
+import { DB_SCHEMA_VERSION } from '../db/schema';
 
 const FILENAME_RE = /^sb-materials-(scheduled|manual|pre-restore)-(\d{8})-(\d{6})\.tar\.gz$/;
 
@@ -86,6 +87,7 @@ export async function createArchive(params: {
       appVersion: config.appVersion,
       createdAt: now.toISOString(),
       kind,
+      dbSchemaVersion: DB_SCHEMA_VERSION,
       schemaFingerprint: computeSchemaFingerprint(db),
       reportCount,
       photoCount,

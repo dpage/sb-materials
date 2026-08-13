@@ -179,29 +179,16 @@ describe('Backup Routes', () => {
       expect(res.status).toBe(404);
     });
 
-    it('rejects restoring an archive with a mismatched schema fingerprint with 400, touching nothing', async () => {
-      const BetterSqlite3 = (await import('better-sqlite3')).default;
-      const throwawayDb = new BetterSqlite3(':memory:');
-      createSchema(throwawayDb);
-      seedData(throwawayDb);
-      const badArchive = await createArchive({
-        db: throwawayDb,
-        backupsDir,
-        uploadsDir,
-        kind: 'manual',
-      });
-      throwawayDb.close();
-      // Corrupt the schema fingerprint recorded in this archive's manifest by
-      // building it from a bare (schema-only, un-migrated) in-memory db so it
-      // diverges from `db`'s fingerprint — here we simulate divergence directly
-      // by asserting against a filename that was never created against `db`'s
-      // schema, using a forged manifest instead.
+    it('rejects restoring an archive that requires a newer schema version than this build supports, with 400, touching nothing', async () => {
+      const badArchive = await createArchive({ db, backupsDir, uploadsDir, kind: 'manual' });
+
+      // Forge a schema version this build has no migrations for.
       const tar = await import('tar');
       const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-forge-'));
       await tar.extract({ file: badArchive.path, cwd: extractDir });
       const manifestPath = path.join(extractDir, 'manifest.json');
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-      manifest.schemaFingerprint = { not_a_real_table: ['id'] };
+      manifest.dbSchemaVersion = 999999;
       fs.writeFileSync(manifestPath, JSON.stringify(manifest));
       fs.unlinkSync(badArchive.path);
       await tar.create({ gzip: true, file: badArchive.path, cwd: extractDir }, [

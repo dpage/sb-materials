@@ -3,6 +3,20 @@ import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
 
+/**
+ * Bump this whenever a table or column is added, removed or renamed below.
+ * It has nothing to do with the live shape of any particular database (that
+ * always drifts, gets migrated forward, and is never checked byte-for-byte)
+ * and everything to do with whether *this running code's* migrations were
+ * written with a given schema in mind. A backup restore compares the archive's
+ * recorded version against this one and refuses only an archive newer than
+ * it: an older archive is safe, because the migrations below already bring
+ * any older database forward on every boot, restore or not; a newer archive
+ * was produced by code with migrations this build has never seen, so nothing
+ * here can promise to make sense of it.
+ */
+export const DB_SCHEMA_VERSION = 1;
+
 export function createSchema(db: Database.Database): void {
   db.exec(`
     -- Users

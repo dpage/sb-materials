@@ -34,11 +34,13 @@ without having to open the file.
 Each tarball contains three things:
 
 - `manifest.json`, holding the format version, the application version, the
-  creation timestamp, the kind, a schema fingerprint (the list of tables with
-  their columns), the report, photo and collection note counts, and a SHA-256 of the database
-  file. The fingerprint is what lets a restore refuse an archive taken against
-  a schema the running code cannot read, and the counts give the UI something
-  human-meaningful to show before someone commits to a restore.
+  creation timestamp, the kind, the database schema version the archive was
+  taken under (`DB_SCHEMA_VERSION` in `server/src/db/schema.ts`), a schema
+  fingerprint (the list of tables with their columns, informational only —
+  see "Restore" below for what actually gates a restore), the report, photo
+  and collection note counts, and a SHA-256 of the database file. The counts
+  give the UI something human-meaningful to show before someone commits to a
+  restore.
 - `sb-materials.db`, produced through better-sqlite3's own `db.backup()`
   online-backup API rather than a filesystem copy. This matters: the database
   runs in WAL mode (`server/src/index.ts:35`), so copying the `.db` file with
@@ -136,8 +138,25 @@ The sequence is:
 1. **Validate.** Confirm the file is a gzip tar containing a `manifest.json` of
    a format version this code understands, that the database member opens as a
    valid SQLite database, that its SHA-256 matches the manifest, and that its
-   schema fingerprint is one the running code can read. Anything that fails
-   here is rejected before a single existing file is touched.
+   database schema version (`dbSchemaVersion` in the manifest) is not higher
+   than this build's own `DB_SCHEMA_VERSION`. That last check is deliberately
+   one-directional: an *older* archive is always accepted, because the app's
+   own boot-time migrations (`createSchema`) already tolerate that drift for
+   any live database, restore or not, and the swap below always ends with a
+   restart that runs them. An archive with no recorded version at all — taken
+   before this field existed — is treated as version 0, the oldest possible,
+   and is likewise always accepted. Only an archive from a build *newer* than
+   this one is refused, since this build's migrations were written without
+   knowledge of whatever schema change that newer build made. (An earlier
+   version of this check compared the full table/column shape for exact
+   equality instead, and it was too strict: a production database's
+   `collection_notes` table had carried three columns — `weight`,
+   `received_signature_path`, `received_signed_date` — since before the
+   commit that dropped them from `CREATE TABLE`, because the migrations here
+   are additive-only and nothing ever ran a compensating `DROP COLUMN`, so a
+   fresh database never had them at all. That harmless, already-tolerated
+   drift was enough to block a completely safe restore.) Anything that fails
+   validation is rejected before a single existing file is touched.
 2. **Snapshot.** Take a full backup of the current state, tagged `pre-restore`,
    so that restoring the wrong archive is recoverable rather than terminal.
 3. **Stage.** Extract the archive into `${DATA_DIR}/.restore-staging/`.
@@ -206,7 +225,9 @@ Unit tests cover the archive round trip against temporary directories, creating
 an archive from a known data directory and extracting it to compare; manifest
 validation, including rejection of a truncated archive, one with a corrupt
 database, one with a mismatched checksum and one with an unknown format
-version; the filename resolution, including traversal attempts; retention
+version; acceptance of an older (or unversioned) database schema and rejection
+of a newer one than this build supports; the filename resolution, including
+traversal attempts; retention
 pruning, confirming it keeps the newest N and never prunes a `pre-restore`
 archive; and the scheduler's due-time logic across simulated restart and
 missed-window boundaries.
