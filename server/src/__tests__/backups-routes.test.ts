@@ -10,9 +10,10 @@ import { createSchema } from '../db/schema';
 import { seedData } from '../db/seed';
 import { authRoutes } from '../routes/auth';
 import { backupRoutes } from '../routes/backups';
-import { BackupCoordinator } from '../backup/scheduler';
+import { BackupCoordinator, BACKUP_KEEP_SETTING } from '../backup/scheduler';
 import { createArchive, computeSchemaFingerprint } from '../backup/archive';
 import { restorePaths, readMarker } from '../backup/restore';
+import { setSetting } from '../utils/settings';
 
 describe('Backup Routes', () => {
   let db: Database.Database;
@@ -203,6 +204,63 @@ describe('Backup Routes', () => {
       expect(res.status).toBe(200);
       await new Promise((resolve) => setImmediate(resolve));
       expect(closeAndRestart).toHaveBeenCalled();
+    });
+
+    it('returns 500, not a crash, when an unexpected error occurs after the pre-restore snapshot', async () => {
+      const postRes = await request(app).post('/api/backups').set('Cookie', cookie);
+      const filename = postRes.body.filename;
+
+      // Simulate something going wrong while taking the pre-restore safety
+      // snapshot (e.g. disk full mid-archive) rather than a validation failure.
+      vi.spyOn(coordinator, 'takeBackupNow').mockRejectedValueOnce(new Error('disk full'));
+
+      const res = await request(app).post(`/api/backups/${filename}/restore`).set('Cookie', cookie);
+
+      // The request fails cleanly instead of hanging or taking the process down,
+      // and no restart is triggered for a restore that never actually happened.
+      expect(res.status).toBe(500);
+      expect(closeAndRestart).not.toHaveBeenCalled();
+
+      const paths = restorePaths(dataDir);
+      expect(readMarker(paths.markerPath)).toBeNull();
+    });
+
+    it('restores from an on-disk archive even when the pre-restore snapshot would otherwise prune it away', async () => {
+      // Two manual archives on disk, built directly (rather than via the route)
+      // so their timestamps, and therefore prune ordering, are under control.
+      const older = await createArchive({
+        db,
+        backupsDir,
+        uploadsDir,
+        kind: 'manual',
+        now: new Date('2026-01-01T00:00:00Z'),
+      });
+      await createArchive({
+        db,
+        backupsDir,
+        uploadsDir,
+        kind: 'manual',
+        now: new Date('2026-01-02T00:00:00Z'),
+      });
+
+      // Lower `backup.keep` below the number of manual archives already on disk,
+      // as if the admin changed the setting after `older` was created. Restoring
+      // from `older` triggers a pre-restore snapshot, whose retention pruning
+      // would otherwise delete `older` (now beyond the limit) before it's staged.
+      setSetting(db, BACKUP_KEEP_SETTING, '1');
+
+      const restoreRes = await request(app).post(`/api/backups/${older.filename}/restore`).set('Cookie', cookie);
+      expect(restoreRes.status).toBe(200);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(closeAndRestart).toHaveBeenCalled();
+
+      // Confirm the scenario actually exercised the prune: `older` no longer
+      // exists in `backupsDir` by the time the restore has finished, because
+      // pruning did delete the original — the restore succeeded only because it
+      // was working from a scratch copy taken before pruning ran.
+      const listing = await request(app).get('/api/backups').set('Cookie', cookie);
+      expect(listing.body.some((a: any) => a.filename === older.filename)).toBe(false);
     });
   });
 });
