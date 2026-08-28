@@ -453,6 +453,34 @@ describe('applySwap and recoverInterruptedRestore', () => {
     expect(recoverInterruptedRestore(dataDir)).toEqual({ status: 'none' });
   });
 
+  it('discards staging and scratch left by a restore that never wrote a marker', async () => {
+    seedCurrentState();
+    const paths = await seedStaging();
+    fs.mkdirSync(paths.scratchDir, { recursive: true });
+    fs.writeFileSync(path.join(paths.scratchDir, 'archive.tar.gz'), 'source');
+
+    expect(recoverInterruptedRestore(dataDir)).toEqual({ status: 'none' });
+
+    expect(fs.existsSync(paths.stagingDir)).toBe(false);
+    expect(fs.existsSync(paths.scratchDir)).toBe(false);
+    // The live data is untouched: without a marker no swap was ever committed.
+    expect(fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8')).toBe('old-db');
+    expect(fs.readFileSync(path.join(dataDir, 'uploads', '1', 'photo.jpg'), 'utf-8')).toBe('old-photo');
+  });
+
+  it('leaves staging alone when a marker says the restore is still pending', async () => {
+    seedCurrentState();
+    const paths = await seedStaging();
+    writeMarker(paths.markerPath, { stagingDir: paths.stagingDir, createdAt: new Date().toISOString() });
+
+    // A second startup that somehow skipped the swap must not treat the staged
+    // copy as debris: the marker means it is still needed.
+    expect(fs.existsSync(paths.stagingDir)).toBe(true);
+    recoverInterruptedRestore(dataDir);
+
+    expect(fs.readFileSync(path.join(dataDir, 'sb-materials.db'), 'utf-8')).toBe('new-db');
+  });
+
   it('recoverInterruptedRestore completes a swap left behind by a marker', async () => {
     seedCurrentState();
     const paths = await seedStaging();

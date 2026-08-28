@@ -164,6 +164,7 @@ async function performRestore(
   }
 
   let scratchDir: string | null = null;
+  let markerWritten = false;
   try {
     const manifest = await validateArchive(archivePath, DB_SCHEMA_VERSION, paths.scratchDir);
 
@@ -186,6 +187,7 @@ async function performRestore(
     if (cleanupSourceAfter) fs.rmSync(archivePath, { force: true });
 
     writeMarker(paths.markerPath, { stagingDir: paths.stagingDir, createdAt: new Date().toISOString() });
+    markerWritten = true;
 
     // Restart only once the response has actually been flushed to the socket.
     // `res.json` merely hands the body to Express, so exiting on the next tick
@@ -218,5 +220,13 @@ async function performRestore(
     }
   } finally {
     if (scratchDir) fs.rmSync(scratchDir, { recursive: true, force: true });
+    // Without a marker nothing will ever come back for the staged copy: startup
+    // recovery keys off the marker, and by design there is no marker until the
+    // restore is committed to going ahead. That copy is the size of the entire
+    // photo tree, so a failure between staging and the marker would otherwise
+    // silently double the space uploads takes, and go on being copied into
+    // every backup thereafter. On the success path the marker exists and the
+    // staged copy is exactly what the pending restore still needs.
+    if (!markerWritten) fs.rmSync(paths.stagingDir, { recursive: true, force: true });
   }
 }

@@ -264,6 +264,44 @@ describe('Backup Routes', () => {
       expect(readMarker(paths.markerPath)).toBeNull();
     });
 
+    it('clears the staged copy when the restore fails before the marker is written', async () => {
+      const postRes = await request(app).post('/api/backups').set('Cookie', cookie);
+      const filename = postRes.body.filename;
+      const paths = restorePaths(dataDir);
+
+      // Fail the marker's final rename, which is the last step of a restore and
+      // the point after which startup recovery would take responsibility for the
+      // staged copy. Anything failing before it leaves that copy, the size of the
+      // entire photo tree, with nothing that will ever come back for it.
+      const realRename = fs.renameSync;
+      const renameSpy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (String(to).endsWith('.restore-marker.json')) throw new Error('rename failed');
+        return realRename(from as string, to as string);
+      });
+
+      try {
+        const res = await request(app).post(`/api/backups/${filename}/restore`).set('Cookie', cookie);
+        expect(res.status).toBe(500);
+      } finally {
+        renameSpy.mockRestore();
+      }
+
+      expect(readMarker(paths.markerPath)).toBeNull();
+      expect(fs.existsSync(paths.stagingDir)).toBe(false);
+      expect(closeAndRestart).not.toHaveBeenCalled();
+    });
+
+    it('leaves the staged copy in place on the success path, for startup recovery to apply', async () => {
+      const postRes = await request(app).post('/api/backups').set('Cookie', cookie);
+
+      const res = await request(app).post(`/api/backups/${postRes.body.filename}/restore`).set('Cookie', cookie);
+
+      expect(res.status).toBe(200);
+      const paths = restorePaths(dataDir);
+      expect(readMarker(paths.markerPath)).not.toBeNull();
+      expect(fs.existsSync(paths.stagingDir)).toBe(true);
+    });
+
     it('restores from an on-disk archive even when the pre-restore snapshot would otherwise prune it away', async () => {
       // Two manual archives on disk, built directly (rather than via the route)
       // so their timestamps, and therefore prune ordering, are under control.

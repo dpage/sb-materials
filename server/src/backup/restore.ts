@@ -407,6 +407,35 @@ export function applySwap(paths: RestorePaths): { quarantinedAt: string | null }
 }
 
 /**
+ * Throw away staging and scratch space belonging to a restore that never got as
+ * far as writing its marker.
+ *
+ * Only ever called when no marker exists, and that is what makes it safe: the
+ * marker is written after the archive has been staged and before anything in
+ * the live data directory is touched, so its absence means the swap was never
+ * committed and the live database and uploads are exactly as they were. What is
+ * left is a redundant extraction of an archive that still exists, and it is as
+ * large as the whole photo tree, so leaving it costs the same again in disk and
+ * gets copied into every subsequent backup.
+ *
+ * The route cleans up after itself when a restore fails, so this is for the
+ * cases it cannot cover: the process being killed outright mid-extract, or the
+ * machine losing power.
+ */
+function discardUnmarkedLeftovers(paths: RestorePaths): void {
+  for (const dir of [paths.stagingDir, paths.scratchDir]) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Best effort only, in keeping with the rest of this module: a leftover
+      // that cannot be removed is wasted disk space, and refusing to start over
+      // it would turn a tidying-up job into an outage.
+    }
+  }
+}
+
+/**
  * Called at startup, and it must be called before anything else so much as
  * looks at the data directory: not merely before the database is opened, but
  * before any code creates the uploads directory, runs a migration or otherwise
@@ -427,7 +456,10 @@ export type RestoreRecovery = { status: 'none' } | { status: 'completed'; quaran
 
 export function recoverInterruptedRestore(dataDir: string): RestoreRecovery {
   const paths = restorePaths(dataDir);
-  if (!fs.existsSync(paths.markerPath)) return { status: 'none' };
+  if (!fs.existsSync(paths.markerPath)) {
+    discardUnmarkedLeftovers(paths);
+    return { status: 'none' };
+  }
 
   const { quarantinedAt } = applySwap(paths);
   clearMarker(paths.markerPath);
