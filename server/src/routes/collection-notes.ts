@@ -13,6 +13,7 @@ import {
 } from '../utils/collection-note-reference';
 import { getSetting } from '../utils/settings';
 import { loadCollectionNote } from '../utils/collection-note-loader';
+import { removeUploadDir } from '../utils/uploads';
 
 const SIGNATURE_SUBDIR = 'collection-notes';
 // Only the dispatching signature is captured: the note leaves with the load and
@@ -302,6 +303,11 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       return;
     }
     db.prepare('DELETE FROM collection_notes WHERE id = ?').run(noteId);
+
+    // Both signature images for the note live under
+    // uploads/collection-notes/{noteId}/, so drop the directory with the row.
+    removeUploadDir(config.uploadsDir, path.join(SIGNATURE_SUBDIR, String(noteId)));
+
     res.json({ ok: true });
   });
 

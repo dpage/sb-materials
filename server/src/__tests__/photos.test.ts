@@ -312,4 +312,53 @@ describe('Photo Routes', () => {
     const res = await request(app).post(`/api/photos/signature/${reportId}`).set('Cookie', cookie);
     expect(res.status).toBe(400);
   });
+
+  it("should delete a report's photos and signature from disk with the report", async () => {
+    const pngData = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    await request(app)
+      .post(`/api/photos/upload/${reportId}`)
+      .set('Cookie', cookie)
+      .attach('photos', pngData, 'one.png')
+      .attach('photos', pngData, 'two.png');
+    await request(app)
+      .post(`/api/photos/signature/${reportId}`)
+      .set('Cookie', cookie)
+      .attach('signature', pngData, 'signature.png');
+
+    const reportDir = path.join(tmpDir, 'uploads', String(reportId));
+    expect(fs.readdirSync(reportDir).length).toBe(3);
+
+    const res = await request(app).delete(`/api/reports/${reportId}`).set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(fs.existsSync(reportDir)).toBe(false);
+  });
+
+  it("should leave other reports' photos alone when one report is deleted", async () => {
+    const pngData = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const otherRes = await request(app).post('/api/reports').set('Cookie', cookie).send({
+      report_type: 'inspection_fibre',
+      customer_id: customerId,
+      site_id: siteId,
+      inspection_date: '2025-01-16',
+      inspector_name: 'Test',
+    });
+    const otherId = otherRes.body.id;
+    await request(app)
+      .post(`/api/photos/upload/${otherId}`)
+      .set('Cookie', cookie)
+      .attach('photos', pngData, 'keep.png');
+    await request(app).post(`/api/photos/upload/${reportId}`).set('Cookie', cookie).attach('photos', pngData, 'go.png');
+
+    await request(app).delete(`/api/reports/${reportId}`).set('Cookie', cookie);
+
+    expect(fs.existsSync(path.join(tmpDir, 'uploads', String(reportId)))).toBe(false);
+    expect(fs.readdirSync(path.join(tmpDir, 'uploads', String(otherId))).length).toBe(1);
+  });
 });

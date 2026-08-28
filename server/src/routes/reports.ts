@@ -2,6 +2,8 @@ import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth } from '../middleware/auth';
 import { loadReportWithDetails, INSPECTION_REPORT_TYPES } from '../utils/report-loader';
+import { config } from '../config';
+import { removeUploadDir } from '../utils/uploads';
 
 export function reportRoutes(db: Database.Database): Router {
   const router = Router();
@@ -401,6 +403,14 @@ export function reportRoutes(db: Database.Database): Router {
     }
 
     db.prepare('DELETE FROM reports WHERE id = ?').run(req.params.id);
+
+    // Photo and signature rows go with the report via ON DELETE CASCADE, but
+    // the files themselves are ours to clean up; every photo and the signature
+    // for a report live under uploads/{reportId}/, so the whole directory goes.
+    // Done after the row is gone so a failure here leaves recoverable orphans
+    // rather than rows pointing at files that no longer exist.
+    removeUploadDir(config.uploadsDir, String(req.params.id));
+
     res.json({ ok: true });
   });
 

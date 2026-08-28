@@ -146,4 +146,19 @@ describe('Collection note signature upload', () => {
     };
     expect(walk(uploadsDir)).toEqual([]);
   });
+
+  it('removes the signature directory when the note is deleted', async () => {
+    await request(app)
+      .post(`/api/collection-notes/${noteId}/signature/dispatched`)
+      .set('Cookie', cookie)
+      .attach('signature', PNG_DATA, 'signature.png');
+
+    const sigDir = path.join(uploadsDir, 'collection-notes', String(noteId));
+    expect(fs.readdirSync(sigDir).length).toBe(1);
+
+    const res = await request(app).delete(`/api/collection-notes/${noteId}`).set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(fs.existsSync(sigDir)).toBe(false);
+  });
 });
