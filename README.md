@@ -113,6 +113,20 @@ nothing in the application prevents a test instance from being pointed at
 production data, so that separation has to be got right in the deployment
 itself.
 
+### Shipping to each installation
+
+The `Deploy` workflow covers both installations, picking its target from how it
+was triggered: a push to `main` deploys the test installation, a pushed version
+tag (`v1.2.3`) deploys production, and `Actions -> Deploy -> Run workflow` will
+send any ref to either on demand. Each target is a GitHub environment of the
+same name holding its own deploy host and SSH credentials, so giving the
+`production` environment required reviewers is what puts a human approval in
+front of every live deploy. Each environment must also set a
+`SB_MATERIALS_DEPLOY_TARGET` variable naming itself, which the workflow checks
+before it connects: an environment that defines no secrets of its own inherits
+the repository's, so without that check a half-configured `test` environment
+would deploy to production.
+
 ## Deploying Behind Nginx
 
 An example Nginx configuration is provided in `nginx.conf.example`. It proxies all traffic to the Express server and handles SSL termination. Adjust `server_name`, certificate paths, and upstream port to match your environment.
