@@ -16,6 +16,7 @@ import { Lookups } from './pages/Lookups';
 import { CollectionNotes } from './pages/CollectionNotes';
 import { CollectionNoteEdit } from './pages/CollectionNoteEdit';
 import { Backups } from './pages/Backups';
+import { Audit } from './pages/Audit';
 import { Travel } from './pages/Travel';
 import { TravelEdit } from './pages/TravelEdit';
 import { Expenses } from './pages/Expenses';
@@ -100,6 +101,7 @@ export function App() {
                 <Route path="users" element={<Users />} />
                 <Route path="lookups" element={<Lookups />} />
                 <Route path="backups" element={<Backups />} />
+                <Route path="audit" element={<Audit />} />
               </Route>
             </Routes>
             <HelpPanel />

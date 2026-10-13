@@ -39,6 +39,8 @@ export function Layout() {
       setTopic('lookups');
     } else if (path === '/backups') {
       setTopic('backups');
+    } else if (path === '/audit') {
+      setTopic('audit');
     } else {
       setTopic('reports');
     }
@@ -133,6 +135,11 @@ export function Layout() {
             {user?.isSuperuser && (
               <NavLink to="/backups" style={({ isActive }) => navStyle(isActive)}>
                 Backups
+              </NavLink>
+            )}
+            {user?.isSuperuser && (
+              <NavLink to="/audit" style={({ isActive }) => navStyle(isActive)}>
+                Audit Log
               </NavLink>
             )}
           </nav>
@@ -243,6 +250,11 @@ export function Layout() {
           {user?.isSuperuser && (
             <NavLink to="/backups" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
               Backups
+            </NavLink>
+          )}
+          {user?.isSuperuser && (
+            <NavLink to="/audit" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
+              Audit Log
             </NavLink>
           )}
         </nav>

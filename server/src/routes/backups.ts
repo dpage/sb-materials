@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { Request, Response } from 'express';
 import { requireSuperuser } from '../middleware/auth';
+import { recordAudit } from '../utils/audit';
 import { listArchives, isArchiveFilename, manifestSidecarPath } from '../backup/archive';
 import {
   validateArchive,
@@ -64,7 +65,7 @@ function asyncRoute<P extends Record<string, string> = Record<string, never>>(
   };
 }
 
-export function backupRoutes(_db: Database.Database, deps: BackupRouteDeps): Router {
+export function backupRoutes(db: Database.Database, deps: BackupRouteDeps): Router {
   const router = Router();
   router.use(requireSuperuser);
 
@@ -93,8 +94,9 @@ export function backupRoutes(_db: Database.Database, deps: BackupRouteDeps): Rou
 
   router.post(
     '/',
-    asyncRoute(async (_req, res) => {
+    asyncRoute(async (req, res) => {
       const result = await deps.coordinator.takeBackupNow('manual');
+      recordAudit(db, req, { action: 'create', entityType: 'backup', summary: result.filename });
       res.json({ filename: result.filename });
     }),
   );
@@ -117,6 +119,7 @@ export function backupRoutes(_db: Database.Database, deps: BackupRouteDeps): Rou
     const archivePath = path.join(deps.backupsDir, match);
     fs.unlinkSync(archivePath);
     fs.rmSync(manifestSidecarPath(archivePath), { force: true });
+    recordAudit(db, req, { action: 'delete', entityType: 'backup', summary: match });
     res.json({ ok: true });
   });
 
@@ -128,6 +131,11 @@ export function backupRoutes(_db: Database.Database, deps: BackupRouteDeps): Rou
         res.status(404).json({ error: 'Archive not found' });
         return;
       }
+      // Written before the swap, and so almost certainly replaced by the
+      // archive's own log: the entry that survives is the one in the snapshot
+      // taken just before the restore, which is where somebody looking for
+      // "who restored what" will find it.
+      recordAudit(db, req, { action: 'restore', entityType: 'backup', summary: match });
       await performRestore(deps, path.join(deps.backupsDir, match), res);
     }),
   );
@@ -140,6 +148,7 @@ export function backupRoutes(_db: Database.Database, deps: BackupRouteDeps): Rou
         res.status(400).json({ error: 'No archive uploaded' });
         return;
       }
+      recordAudit(db, req, { action: 'restore', entityType: 'backup', summary: req.file.originalname });
       await performRestore(deps, req.file.path, res, true);
     }),
   );

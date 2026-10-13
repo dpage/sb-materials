@@ -48,6 +48,17 @@ describe('computeSchemaFingerprint', () => {
     createSchema(db);
     expect(computeSchemaFingerprint(db)).toEqual({
       app_settings: ['key', 'value'],
+      audit_log: [
+        'action',
+        'created_at',
+        'display_name',
+        'entity_id',
+        'entity_type',
+        'id',
+        'summary',
+        'user_id',
+        'username',
+      ],
       collection_note_items: [
         'collection_point',
         'description',

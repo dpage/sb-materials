@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
+import { recordAudit } from '../utils/audit';
 
 export function authRoutes(db: Database.Database): Router {
   const router = Router();
@@ -18,13 +19,30 @@ export function authRoutes(db: Database.Database): Router {
       )
       .get(username) as any;
 
-    if (!user || !user.is_active) {
+    // A failed attempt has no session to attribute it to, so the username as
+    // typed is recorded as the actor: whether the account exists is exactly
+    // what somebody reading the log wants to tell apart.
+    const failed = (reason: string) => {
+      recordAudit(db, null, {
+        action: 'login-failed',
+        entityType: 'session',
+        entityId: user?.id ?? null,
+        summary: `${username}: ${reason}`,
+        actor: { id: user?.id ?? null, username, displayName: user?.display_name ?? null },
+      });
       res.status(401).json({ error: 'Invalid credentials' });
+    };
+
+    if (!user) {
+      failed('no such user');
       return;
     }
-
+    if (!user.is_active) {
+      failed('account deactivated');
+      return;
+    }
     if (!bcrypt.compareSync(password, user.password_hash)) {
-      res.status(401).json({ error: 'Invalid credentials' });
+      failed('wrong password');
       return;
     }
 
@@ -33,6 +51,8 @@ export function authRoutes(db: Database.Database): Router {
     req.session.displayName = user.display_name;
     req.session.phone = user.phone ?? null;
     req.session.isSuperuser = !!user.is_superuser;
+
+    recordAudit(db, req, { action: 'login', entityType: 'session', entityId: user.id, summary: user.display_name });
 
     res.json({
       id: user.id,
@@ -44,6 +64,17 @@ export function authRoutes(db: Database.Database): Router {
   });
 
   router.post('/logout', (req, res) => {
+    // Written before the session is destroyed, since afterwards there is
+    // nothing left to say who logged out.
+    if (req.session.userId) {
+      recordAudit(db, req, {
+        action: 'logout',
+        entityType: 'session',
+        entityId: req.session.userId,
+        summary: req.session.displayName ?? null,
+      });
+    }
+
     req.session.destroy((err) => {
       if (err) {
         res.status(500).json({ error: 'Failed to logout' });

@@ -404,3 +404,29 @@ export interface ExpenseSheet {
   item_count?: number;
   totals: ExpenseTotals;
 }
+
+export interface AuditEntry {
+  id: number;
+  created_at: string;
+  user_id: number | null;
+  username: string | null;
+  display_name: string | null;
+  current_display_name: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: number | null;
+  summary: string | null;
+}
+
+export interface AuditFilters {
+  actions: string[];
+  entityTypes: string[];
+  users: { id: number; display_name: string }[];
+}
+
+export interface AuditPage {
+  data: AuditEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}

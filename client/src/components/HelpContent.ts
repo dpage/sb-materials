@@ -323,6 +323,27 @@ export const helpTopics: Record<string, HelpTopic> = {
     ],
   },
 
+  audit: {
+    heading: 'Audit Log',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Audit Log is available to superusers only, and records who did what: reports, collection notes, customers, users, lookups and sheets created, changed or deleted, settings changed, backups taken and restored, and logins, logouts and failed login attempts. The newest entries are listed first.',
+      },
+      {
+        title: 'What an Entry Says',
+        body: 'Each entry records when it happened, who did it, the action, the kind of record and a short description written at the time. The description is deliberately a snapshot, so an entry for a deleted report still says which report it was even though the report has gone, and an entry still names the person who did it after their account has been renamed or removed.',
+      },
+      {
+        title: 'Finding Something',
+        body: 'Filter by person, action, kind of record or date range, or type in the search box to match the description or the person. The dropdowns offer only the values that actually appear in the log. Changing any filter takes you back to the first page.',
+      },
+      {
+        title: 'What It Is Not',
+        body: 'This is plain history for answering questions such as "where did that report go?". It is not tamper proof: a superuser with access to the server could alter it, and passwords are never recorded, only the fact that one was changed.',
+      },
+    ],
+  },
   backups: {
     heading: 'Backups',
     sections: [

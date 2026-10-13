@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth, requireSuperuser } from '../middleware/auth';
+import { recordAudit } from '../utils/audit';
 import { getAllSettings, setSetting } from '../utils/settings';
 import { NEXT_NUMBER_SETTING, PREFIX_SETTING } from '../utils/collection-note-reference';
 import { BACKUP_ENABLED_SETTING, BACKUP_HOUR_SETTING, BACKUP_KEEP_SETTING } from '../backup/scheduler';
@@ -90,6 +91,11 @@ export function settingsRoutes(db: Database.Database): Router {
     for (const key of keys) {
       setSetting(db, key, String(body[key]).trim());
     }
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'settings',
+      summary: keys.map((key) => `${key} = ${String(body[key]).trim()}`).join('; '),
+    });
     res.json({ ok: true });
   });
 

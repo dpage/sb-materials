@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth } from '../middleware/auth';
 import { mileagePayment, mileageRates, milesBroughtForward, toNumber, totalJourneyMiles } from '../utils/mileage';
+import { describeSheet, recordAudit } from '../utils/audit';
 import {
   isSuperuser,
   loadSheetForUser,
@@ -109,7 +110,21 @@ export function travelRoutes(db: Database.Database): Router {
       return;
     }
 
+    // Opening a month is idempotent, so only a sheet that did not exist a
+    // moment ago is worth an entry: otherwise every visit to the page would
+    // log one.
+    const existing = db
+      .prepare('SELECT id FROM travel_sheets WHERE user_id = ? AND year = ? AND month = ?')
+      .get(userId, month.year, month.month);
     const id = openSheet(db, 'travel_sheets', userId, month.year, month.month);
+    if (!existing) {
+      recordAudit(db, req, {
+        action: 'create',
+        entityType: 'travel-sheet',
+        entityId: id,
+        summary: describeSheet(db, 'travel_sheets', id),
+      });
+    }
     const sheet = loadSheetForUser(db, 'travel_sheets', id, req)!;
     res.status(201).json(withTotals(sheet));
   });
@@ -159,6 +174,13 @@ export function travelRoutes(db: Database.Database): Router {
     });
     save();
 
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'travel-sheet',
+      entityId: sheet.id,
+      summary: describeSheet(db, 'travel_sheets', sheet.id),
+    });
+
     res.json(withTotals(loadSheetForUser(db, 'travel_sheets', sheet.id, req)!));
   });
 
@@ -169,7 +191,9 @@ export function travelRoutes(db: Database.Database): Router {
       return;
     }
     // The journeys go with it through ON DELETE CASCADE.
+    const summary = describeSheet(db, 'travel_sheets', sheet.id);
     db.prepare('DELETE FROM travel_sheets WHERE id = ?').run(sheet.id);
+    recordAudit(db, req, { action: 'delete', entityType: 'travel-sheet', entityId: sheet.id, summary });
     res.json({ ok: true });
   });
 

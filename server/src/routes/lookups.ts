@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth } from '../middleware/auth';
+import { recordAudit } from '../utils/audit';
 
 const LOOKUP_TABLES = [
   'lookup_product_descriptions',
@@ -72,6 +73,12 @@ export function lookupRoutes(db: Database.Database): Router {
 
     if (GLOBAL_TABLES.includes(table)) {
       const result = db.prepare(`INSERT INTO ${table} (value) VALUES (?)`).run(value);
+      recordAudit(db, req, {
+        action: 'create',
+        entityType: table,
+        entityId: result.lastInsertRowid as number,
+        summary: value,
+      });
       res.json({ id: result.lastInsertRowid, value });
     } else {
       if (!report_type) {
@@ -79,6 +86,12 @@ export function lookupRoutes(db: Database.Database): Router {
         return;
       }
       const result = db.prepare(`INSERT INTO ${table} (report_type, value) VALUES (?, ?)`).run(report_type, value);
+      recordAudit(db, req, {
+        action: 'create',
+        entityType: table,
+        entityId: result.lastInsertRowid as number,
+        summary: `${value} (${report_type})`,
+      });
       res.json({ id: result.lastInsertRowid, report_type, value });
     }
   });
@@ -97,6 +110,16 @@ export function lookupRoutes(db: Database.Database): Router {
       is_active !== undefined ? (is_active ? 1 : 0) : null,
       req.params.id,
     );
+    const lookupId = parseInt(req.params.id, 10);
+    const row = db.prepare(`SELECT value, is_active FROM ${table} WHERE id = ?`).get(lookupId) as
+      | { value: string; is_active: number }
+      | undefined;
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: table,
+      entityId: lookupId,
+      summary: `${row?.value ?? lookupId}${row && !row.is_active ? ' (deactivated)' : ''}`,
+    });
     res.json({ ok: true });
   });
 

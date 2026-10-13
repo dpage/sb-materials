@@ -20,6 +20,8 @@ import type {
   TravelJourney,
   ExpenseSheet,
   ExpenseItem,
+  AuditPage,
+  AuditFilters,
 } from '../types';
 
 const BASE = '/api';
@@ -285,6 +287,13 @@ export const api = {
   // Settings
   getSettings: () => request<AppSettings>('/settings'),
   updateSettings: (data: AppSettings) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Audit log
+  getAuditLog: (params: Record<string, string>) => {
+    const query = new URLSearchParams(params).toString();
+    return request<AuditPage>(`/audit${query ? `?${query}` : ''}`);
+  },
+  getAuditFilters: () => request<AuditFilters>('/audit/filters'),
 
   // Backups
   getBackups: () => request<Backup[]>('/backups'),

@@ -16,6 +16,7 @@ import { settingsRoutes } from '../routes/settings';
 import { appInfoRoutes } from '../routes/app-info';
 import { travelRoutes } from '../routes/travel';
 import { expenseRoutes } from '../routes/expenses';
+import { auditRoutes } from '../routes/audit';
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -49,6 +50,7 @@ export function createTestApp(db: Database.Database) {
   app.use('/api/settings', settingsRoutes(db));
   app.use('/api/travel', travelRoutes(db));
   app.use('/api/expenses', expenseRoutes(db));
+  app.use('/api/audit', auditRoutes(db));
 
   return app;
 }

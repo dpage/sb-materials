@@ -14,6 +14,7 @@ import {
 import { getSetting } from '../utils/settings';
 import { loadCollectionNote } from '../utils/collection-note-loader';
 import { removeUploadDir } from '../utils/uploads';
+import { describeCollectionNote, recordAudit } from '../utils/audit';
 
 const SIGNATURE_SUBDIR = 'collection-notes';
 // Only the dispatching signature is captured: the note leaves with the load and
@@ -172,6 +173,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
 
     try {
       const id = save();
+      recordAudit(db, req, {
+        action: 'create',
+        entityType: 'collection-note',
+        entityId: id,
+        summary: describeCollectionNote(db, id),
+      });
       res.json({ id, reference });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -234,6 +241,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
 
     try {
       update();
+      recordAudit(db, req, {
+        action: 'update',
+        entityType: 'collection-note',
+        entityId: noteId,
+        summary: describeCollectionNote(db, noteId),
+      });
       res.json({ ok: true });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -286,7 +299,14 @@ export function collectionNoteRoutes(db: Database.Database): Router {
     });
 
     try {
-      res.json(copy());
+      const made = copy();
+      recordAudit(db, req, {
+        action: 'duplicate',
+        entityType: 'collection-note',
+        entityId: made.id,
+        summary: `${describeCollectionNote(db, made.id)} (copied from ${source.reference})`,
+      });
+      res.json(made);
     } catch (err) {
       if (isUniqueViolation(err)) {
         res.status(409).json({ error: 'The next reference is already in use; try again' });
@@ -302,7 +322,9 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       res.status(404).json({ error: 'Collection note not found' });
       return;
     }
+    const summary = describeCollectionNote(db, noteId);
     db.prepare('DELETE FROM collection_notes WHERE id = ?').run(noteId);
+    recordAudit(db, req, { action: 'delete', entityType: 'collection-note', entityId: noteId, summary });
 
     // Both signature images for the note live under
     // uploads/collection-notes/{noteId}/, so drop the directory with the row.

@@ -5,6 +5,7 @@ import { loadReportWithDetails, INSPECTION_REPORT_TYPES } from '../utils/report-
 import { isSamplingEmpty, toWeight } from '../utils/sampling';
 import { config } from '../config';
 import { removeUploadDir } from '../utils/uploads';
+import { describeReport, recordAudit } from '../utils/audit';
 
 export function reportRoutes(db: Database.Database): Router {
   const router = Router();
@@ -228,6 +229,12 @@ export function reportRoutes(db: Database.Database): Router {
     });
 
     const result = saveReport();
+    recordAudit(db, req, {
+      action: 'create',
+      entityType: 'report',
+      entityId: result.reportId,
+      summary: describeReport(db, result.reportId),
+    });
     res.json({ id: result.reportId, containerIds: result.containerIds });
   });
 
@@ -407,6 +414,12 @@ export function reportRoutes(db: Database.Database): Router {
     });
 
     const containerIds = updateReport();
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'report',
+      entityId: reportId,
+      summary: describeReport(db, reportId),
+    });
     res.json({ ok: true, containerIds });
   });
 
@@ -418,7 +431,16 @@ export function reportRoutes(db: Database.Database): Router {
       return;
     }
 
+    // Described before the row goes, since afterwards there is nothing left
+    // to describe it by.
+    const summary = describeReport(db, parseInt(req.params.id, 10));
     db.prepare('DELETE FROM reports WHERE id = ?').run(req.params.id);
+    recordAudit(db, req, {
+      action: 'delete',
+      entityType: 'report',
+      entityId: parseInt(req.params.id, 10),
+      summary,
+    });
 
     // Photo and signature rows go with the report via ON DELETE CASCADE, but
     // the files themselves are ours to clean up; every photo and the signature
@@ -444,6 +466,7 @@ export function reportRoutes(db: Database.Database): Router {
     db.prepare(
       "UPDATE reports SET status = 'completed', date_completed = date('now'), updated_at = datetime('now') WHERE id = ?",
     ).run(id);
+    recordAudit(db, req, { action: 'submit', entityType: 'report', entityId: id, summary: describeReport(db, id) });
     res.json({ ok: true });
   });
 
@@ -460,6 +483,7 @@ export function reportRoutes(db: Database.Database): Router {
     db.prepare(
       "UPDATE reports SET status = 'assigned', date_completed = NULL, updated_at = datetime('now') WHERE id = ?",
     ).run(id);
+    recordAudit(db, req, { action: 'reopen', entityType: 'report', entityId: id, summary: describeReport(db, id) });
     res.json({ ok: true });
   });
 

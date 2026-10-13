@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth } from '../middleware/auth';
+import { recordAudit } from '../utils/audit';
 
 export function customerRoutes(db: Database.Database): Router {
   const router = Router();
@@ -38,6 +39,12 @@ export function customerRoutes(db: Database.Database): Router {
     const result = db
       .prepare('INSERT INTO customers (name, contact_name, email, phone, address) VALUES (?, ?, ?, ?, ?)')
       .run(name, contact_name || null, email || null, phone || null, address || null);
+    recordAudit(db, req, {
+      action: 'create',
+      entityType: 'customer',
+      entityId: result.lastInsertRowid as number,
+      summary: name,
+    });
     res.json({ id: result.lastInsertRowid, name, contact_name, email, phone, address });
   });
 
@@ -80,6 +87,19 @@ export function customerRoutes(db: Database.Database): Router {
 
     params.push(req.params.id);
     db.prepare(`UPDATE customers SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+
+    // A customer is retired rather than deleted, so the log says which of the
+    // two an update was: "went missing" is the question the log answers.
+    const customerId = parseInt(req.params.id, 10);
+    const row = db.prepare('SELECT name, is_active FROM customers WHERE id = ?').get(customerId) as
+      | { name: string; is_active: number }
+      | undefined;
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'customer',
+      entityId: customerId,
+      summary: `${row?.name ?? customerId}${row && !row.is_active ? ' (deactivated)' : ''}`,
+    });
     res.json({ ok: true });
   });
 
@@ -103,6 +123,12 @@ export function customerRoutes(db: Database.Database): Router {
     const result = db
       .prepare('INSERT INTO customer_sites (customer_id, address) VALUES (?, ?)')
       .run(req.params.id, address);
+    recordAudit(db, req, {
+      action: 'create',
+      entityType: 'customer-site',
+      entityId: result.lastInsertRowid as number,
+      summary: address,
+    });
     res.json({ id: result.lastInsertRowid, customer_id: parseInt(req.params.id), address });
   });
 
@@ -112,6 +138,16 @@ export function customerRoutes(db: Database.Database): Router {
     db.prepare(
       'UPDATE customer_sites SET address = COALESCE(?, address), is_active = COALESCE(?, is_active) WHERE id = ? AND customer_id = ?',
     ).run(address, is_active !== undefined ? (is_active ? 1 : 0) : null, req.params.siteId, req.params.customerId);
+    const siteId = parseInt(req.params.siteId, 10);
+    const site = db.prepare('SELECT address, is_active FROM customer_sites WHERE id = ?').get(siteId) as
+      | { address: string; is_active: number }
+      | undefined;
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'customer-site',
+      entityId: siteId,
+      summary: `${site?.address ?? siteId}${site && !site.is_active ? ' (deactivated)' : ''}`,
+    });
     res.json({ ok: true });
   });
 

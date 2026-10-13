@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import { requireSuperuser } from '../middleware/auth';
+import { recordAudit } from '../utils/audit';
 
 export function userRoutes(db: Database.Database): Router {
   const router = Router();
@@ -41,6 +42,12 @@ export function userRoutes(db: Database.Database): Router {
           'INSERT INTO users (username, password_hash, display_name, phone, is_superuser) VALUES (?, ?, ?, ?, ?)',
         )
         .run(username, hash, display_name, phone ?? null, is_superuser ? 1 : 0);
+      recordAudit(db, req, {
+        action: 'create',
+        entityType: 'user',
+        entityId: result.lastInsertRowid as number,
+        summary: `${display_name} (${username})${is_superuser ? ', superuser' : ''}`,
+      });
       res.json({ id: result.lastInsertRowid });
     } catch (err: any) {
       if (err.message?.includes('UNIQUE')) {
@@ -74,6 +81,25 @@ export function userRoutes(db: Database.Database): Router {
       is_active !== undefined ? (is_active ? 1 : 0) : null,
       req.params.id,
     );
+
+    // The password itself is never logged, but the fact that it was changed is
+    // exactly the sort of thing somebody later wants to know.
+    const userId = parseInt(req.params.id, 10);
+    const row = db.prepare('SELECT username, display_name, is_active FROM users WHERE id = ?').get(userId) as
+      | { username: string; display_name: string; is_active: number }
+      | undefined;
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'user',
+      entityId: userId,
+      summary: [
+        `${row?.display_name ?? userId} (${row?.username ?? ''})`,
+        password ? 'password changed' : null,
+        row && !row.is_active ? 'deactivated' : null,
+      ]
+        .filter(Boolean)
+        .join(', '),
+    });
 
     res.json({ ok: true });
   });

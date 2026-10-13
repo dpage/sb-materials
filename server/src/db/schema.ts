@@ -25,7 +25,7 @@ import { logger } from '../utils/logger';
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 3;
+export const DB_SCHEMA_VERSION = 4;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -431,6 +431,27 @@ export function createSchema(db: Database.Database): void {
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Who did what, as plain history: no hash chain and no append-only
+    -- trickery, since the point is answering "where did that report go?"
+    -- rather than defending against a determined insider. The username and
+    -- display name are snapshotted beside user_id so an entry still reads
+    -- after an account is renamed or removed, and the summary is written at
+    -- the time of the event because the record it describes may be gone.
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      username TEXT,
+      display_name TEXT,
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER,
+      summary TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id);
 
     -- Generic key/value settings, so values such as the collection note
     -- sequence can be corrected without a redeploy.

@@ -9,6 +9,7 @@ import { archiveImageFile } from '../utils/image';
 import { logger } from '../utils/logger';
 import { removeUploadDir } from '../utils/uploads';
 import { expenseTotals, toNumber } from '../utils/mileage';
+import { describeSheet, recordAudit } from '../utils/audit';
 import {
   isSuperuser,
   loadSheetForUser,
@@ -121,7 +122,20 @@ export function expenseRoutes(db: Database.Database): Router {
       return;
     }
 
+    // As on the travel sheets, only a sheet that did not already exist earns
+    // an entry: opening a month you already have is a navigation, not a change.
+    const existing = db
+      .prepare('SELECT id FROM expense_sheets WHERE user_id = ? AND year = ? AND month = ?')
+      .get(userId, month.year, month.month);
     const id = openSheet(db, 'expense_sheets', userId, month.year, month.month);
+    if (!existing) {
+      recordAudit(db, req, {
+        action: 'create',
+        entityType: 'expense-sheet',
+        entityId: id,
+        summary: describeSheet(db, 'expense_sheets', id),
+      });
+    }
     res.status(201).json(withTotals(loadSheetForUser(db, 'expense_sheets', id, req)!));
   });
 
@@ -188,6 +202,13 @@ export function expenseRoutes(db: Database.Database): Router {
     });
     save();
 
+    recordAudit(db, req, {
+      action: 'update',
+      entityType: 'expense-sheet',
+      entityId: sheet.id,
+      summary: describeSheet(db, 'expense_sheets', sheet.id),
+    });
+
     res.json(withTotals(loadSheetForUser(db, 'expense_sheets', sheet.id, req)!));
   });
 
@@ -197,7 +218,9 @@ export function expenseRoutes(db: Database.Database): Router {
       res.status(404).json({ error: 'Expense sheet not found' });
       return;
     }
+    const summary = describeSheet(db, 'expense_sheets', sheet.id);
     db.prepare('DELETE FROM expense_sheets WHERE id = ?').run(sheet.id);
+    recordAudit(db, req, { action: 'delete', entityType: 'expense-sheet', entityId: sheet.id, summary });
     removeUploadDir(config.uploadsDir, path.join(RECEIPT_SUBDIR, String(sheet.id)));
     res.json({ ok: true });
   });
