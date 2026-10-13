@@ -7,9 +7,16 @@ import { loadReportWithDetails } from '../utils/report-loader';
 import { loadCollectionNote } from '../utils/collection-note-loader';
 import { generateCollectionNotePdf, collectionNotePdfFilename } from '../utils/collection-note-pdf';
 import { logger } from '../utils/logger';
+import { deploymentWatermark, type PdfOptions } from '../utils/watermark';
 
 export function pdfRoutes(db: Database.Database): Router {
   const router = Router();
+
+  // A report printed from the test deployment carries a watermark saying so,
+  // since a PDF outlives the browser tab it was downloaded from.
+  const pdfOptions: PdfOptions = config.isTestDeployment
+    ? { watermark: deploymentWatermark(config.deploymentLabel) }
+    : {};
 
   router.use(requireAuth);
 
@@ -25,7 +32,7 @@ export function pdfRoutes(db: Database.Database): Router {
     }
 
     try {
-      const pdfBuffer = await generateCollectionNotePdf(note, config.uploadsDir);
+      const pdfBuffer = await generateCollectionNotePdf(note, config.uploadsDir, pdfOptions);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${collectionNotePdfFilename(note)}"`);
       res.send(pdfBuffer);
@@ -46,7 +53,7 @@ export function pdfRoutes(db: Database.Database): Router {
     }
 
     try {
-      const pdfBuffer = await generatePdf(report, config.uploadsDir);
+      const pdfBuffer = await generatePdf(report, config.uploadsDir, pdfOptions);
 
       const typeName = report.report_type.replace(/_/g, '-');
       const date = report.inspection_date;

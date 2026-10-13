@@ -5,6 +5,7 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import { logger } from './logger';
 import { SB_LOGO_DATA_URL } from './logo';
 import { imageFileToJpegDataUrl, PDF_MAX_DIM, PDF_QUALITY } from './image';
+import type { PdfOptions } from './watermark';
 import {
   UNWANTED_MATERIAL_QUESTION,
   CONTAMINATES_QUESTION,
@@ -153,7 +154,7 @@ function photoBlock(base64: string, label: string | null, width: number = PHOTO_
   return { stack: items, unbreakable: true } as any;
 }
 
-export async function generatePdf(report: any, uploadsDir: string): Promise<Buffer> {
+export async function generatePdf(report: any, uploadsDir: string, options: PdfOptions = {}): Promise<Buffer> {
   const content: Content[] = [];
 
   // Title
@@ -183,6 +184,7 @@ export async function generatePdf(report: any, uploadsDir: string): Promise<Buff
 
   const docDefinition: TDocumentDefinitions = {
     content,
+    ...(options.watermark ? { watermark: options.watermark } : {}),
     styles: {
       companyName: { fontSize: 16, bold: true, color: '#1a5276' },
       header: { fontSize: 14, bold: true, color: '#2c3e50' },

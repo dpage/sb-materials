@@ -16,6 +16,7 @@ vi.mock('../api', () => ({
     me: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
+    getAppInfo: vi.fn().mockResolvedValue({ testDeployment: false, deploymentLabel: '', appVersion: '0.0.0' }),
   },
 }));
 
@@ -46,7 +47,12 @@ describe('App', () => {
     vi.mock('../pages/Lookups', () => ({ Lookups: () => <div>Lookups Page</div> }));
     vi.mock('../components/HelpPanel', () => ({ HelpPanel: () => <div>Help</div> }));
     vi.mock('../api', () => ({
-      api: { me: vi.fn().mockRejectedValue(new Error('no')), login: vi.fn(), logout: vi.fn() },
+      api: {
+        me: vi.fn().mockRejectedValue(new Error('no')),
+        login: vi.fn(),
+        logout: vi.fn(),
+        getAppInfo: vi.fn().mockResolvedValue({ testDeployment: false, deploymentLabel: '', appVersion: '0.0.0' }),
+      },
     }));
     const { App } = await import('../App');
     render(<App />);

@@ -21,6 +21,7 @@ import { photoRoutes } from './routes/photos';
 import { pdfRoutes } from './routes/pdf';
 import { collectionNoteRoutes } from './routes/collection-notes';
 import { settingsRoutes } from './routes/settings';
+import { appInfoRoutes } from './routes/app-info';
 import { backupRoutes } from './routes/backups';
 import { BackupCoordinator } from './backup/scheduler';
 import { recoverInterruptedRestore } from './backup/restore';
@@ -125,6 +126,14 @@ app.use(
 app.use('/api', csrfProtection);
 
 // API routes
+app.use(
+  '/api/app-info',
+  appInfoRoutes({
+    testDeployment: config.isTestDeployment,
+    deploymentLabel: config.deploymentLabel,
+    appVersion: config.appVersion,
+  }),
+);
 app.use('/api/auth', authRoutes(db));
 app.use('/api/users', userRoutes(db));
 app.use('/api/customers', customerRoutes(db));
@@ -168,6 +177,9 @@ if (fs.existsSync(clientDist)) {
 const server = app.listen(config.port, () => {
   logger.info(`SB Materials server running on port ${config.port}`);
   logger.info(`Data directory: ${config.dataDir}`);
+  if (config.isTestDeployment) {
+    logger.info(`TEST deployment: the UI is badged "${config.deploymentLabel}" and PDFs are watermarked`);
+  }
 });
 
 process.on('SIGTERM', () => {

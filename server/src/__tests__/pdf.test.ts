@@ -5,6 +5,7 @@ import type { Express } from 'express';
 import { createTestDb, createTestApp, loginAsAdmin, createTestCustomerAndSite } from './helpers';
 import { generatePdf } from '../utils/pdf-generator';
 import { SB_LOGO_DATA_URL } from '../utils/logo';
+import { deploymentWatermark } from '../utils/watermark';
 import { loadCollectionNote } from '../utils/collection-note-loader';
 import {
   generateCollectionNotePdf,
@@ -874,5 +875,58 @@ describe('collection note PDF', () => {
     expect(formatUkDate('2026-08-03T14:30')).toBe('03/08/2026 14:30');
     expect(formatUkDate(null)).toBe('');
     expect(formatUkDate('not a date')).toBe('not a date');
+  });
+});
+
+describe('test deployment watermark', () => {
+  let tmpDir: string;
+  let db: Database.Database;
+  let noteId: number;
+
+  const report = {
+    id: 1,
+    report_type: 'quarterly_pern',
+    status: 'completed',
+    customer_name: 'Cust',
+    site_address: 'Addr',
+    inspection_date: '2026-05-02',
+    inspector_name: 'Insp',
+    inspection_details: {},
+    unwanted_materials: [],
+    contaminants: [],
+    containers: [],
+    photos: [],
+  };
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-watermark-'));
+    db = createTestDb();
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Acme Recycling Ltd');
+    const info = db
+      .prepare('INSERT INTO collection_notes (reference, customer_id, collection_date) VALUES (?, ?, ?)')
+      .run('SBM2001', cust.lastInsertRowid, '2026-08-03');
+    noteId = Number(info.lastInsertRowid);
+  });
+
+  it('stamps the label across a report when one is supplied', async () => {
+    const buffer = await generatePdf(report as any, tmpDir, { watermark: deploymentWatermark('PRE-PROD') });
+    expect(extractPdfText(buffer)).toContain('PRE-PROD');
+  });
+
+  it('leaves a report unmarked when no watermark is supplied', async () => {
+    const buffer = await generatePdf(report as any, tmpDir);
+    expect(extractPdfText(buffer)).not.toContain('PRE-PROD');
+  });
+
+  it('stamps the label across a collection note when one is supplied', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, tmpDir, { watermark: deploymentWatermark('PRE-PROD') });
+    expect(extractPdfText(buffer)).toContain('PRE-PROD');
+  });
+
+  it('leaves a collection note unmarked when no watermark is supplied', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const buffer = await generateCollectionNotePdf(note, tmpDir);
+    expect(extractPdfText(buffer)).not.toContain('PRE-PROD');
   });
 });

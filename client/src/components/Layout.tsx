@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import { useHelp } from './HelpContext';
+import { useDeployment } from './DeploymentContext';
+import { TEST_BANNER_RED } from './TestDeploymentBanner';
 import logoUrl from '../assets/sb-logo.png';
 
 export function Layout() {
@@ -9,6 +11,7 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { open: openHelp, setTopic } = useHelp();
+  const { testDeployment, deploymentLabel } = useDeployment();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Set help topic based on current route
@@ -53,9 +56,13 @@ export function Layout() {
     <div style={{ minHeight: '100vh' }}>
       <header
         style={{
-          background: '#ffffff',
+          // The banner at the top of the page scrolls away, whilst this header
+          // is sticky, so a test installation is tinted here as well: at no
+          // scroll position should it be possible to mistake it for the live
+          // system.
+          background: testDeployment ? '#fff5f5' : '#ffffff',
           color: '#24292f',
-          borderBottom: '1px solid #e1e4e8',
+          borderBottom: testDeployment ? `2px solid ${TEST_BANNER_RED}` : '1px solid #e1e4e8',
           padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
@@ -71,6 +78,24 @@ export function Layout() {
           <NavLink to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
             <img src={logoUrl} alt="SB Materials" className="brand-logo" style={{ width: 'auto', display: 'block' }} />
           </NavLink>
+
+          {testDeployment && (
+            <span
+              style={{
+                background: TEST_BANNER_RED,
+                color: '#ffffff',
+                borderRadius: 4,
+                padding: '3px 8px',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {deploymentLabel}
+            </span>
+          )}
 
           {/* Desktop nav */}
           <nav style={{ display: 'flex', gap: 4 }} className="desktop-nav">

@@ -11,6 +11,8 @@ ExecStart=/usr/bin/node server/dist/index.js
 
 # PORT, DATA_DIR, SESSION_SECRET and ALLOWED_ORIGINS, as per .env.default.
 # Set DATA_DIR to an absolute path here rather than the relative default.
+# On a test or pre-production host, also set TEST_DEPLOYMENT=true (and
+# optionally DEPLOYMENT_LABEL) so the UI is badged and the PDFs watermarked.
 EnvironmentFile=/opt/sb-materials/.env
 
 # REQUIRED by the backup and restore feature, not merely a nicety. A restore

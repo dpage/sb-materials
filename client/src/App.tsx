@@ -4,6 +4,8 @@ import type { User } from './types';
 import { api } from './api';
 import { Layout } from './components/Layout';
 import { HelpProvider } from './components/HelpContext';
+import { DeploymentProvider } from './components/DeploymentContext';
+import { TestDeploymentBanner } from './components/TestDeploymentBanner';
 import { HelpPanel } from './components/HelpPanel';
 import { Login } from './pages/Login';
 import { Reports } from './pages/Reports';
@@ -66,33 +68,36 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <HelpProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Reports />} />
-              <Route path="reports/new" element={<ReportEdit />} />
-              <Route path="reports/:id" element={<ReportEdit />} />
-              <Route path="collection-notes" element={<CollectionNotes />} />
-              <Route path="collection-notes/new" element={<CollectionNoteEdit />} />
-              <Route path="collection-notes/:id" element={<CollectionNoteEdit />} />
-              <Route path="customers" element={<Customers />} />
-              <Route path="users" element={<Users />} />
-              <Route path="lookups" element={<Lookups />} />
-              <Route path="backups" element={<Backups />} />
-            </Route>
-          </Routes>
-          <HelpPanel />
-        </HelpProvider>
-      </AuthProvider>
+      <DeploymentProvider>
+        <AuthProvider>
+          <HelpProvider>
+            <TestDeploymentBanner />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Reports />} />
+                <Route path="reports/new" element={<ReportEdit />} />
+                <Route path="reports/:id" element={<ReportEdit />} />
+                <Route path="collection-notes" element={<CollectionNotes />} />
+                <Route path="collection-notes/new" element={<CollectionNoteEdit />} />
+                <Route path="collection-notes/:id" element={<CollectionNoteEdit />} />
+                <Route path="customers" element={<Customers />} />
+                <Route path="users" element={<Users />} />
+                <Route path="lookups" element={<Lookups />} />
+                <Route path="backups" element={<Backups />} />
+              </Route>
+            </Routes>
+            <HelpPanel />
+          </HelpProvider>
+        </AuthProvider>
+      </DeploymentProvider>
     </BrowserRouter>
   );
 }

@@ -12,6 +12,7 @@ import { photoRoutes } from '../routes/photos';
 import { pdfRoutes } from '../routes/pdf';
 import { collectionNoteRoutes } from '../routes/collection-notes';
 import { settingsRoutes } from '../routes/settings';
+import { appInfoRoutes } from '../routes/app-info';
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -33,6 +34,7 @@ export function createTestApp(db: Database.Database) {
     }),
   );
 
+  app.use('/api/app-info', appInfoRoutes({ testDeployment: false, deploymentLabel: 'TEST', appVersion: '0.0.0-test' }));
   app.use('/api/auth', authRoutes(db));
   app.use('/api/users', userRoutes(db));
   app.use('/api/customers', customerRoutes(db));

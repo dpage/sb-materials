@@ -5,6 +5,7 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import { logger } from './logger';
 import { SB_LOGO_DATA_URL } from './logo';
 import type { CollectionNoteRecord } from './collection-note-loader';
+import type { PdfOptions } from './watermark';
 
 // Fixed wording, reproduced verbatim from the collection note the company has
 // been issuing as a Word document. It is signed by two parties at the
@@ -147,7 +148,11 @@ function dateCell(value: string | null): Content {
   };
 }
 
-export async function generateCollectionNotePdf(note: CollectionNoteRecord, uploadsDir: string): Promise<Buffer> {
+export async function generateCollectionNotePdf(
+  note: CollectionNoteRecord,
+  uploadsDir: string,
+  options: PdfOptions = {},
+): Promise<Buffer> {
   const content: Content[] = [];
 
   // Letterhead: the logo on the left, the document title ranged right against
@@ -244,6 +249,7 @@ export async function generateCollectionNotePdf(note: CollectionNoteRecord, uplo
 
   const docDefinition: TDocumentDefinitions = {
     content,
+    ...(options.watermark ? { watermark: options.watermark } : {}),
     defaultStyle: { fontSize: 10 },
     images: { [LOGO_IMAGE_KEY]: SB_LOGO_DATA_URL },
     pageMargins: [45, 45, 45, 45] as [number, number, number, number],

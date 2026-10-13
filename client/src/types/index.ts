@@ -256,6 +256,17 @@ export interface CollectionNoteData {
   items?: CollectionNoteItem[];
 }
 
+/**
+ * Facts about the installation itself, as opposed to anything stored in it.
+ * Served unauthenticated so the login page can carry the test-deployment
+ * warning as well.
+ */
+export interface AppInfo {
+  testDeployment: boolean;
+  deploymentLabel: string;
+  appVersion: string;
+}
+
 export interface AppSettings {
   collection_note_prefix?: string;
   collection_note_next_number?: string;

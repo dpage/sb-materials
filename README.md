@@ -63,6 +63,8 @@ A web application for SB Materials — a company providing inspection and auditi
    | `DATA_DIR` | Directory for SQLite database and uploaded photos | `./data` |
    | `SESSION_SECRET` | Secret for signing session cookies (change in production) | — |
    | `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins | `http://localhost:5173` |
+   | `TEST_DEPLOYMENT` | Marks the installation as a test one rather than the live service (see below) | `false` |
+   | `DEPLOYMENT_LABEL` | Wording used in the test badge and PDF watermark | `TEST` |
 
 4. **Run in development mode**
 
@@ -80,6 +82,36 @@ A web application for SB Materials — a company providing inspection and auditi
    ```
 
    The production server serves the built React client and the API from a single Express process on the configured port.
+
+## Test and Pre-production Installations
+
+Set `TEST_DEPLOYMENT=true` on any installation that is not the live service. The
+application then makes that obvious in three places at once, because the usual
+way to come unstuck is to have both open in neighbouring browser tabs:
+
+- a red warning strip across the top of every page, the login page included;
+- the header tinted red and badged with `DEPLOYMENT_LABEL`, which stays visible
+  when the page is scrolled and the strip has gone, and the same label in the
+  window title, so a stray tab is identifiable without clicking it;
+- a diagonal watermark on every page of every PDF, since a report outlives the
+  tab it was downloaded from.
+
+`DEPLOYMENT_LABEL` sets the wording, defaulting to `TEST`; something like
+`PRE-PROD` or `STAGING` is just as good, and it is used both on screen and in
+the watermark. Any of `1`, `true`, `yes` or `on` turns the flag on, in any case;
+anything else, including an unset variable, means production.
+
+This is deliberately an environment variable rather than an application setting
+stored in the database, for two reasons: it is a property of the deployment
+rather than of the data, and a test installation is very often populated by
+restoring a backup taken from production, which would otherwise bring the
+production value of the flag along with it.
+
+The flag changes presentation only. A test installation is a genuinely separate
+deployment, with its own `DATA_DIR`, database, uploads and session secret;
+nothing in the application prevents a test instance from being pointed at
+production data, so that separation has to be got right in the deployment
+itself.
 
 ## Deploying Behind Nginx
 

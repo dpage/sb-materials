@@ -13,6 +13,7 @@ import type {
   PernDetails,
   CollectionNote,
   CollectionNoteData,
+  AppInfo,
   AppSettings,
   Backup,
 } from '../types';
@@ -223,6 +224,9 @@ export const api = {
     return res.json();
   },
   downloadCollectionNotePdf: (id: number) => `${BASE}/pdf/collection-note/${id}`,
+
+  // Deployment
+  getAppInfo: () => request<AppInfo>('/app-info'),
 
   // Settings
   getSettings: () => request<AppSettings>('/settings'),
