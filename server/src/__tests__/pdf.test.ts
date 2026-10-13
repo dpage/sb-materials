@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import type Database from 'better-sqlite3';
 import type { Express } from 'express';
-import { createTestDb, createTestApp, loginAsAdmin, createTestCustomerAndSite } from './helpers';
+import { createTestDb, createTestApp, loginAsAdmin, createTestCustomerAndSite, extractPdfText } from './helpers';
 import { generatePdf } from '../utils/pdf-generator';
 import { SB_LOGO_DATA_URL } from '../utils/logo';
 import { deploymentWatermark } from '../utils/watermark';
@@ -20,32 +20,6 @@ import path from 'path';
 import sharp from 'sharp';
 import crypto from 'crypto';
 import zlib from 'zlib';
-
-// Inflate every FlateDecode stream in a PDF and decode the hex-encoded text
-// runs (e.g. `[<4f6e20> 0] TJ`) so tests can assert on rendered text. pdfmake
-// emits one run per word with the trailing space inside the hex, so plain
-// concatenation reconstructs the visible text. Image streams fail to inflate
-// and are skipped.
-function extractPdfText(buf: Buffer): string {
-  const out: string[] = [];
-  let idx = 0;
-  while ((idx = buf.indexOf('stream', idx)) !== -1) {
-    const start = buf.indexOf('\n', idx) + 1;
-    const end = buf.indexOf('endstream', start);
-    if (end === -1) break;
-    let content = '';
-    try {
-      content = zlib.inflateSync(buf.subarray(start, end)).toString('latin1');
-    } catch {
-      // not a deflate stream (e.g. an image) - skip
-    }
-    for (const m of content.matchAll(/<([0-9a-fA-F]+)>/g)) {
-      out.push(Buffer.from(m[1], 'hex').toString('latin1'));
-    }
-    idx = end + 'endstream'.length;
-  }
-  return out.join('');
-}
 
 // Count `/Ixx Do` image-draw operators across every page content stream, and
 // the pages themselves. pdfkit writes an image XObject as soon as it is

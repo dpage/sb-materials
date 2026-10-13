@@ -4,6 +4,7 @@ import { requireAuth, requireSuperuser } from '../middleware/auth';
 import { getAllSettings, setSetting } from '../utils/settings';
 import { NEXT_NUMBER_SETTING, PREFIX_SETTING } from '../utils/collection-note-reference';
 import { BACKUP_ENABLED_SETTING, BACKUP_HOUR_SETTING, BACKUP_KEEP_SETTING } from '../backup/scheduler';
+import { MILEAGE_BAND_SETTING, MILEAGE_RATE_HIGH_SETTING, MILEAGE_RATE_LOW_SETTING, toNumber } from '../utils/mileage';
 
 // Only these keys may be written through the API, so a stray request cannot
 // invent settings the app never reads.
@@ -13,7 +14,18 @@ const WRITABLE_SETTINGS = [
   BACKUP_ENABLED_SETTING,
   BACKUP_HOUR_SETTING,
   BACKUP_KEEP_SETTING,
+  MILEAGE_RATE_HIGH_SETTING,
+  MILEAGE_RATE_LOW_SETTING,
+  MILEAGE_BAND_SETTING,
 ];
+
+// The mileage settings are money per mile and a mileage threshold, so they are
+// validated together rather than one clause each.
+const MILEAGE_SETTING_LABELS: Record<string, string> = {
+  [MILEAGE_RATE_HIGH_SETTING]: 'The higher mileage rate',
+  [MILEAGE_RATE_LOW_SETTING]: 'The lower mileage rate',
+  [MILEAGE_BAND_SETTING]: 'The mileage threshold',
+};
 
 export function settingsRoutes(db: Database.Database): Router {
   const router = Router();
@@ -63,6 +75,16 @@ export function settingsRoutes(db: Database.Database): Router {
     if (enabledRaw !== undefined && !['true', 'false'].includes(String(enabledRaw).trim())) {
       res.status(400).json({ error: 'The backup enabled flag must be true or false' });
       return;
+    }
+
+    for (const [key, label] of Object.entries(MILEAGE_SETTING_LABELS)) {
+      const raw = body[key];
+      if (raw === undefined) continue;
+      const parsed = toNumber(raw);
+      if (parsed === null || parsed < 0) {
+        res.status(400).json({ error: `${label} must be a number of 0 or more` });
+        return;
+      }
     }
 
     for (const key of keys) {

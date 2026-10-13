@@ -25,7 +25,7 @@ import { logger } from '../utils/logger';
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 2;
+export const DB_SCHEMA_VERSION = 3;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -355,6 +355,81 @@ export function createSchema(db: Database.Database): void {
       pern_prn_claimed_percent REAL,
       contamination_limit_percent REAL,
       comments TEXT
+    );
+
+    -- Travel and expenses are kept per person per month: UNIQUE (user_id,
+    -- year, month) is what makes a sheet monthly, so opening September 2026
+    -- either finds the existing sheet or creates it and there is no way to end
+    -- up with two competing sheets for one month. Miles and money are REAL
+    -- because they are totalled; costs are in pounds, rounded to pence only
+    -- where they are shown.
+    CREATE TABLE IF NOT EXISTS travel_sheets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE (user_id, year, month)
+    );
+
+    -- One row per leg rather than per day: a run serving four customers is
+    -- four rows sharing a date, so the mileage is attributable to the customer
+    -- it was driven for. A round trip is one row with round_trip set, which
+    -- doubles the distance wherever it is totalled; customer_name is
+    -- denormalised beside customer_id as the reports do, so a journey still
+    -- reads correctly after a customer is renamed or removed.
+    CREATE TABLE IF NOT EXISTS travel_journeys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sheet_id INTEGER NOT NULL REFERENCES travel_sheets(id) ON DELETE CASCADE,
+      journey_date TEXT,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+      customer_name TEXT,
+      job TEXT,
+      from_location TEXT,
+      to_location TEXT,
+      miles REAL,
+      round_trip INTEGER,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS expense_sheets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT,
+      UNIQUE (user_id, year, month)
+    );
+
+    -- vat_amount is entered rather than derived: receipts state the VAT that
+    -- was actually charged, and assuming 20% would be wrong for the zero and
+    -- reduced rated things an inspector buys.
+    CREATE TABLE IF NOT EXISTS expense_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sheet_id INTEGER NOT NULL REFERENCES expense_sheets(id) ON DELETE CASCADE,
+      item_date TEXT,
+      description TEXT,
+      cost REAL,
+      vat_applicable INTEGER,
+      vat_amount REAL,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+
+    -- Receipts live under uploads/expenses/<sheetId>/, following the
+    -- collection note signatures, so the backup archive already carries them.
+    -- item_id is nullable because a receipt covering a whole trip belongs to
+    -- the sheet rather than to any one line.
+    CREATE TABLE IF NOT EXISTS expense_photos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sheet_id INTEGER NOT NULL REFERENCES expense_sheets(id) ON DELETE CASCADE,
+      item_id INTEGER REFERENCES expense_items(id) ON DELETE SET NULL,
+      file_path TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     -- Generic key/value settings, so values such as the collection note

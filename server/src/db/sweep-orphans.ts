@@ -33,9 +33,9 @@ export interface SweepOptions {
 /**
  * Every file path the database knows about, relative to the uploads directory.
  *
- * The collection note signature columns are read defensively because older
- * databases predate them, and a missing column must not turn the whole of
- * uploads into "unreferenced".
+ * The collection note signature columns and the expense receipts are read
+ * defensively because older databases predate them, and a missing column or
+ * table must not turn the whole of uploads into "unreferenced".
  */
 function referencedPaths(db: Database.Database): Set<string> {
   const paths = new Set<string>();
@@ -50,6 +50,18 @@ function referencedPaths(db: Database.Database): Set<string> {
     signature_path: string;
   }[]) {
     add(row.signature_path);
+  }
+
+  // Expense receipts, read defensively for the same reason: a database from
+  // before the expenses sheets has no such table, and that must not make the
+  // whole of uploads look unreferenced.
+  const hasExpensePhotos = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'expense_photos'")
+    .get();
+  if (hasExpensePhotos) {
+    for (const row of db.prepare('SELECT file_path FROM expense_photos').all() as { file_path: string }[]) {
+      add(row.file_path);
+    }
   }
 
   const noteColumns = (db.prepare('PRAGMA table_info(collection_notes)').all() as { name: string }[])

@@ -23,6 +23,8 @@ import { collectionNoteRoutes } from './routes/collection-notes';
 import { settingsRoutes } from './routes/settings';
 import { appInfoRoutes } from './routes/app-info';
 import { backupRoutes } from './routes/backups';
+import { travelRoutes } from './routes/travel';
+import { expenseRoutes } from './routes/expenses';
 import { BackupCoordinator } from './backup/scheduler';
 import { recoverInterruptedRestore } from './backup/restore';
 
@@ -142,6 +144,8 @@ app.use('/api/reports', reportRoutes(db));
 app.use('/api/photos', photoRoutes(db));
 app.use('/api/pdf', pdfRoutes(db));
 app.use('/api/collection-notes', collectionNoteRoutes(db));
+app.use('/api/travel', travelRoutes(db));
+app.use('/api/expenses', expenseRoutes(db));
 app.use('/api/settings', settingsRoutes(db));
 
 const backupCoordinator = new BackupCoordinator(db, config.backupsDir, config.uploadsDir);

@@ -101,6 +101,22 @@ describe('sweepOrphanedUploads', () => {
     expect(fs.existsSync(path.join(uploadsDir, 'collection-notes/1/sig.png'))).toBe(true);
   });
 
+  it('treats expense receipts as referenced', () => {
+    const sheetId = db.prepare('INSERT INTO expense_sheets (user_id, year, month) VALUES (1, 2026, 10)').run()
+      .lastInsertRowid as number;
+    db.prepare('INSERT INTO expense_photos (sheet_id, file_path) VALUES (?, ?)').run(
+      sheetId,
+      `expenses/${sheetId}/receipt.jpg`,
+    );
+    writeFile(`expenses/${sheetId}/receipt.jpg`);
+    writeFile(`expenses/${sheetId}/stray.jpg`);
+
+    const result = sweepOrphanedUploads(db, uploadsDir, { deleteFiles: true });
+
+    expect(result.orphans.map((o) => o.relPath)).toEqual([`expenses/${sheetId}/stray.jpg`]);
+    expect(fs.existsSync(path.join(uploadsDir, `expenses/${sheetId}/receipt.jpg`))).toBe(true);
+  });
+
   it('refuses to delete when the database references nothing at all', () => {
     writeFile('7/suspicious.jpg');
 

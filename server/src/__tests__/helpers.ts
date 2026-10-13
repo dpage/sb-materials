@@ -1,4 +1,5 @@
 import express from 'express';
+import zlib from 'zlib';
 import session from 'express-session';
 import Database from 'better-sqlite3';
 import { createSchema } from '../db/schema';
@@ -13,6 +14,8 @@ import { pdfRoutes } from '../routes/pdf';
 import { collectionNoteRoutes } from '../routes/collection-notes';
 import { settingsRoutes } from '../routes/settings';
 import { appInfoRoutes } from '../routes/app-info';
+import { travelRoutes } from '../routes/travel';
+import { expenseRoutes } from '../routes/expenses';
 
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -44,6 +47,8 @@ export function createTestApp(db: Database.Database) {
   app.use('/api/pdf', pdfRoutes(db));
   app.use('/api/collection-notes', collectionNoteRoutes(db));
   app.use('/api/settings', settingsRoutes(db));
+  app.use('/api/travel', travelRoutes(db));
+  app.use('/api/expenses', expenseRoutes(db));
 
   return app;
 }
@@ -83,4 +88,32 @@ export function createTestCustomerAndSite(db: Database.Database): { customerId: 
     .prepare('INSERT INTO customer_sites (customer_id, address) VALUES (?, ?)')
     .run(cust.lastInsertRowid, '123 Test St');
   return { customerId: cust.lastInsertRowid as number, siteId: site.lastInsertRowid as number };
+}
+
+/**
+ * Inflate every FlateDecode stream in a PDF and decode the hex-encoded text
+ * runs (e.g. `[<4f6e20> 0] TJ`) so tests can assert on rendered text. pdfmake
+ * emits one run per word with the trailing space inside the hex, so plain
+ * concatenation reconstructs the visible text. Image streams fail to inflate
+ * and are skipped.
+ */
+export function extractPdfText(buf: Buffer): string {
+  const out: string[] = [];
+  let idx = 0;
+  while ((idx = buf.indexOf('stream', idx)) !== -1) {
+    const start = buf.indexOf('\n', idx) + 1;
+    const end = buf.indexOf('endstream', start);
+    if (end === -1) break;
+    let content = '';
+    try {
+      content = zlib.inflateSync(buf.subarray(start, end)).toString('latin1');
+    } catch {
+      // not a deflate stream (e.g. an image) - skip
+    }
+    for (const m of content.matchAll(/<([0-9a-fA-F]+)>/g)) {
+      out.push(Buffer.from(m[1], 'hex').toString('latin1'));
+    }
+    idx = end + 'endstream'.length;
+  }
+  return out.join('');
 }
