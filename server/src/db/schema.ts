@@ -25,7 +25,7 @@ import { logger } from '../utils/logger';
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 1;
+export const DB_SCHEMA_VERSION = 2;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -279,6 +279,13 @@ export function createSchema(db: Database.Database): void {
     { name: 'bale_break_results', type: 'TEXT' },
     { name: 'packaging_thresholds', type: 'TEXT' },
   ]);
+  // Material description and grade on the PERN audit: plain text rather than
+  // lookups, since the lookup tables are keyed by report type and hold nothing
+  // for pern_audit.
+  addColumns('report_pern_details', [
+    { name: 'product_description', type: 'TEXT' },
+    { name: 'product_grade', type: 'TEXT' },
+  ]);
   addColumns('report_containers', [
     { name: 'number_of_bales', type: 'TEXT' },
     { name: 'weighbridge_ticket', type: 'TEXT' },
@@ -326,6 +333,28 @@ export function createSchema(db: Database.Database): void {
       nett_weight TEXT,
       collection_point TEXT,
       sort_order INTEGER DEFAULT 0
+    );
+
+    -- Sampling (the bale break, reworked): one row per report, on every report
+    -- type, because a sample is always taken unless the area is unsafe. Weights
+    -- are REAL rather than the free text used for weights elsewhere because the
+    -- percentages shown beside them are arithmetic; the percentages themselves
+    -- are derived wherever they are shown rather than stored, so a corrected
+    -- weight cannot leave a stale percentage behind.
+    CREATE TABLE IF NOT EXISTS report_sampling (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      report_id INTEGER NOT NULL UNIQUE REFERENCES reports(id) ON DELETE CASCADE,
+      not_carried_out INTEGER,
+      not_carried_out_reason TEXT,
+      sample_size_kg REAL,
+      in_scope_kg REAL,
+      out_of_scope_kg REAL,
+      contamination_kg REAL,
+      prohibited_kg REAL,
+      prohibited_items TEXT,
+      pern_prn_claimed_percent REAL,
+      contamination_limit_percent REAL,
+      comments TEXT
     );
 
     -- Generic key/value settings, so values such as the collection note

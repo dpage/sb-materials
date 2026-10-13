@@ -34,7 +34,7 @@ export interface CustomerSite {
   is_active: number;
 }
 
-export type ReportType = 'loading_inspection' | 'quarterly_pern' | 'pern_audit';
+export type ReportType = 'loading_inspection' | 'quarterly_pern' | 'pern_audit' | 'loading_quarterly_pern' | 'sampling';
 
 export interface Report {
   id: number;
@@ -63,6 +63,7 @@ export interface Report {
   contaminants?: Contaminant[];
   containers?: Container[];
   pern_details?: PernDetails;
+  sampling?: ReportSampling | null;
   photos?: ReportPhoto[];
 }
 
@@ -169,6 +170,29 @@ export interface PernDetails {
   notes: string | null;
   auditor_position: string | null;
   intro_letter: string | null;
+  product_description: string | null;
+  product_grade: string | null;
+}
+
+/**
+ * The sampling block (the bale break reworked), on every report type. Weights
+ * are in kilograms; the percentages shown beside them are worked out from the
+ * sample size rather than stored.
+ */
+export interface ReportSampling {
+  id?: number;
+  report_id?: number;
+  not_carried_out?: number | null;
+  not_carried_out_reason?: string | null;
+  sample_size_kg?: number | string | null;
+  in_scope_kg?: number | string | null;
+  out_of_scope_kg?: number | string | null;
+  contamination_kg?: number | string | null;
+  prohibited_kg?: number | string | null;
+  prohibited_items?: string | null;
+  pern_prn_claimed_percent?: number | string | null;
+  contamination_limit_percent?: number | string | null;
+  comments?: string | null;
 }
 
 export interface ReportPhoto {
@@ -192,18 +216,24 @@ export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   loading_inspection: 'Loading & Inspection',
   quarterly_pern: 'Quarterly PERN Inspection',
   pern_audit: 'PERN Audit',
+  loading_quarterly_pern: 'Loading & Qtr PERN',
+  sampling: 'Sampling',
 };
 
 export const TYPE_COLORS: Record<string, string> = {
   loading_inspection: '#2e86de',
   quarterly_pern: '#16a085',
   pern_audit: '#8e44ad',
+  loading_quarterly_pern: '#d35400',
+  sampling: '#c0392b',
 };
 
 export const TYPE_SHORT: Record<string, string> = {
   loading_inspection: 'Loading',
   quarterly_pern: 'Quarterly',
   pern_audit: 'PERN',
+  loading_quarterly_pern: 'Loading+Qtr',
+  sampling: 'Sampling',
 };
 
 export interface CollectionNoteItem {

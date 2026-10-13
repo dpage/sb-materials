@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3';
 
-export const INSPECTION_REPORT_TYPES = ['loading_inspection', 'quarterly_pern'];
+// Types that carry report_inspection_details, with the unwanted materials,
+// contaminants and containers alongside. loading_quarterly_pern is the combined
+// form: it shows the loading and quarterly sections together, so it stores
+// exactly what those two do.
+export const INSPECTION_REPORT_TYPES = ['loading_inspection', 'quarterly_pern', 'loading_quarterly_pern'];
 
 export function loadReportWithDetails(db: Database.Database, reportId: number): any | null {
   const report = db
@@ -28,6 +32,9 @@ export function loadReportWithDetails(db: Database.Database, reportId: number): 
   if (report.report_type === 'pern_audit') {
     report.pern_details = db.prepare('SELECT * FROM report_pern_details WHERE report_id = ?').get(reportId);
   }
+
+  // Sampling is on every report type, including the standalone sampling one.
+  report.sampling = db.prepare('SELECT * FROM report_sampling WHERE report_id = ?').get(reportId) ?? null;
 
   report.photos = db.prepare('SELECT * FROM report_photos WHERE report_id = ? ORDER BY sort_order').all(reportId);
 

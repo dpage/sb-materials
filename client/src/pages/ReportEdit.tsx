@@ -15,9 +15,17 @@ import type {
   ReportPhoto,
   UnwantedMaterial,
   Contaminant,
+  ReportSampling,
 } from '../types';
 import { REPORT_TYPE_LABELS } from '../types';
 import { chunkBySizeAndCount } from '../utils/uploadChunks';
+import {
+  SAMPLING_COMPONENTS,
+  SAMPLING_PHOTO_LABEL,
+  formatSamplingPercent,
+  samplingTotals,
+  toWeight,
+} from '../utils/sampling';
 
 const YES_NO = ['YES', 'NO'];
 const YES_NO_NA = ['YES', 'NO', 'N/A'];
@@ -32,6 +40,39 @@ const PACKAGING_THRESHOLDS = [
 ];
 // Reserved photo_label used to group moisture-reading evidence photos
 const MOISTURE_PHOTO_LABEL = 'Moisture Readings';
+
+// Types that carry the inspection sections. Mirrors INSPECTION_REPORT_TYPES in
+// server/src/utils/report-loader.ts.
+const INSPECTION_REPORT_TYPES: ReportType[] = ['loading_inspection', 'quarterly_pern', 'loading_quarterly_pern'];
+
+function showsLoading(type: ReportType): boolean {
+  return type === 'loading_inspection' || type === 'loading_quarterly_pern';
+}
+
+function showsQuarterly(type: ReportType): boolean {
+  return type === 'quarterly_pern' || type === 'loading_quarterly_pern';
+}
+
+// Which stored lookup lists each report type draws on. The combined report
+// draws on both of the types whose sections it shows; the lists themselves are
+// still managed per type on the Lookups page.
+const LOOKUP_SOURCE_TYPES: Partial<Record<ReportType, ReportType[]>> = {
+  loading_inspection: ['loading_inspection'],
+  quarterly_pern: ['quarterly_pern'],
+  loading_quarterly_pern: ['loading_inspection', 'quarterly_pern'],
+};
+
+function dedupeLookups(lists: LookupValue[][]): LookupValue[] {
+  const seen = new Set<string>();
+  const out: LookupValue[] = [];
+  for (const value of lists.flat()) {
+    const key = value.value.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out.sort((a, b) => a.value.localeCompare(b.value));
+}
 
 // Verbatim legal wording from the original Google Forms (see reference/sample-reports).
 // These strings must match the originals exactly, including their idiosyncratic
@@ -87,6 +128,10 @@ export function ReportEdit() {
 
   // PERN
   const [pern, setPern] = useState<Partial<PernDetails>>({});
+
+  // Sampling (the bale break, reworked): on every report type, because a sample
+  // is always taken unless the area is unsafe.
+  const [sampling, setSampling] = useState<ReportSampling>({});
 
   // Photos
   const [photos, setPhotos] = useState<ReportPhoto[]>([]);
@@ -170,17 +215,22 @@ export function ReportEdit() {
     api.getLookups('lookup_clients').then(setClientOptions);
   }, []);
 
-  // Load lookups when report type changes
+  // Load lookups when report type changes. Lookup values are stored per report
+  // type, and the combined Loading & Qtr PERN report shows the sections of two
+  // types, so it reads both lists and merges them rather than making the lists
+  // be entered a third time.
   useEffect(() => {
-    if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
-      api.getLookups('lookup_product_grades', reportType).then(setProductGrades);
-      api.getLookups('lookup_unwanted_materials', reportType).then(setUnwantedOptions);
-      api.getLookups('lookup_contaminants', reportType).then(setContaminantOptions);
-      api.getLookups('lookup_storage_modes').then(setStorageModes);
+    const sourceTypes = LOOKUP_SOURCE_TYPES[reportType];
+    if (!sourceTypes) return;
 
-      if (reportType === 'loading_inspection') {
-        api.getLookups('lookup_product_descriptions', reportType).then(setProductDescs);
-      }
+    const merged = (table: string) => Promise.all(sourceTypes.map((t) => api.getLookups(table, t))).then(dedupeLookups);
+
+    merged('lookup_product_grades').then(setProductGrades);
+    merged('lookup_unwanted_materials').then(setUnwantedOptions);
+    merged('lookup_contaminants').then(setContaminantOptions);
+    api.getLookups('lookup_storage_modes').then(setStorageModes);
+    if (sourceTypes.includes('loading_inspection')) {
+      merged('lookup_product_descriptions').then(setProductDescs);
     }
   }, [reportType]);
 
@@ -249,6 +299,7 @@ export function ReportEdit() {
           }
           setPern(pd);
         }
+        setSampling(report.sampling ?? {});
         if (report.photos) setPhotos(report.photos);
         if (report.signature_path) setExistingSignature(report.signature_path);
       })
@@ -280,7 +331,10 @@ export function ReportEdit() {
         assigned_to_id: assignedToId === '' ? null : assignedToId,
       };
 
-      if (reportType === 'loading_inspection' || reportType === 'quarterly_pern') {
+      // Sampling goes on every report type, including the standalone one.
+      data.sampling = sampling;
+
+      if (INSPECTION_REPORT_TYPES.includes(reportType)) {
         data.inspection_details = details;
         data.unwanted_materials = unwantedMaterials.map((m) => ({
           material: m.material,
@@ -296,7 +350,7 @@ export function ReportEdit() {
         if (contaminantOther.trim()) {
           data.contaminants.push({ contaminant: 'Other', notes: contaminantOther.trim() });
         }
-        if (reportType === 'loading_inspection') {
+        if (showsLoading(reportType)) {
           data.containers = containers;
         }
       } else if (reportType === 'pern_audit') {
@@ -453,6 +507,19 @@ export function ReportEdit() {
     e.target.value = '';
   };
 
+  const handleSamplingPhotoAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles = Array.from(files).map((f) => ({
+      file: f,
+      label: SAMPLING_PHOTO_LABEL,
+      containerId: null as number | null,
+      previewUrl: URL.createObjectURL(f),
+    }));
+    setNewPhotos((prev) => [...prev, ...newFiles]);
+    e.target.value = '';
+  };
+
   const removeNewPhoto = (index: number) => {
     setNewPhotos((prev) => {
       URL.revokeObjectURL(prev[index].previewUrl);
@@ -488,8 +555,10 @@ export function ReportEdit() {
     </div>
   );
 
-  const isLoading = reportType === 'loading_inspection';
-  const isQuarterly = reportType === 'quarterly_pern';
+  // Which sections this report shows, rather than which type it is: the
+  // combined Loading & Qtr PERN report shows both sets.
+  const isLoading = showsLoading(reportType);
+  const isQuarterly = showsQuarterly(reportType);
   const isInspection = isLoading || isQuarterly;
   const isPern = reportType === 'pern_audit';
 
@@ -607,7 +676,13 @@ export function ReportEdit() {
             </div>
             <div>
               <label style={labelStyle}>
-                {isLoading ? 'Time Of First Loading' : isQuarterly ? 'Time Of Inspection' : 'Time of Inspection'}
+                {isLoading && isQuarterly
+                  ? 'Time Of Inspection / First Loading'
+                  : isLoading
+                    ? 'Time Of First Loading'
+                    : isQuarterly
+                      ? 'Time Of Inspection'
+                      : 'Time of Inspection'}
               </label>
               <input
                 type="time"
@@ -1003,35 +1078,10 @@ export function ReportEdit() {
               </div>
             </Section>
 
-            {isLoading && <Section title="Packaging Content">{packagingCheckboxes}</Section>}
-
-            {isQuarterly && (
-              <Section title="Bale Break">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <input
-                    type="checkbox"
-                    aria-label="Bale break performed?"
-                    checked={details.bale_break === 1}
-                    onChange={(e) => setDetails((d) => ({ ...d, bale_break: e.target.checked ? 1 : 0 }))}
-                  />
-                  Bale break performed?
-                </label>
-                {details.bale_break === 1 && (
-                  <>
-                    <div style={{ marginBottom: 12 }}>
-                      <label style={labelStyle}>Bale Break Results</label>
-                      <textarea
-                        value={details.bale_break_results || ''}
-                        onChange={(e) => setDetails((d) => ({ ...d, bale_break_results: e.target.value || null }))}
-                        style={{ ...inputStyle, minHeight: 60 }}
-                      />
-                    </div>
-                    <label style={labelStyle}>Packaging Content</label>
-                    {packagingCheckboxes}
-                  </>
-                )}
-              </Section>
-            )}
+            {/* Packaging Content used to be buried inside the bale break on a
+                quarterly report; with the bale break replaced by the sampling
+                section it stands on its own for every inspection type. */}
+            <Section title="Packaging Content">{packagingCheckboxes}</Section>
 
             {/* Quality Score */}
             <Section title="Quality & Result">
@@ -1219,11 +1269,25 @@ export function ReportEdit() {
         {/* PERN Audit Form */}
         {isPern && <PernAuditSection pern={pern} setPern={setPern} />}
 
+        {/* Sampling: the bale break, reworked, at the foot of every report */}
+        <SamplingSection
+          sampling={sampling}
+          setSampling={setSampling}
+          photos={photos}
+          newPhotos={newPhotos}
+          onAddPhotos={handleSamplingPhotoAdd}
+          onRemoveNewPhoto={removeNewPhoto}
+          onDeletePhoto={deleteExistingPhoto}
+        />
+
         {/* General Photos */}
         <Section title="Photos">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             {photos
-              .filter((p) => !p.container_id && p.photo_label !== MOISTURE_PHOTO_LABEL)
+              .filter(
+                (p) =>
+                  !p.container_id && p.photo_label !== MOISTURE_PHOTO_LABEL && p.photo_label !== SAMPLING_PHOTO_LABEL,
+              )
               .map((p) => (
                 <div key={p.id} style={photoThumbStyle}>
                   <img
@@ -1238,7 +1302,7 @@ export function ReportEdit() {
                 </div>
               ))}
             {newPhotos.map((p, idx) =>
-              p.containerId === null && p.label !== MOISTURE_PHOTO_LABEL ? (
+              p.containerId === null && p.label !== MOISTURE_PHOTO_LABEL && p.label !== SAMPLING_PHOTO_LABEL ? (
                 <div key={`new-${idx}`} style={photoThumbStyle}>
                   <img
                     src={p.previewUrl}
@@ -1436,6 +1500,216 @@ export function ReportEdit() {
   );
 }
 
+// Sampling: the bale break, reworked, at the foot of every report type. The
+// percentages beside each weight are worked out as they are typed rather than
+// stored, so a corrected weight cannot leave a stale percentage behind.
+function SamplingSection({
+  sampling,
+  setSampling,
+  photos,
+  newPhotos,
+  onAddPhotos,
+  onRemoveNewPhoto,
+  onDeletePhoto,
+}: {
+  sampling: ReportSampling;
+  setSampling: React.Dispatch<React.SetStateAction<ReportSampling>>;
+  photos: ReportPhoto[];
+  newPhotos: { file: File; label: string; containerId: number | null; previewUrl: string }[];
+  onAddPhotos: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveNewPhoto: (index: number) => void;
+  onDeletePhoto: (photoId: number) => void;
+}) {
+  const update = (field: keyof ReportSampling, value: any) => {
+    setSampling((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const notCarriedOut = sampling.not_carried_out === 1;
+  const sampleSize = sampling.sample_size_kg ?? '';
+  const totals = samplingTotals(sampling as Record<string, unknown>);
+
+  const weightRow = (label: string, field: keyof ReportSampling) => (
+    <div key={field} style={samplingRowStyle}>
+      <label style={{ ...labelStyle, marginBottom: 0 }}>{label}</label>
+      <input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        min="0"
+        aria-label={`${label} (kg)`}
+        value={(sampling[field] as number | string | null) ?? ''}
+        onChange={(e) => update(field, e.target.value === '' ? null : e.target.value)}
+        style={{ ...inputStyle, width: 120 }}
+        placeholder="kg"
+      />
+      <div style={samplingPercentStyle} aria-label={`${label} percentage`}>
+        {formatSamplingPercent(sampling[field], sampleSize) || '—'}
+      </div>
+    </div>
+  );
+
+  return (
+    <Section title="Sampling">
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <input
+          type="checkbox"
+          aria-label="Sampling not carried out"
+          checked={notCarriedOut}
+          onChange={(e) => update('not_carried_out', e.target.checked ? 1 : 0)}
+        />
+        Sampling not carried out
+      </label>
+
+      {notCarriedOut ? (
+        <div>
+          <label style={labelStyle}>Why not?</label>
+          <input
+            value={sampling.not_carried_out_reason || ''}
+            onChange={(e) => update('not_carried_out_reason', e.target.value || null)}
+            style={inputStyle}
+            placeholder="e.g. Area unsafe"
+          />
+        </div>
+      ) : (
+        <>
+          <div style={samplingRowStyle}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>Sample Size</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              aria-label="Sample Size (kg)"
+              value={sampleSize}
+              onChange={(e) => update('sample_size_kg', e.target.value === '' ? null : e.target.value)}
+              style={{ ...inputStyle, width: 120 }}
+              placeholder="kg"
+            />
+            <div style={{ ...samplingPercentStyle, color: '#95a5a6' }}>% of sample</div>
+          </div>
+
+          {SAMPLING_COMPONENTS.map((component) => weightRow(component.label, component.key))}
+
+          <div style={{ ...samplingRowStyle, borderTop: '1px solid #e4e7eb', paddingTop: 10, fontWeight: 700 }}>
+            <label style={{ ...labelStyle, marginBottom: 0, fontWeight: 700 }}>Total Accounted For</label>
+            <div style={{ width: 120 }} aria-label="Total accounted for">
+              {totals.accountedKg === null ? '—' : `${totals.accountedKg} kg`}
+            </div>
+            <div style={samplingPercentStyle} aria-label="Total accounted for percentage">
+              {totals.accountedPercent === null ? '—' : `${totals.accountedPercent.toFixed(1)}%`}
+            </div>
+          </div>
+
+          {totals.outOfBalance && (
+            <div role="status" style={samplingWarningStyle}>
+              The weights add up to {totals.accountedKg} kg, which is {Math.abs(totals.differenceKg as number)} kg{' '}
+              {(totals.differenceKg as number) > 0 ? 'more' : 'less'} than the sample size of {toWeight(sampleSize)} kg.
+            </div>
+          )}
+
+          <div style={{ ...formGrid, marginTop: 14 }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Prohibited Items Found</label>
+              <input
+                value={sampling.prohibited_items || ''}
+                onChange={(e) => update('prohibited_items', e.target.value || null)}
+                style={inputStyle}
+                placeholder="What was found"
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>PERN/PRN % Claimed</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                aria-label="PERN/PRN % Claimed"
+                value={sampling.pern_prn_claimed_percent ?? ''}
+                onChange={(e) => update('pern_prn_claimed_percent', e.target.value === '' ? null : e.target.value)}
+                style={inputStyle}
+                placeholder="%"
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Contamination Maximum Limit %</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="any"
+                aria-label="Contamination Maximum Limit %"
+                value={sampling.contamination_limit_percent ?? ''}
+                onChange={(e) => update('contamination_limit_percent', e.target.value === '' ? null : e.target.value)}
+                style={inputStyle}
+                placeholder="%"
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <label style={labelStyle}>Sampling Photos</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              {photos
+                .filter((p) => p.photo_label === SAMPLING_PHOTO_LABEL)
+                .map((p) => (
+                  <div key={p.id} style={photoThumbStyle}>
+                    <img
+                      src={api.getPhotoUrl(p.file_path)}
+                      alt="Sampling"
+                      style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 6 }}
+                    />
+                    <button onClick={() => onDeletePhoto(p.id)} style={photoRemoveBtn}>
+                      ×
+                    </button>
+                  </div>
+                ))}
+              {newPhotos.map((p, idx) =>
+                p.label === SAMPLING_PHOTO_LABEL ? (
+                  <div key={`s-${idx}`} style={photoThumbStyle}>
+                    <img
+                      src={p.previewUrl}
+                      alt=""
+                      style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 6 }}
+                    />
+                    <button onClick={() => onRemoveNewPhoto(idx)} style={photoRemoveBtn}>
+                      ×
+                    </button>
+                  </div>
+                ) : null,
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <label style={{ ...addBtnStyle, display: 'inline-block', cursor: 'pointer' }}>
+                + Add Photos
+                <input type="file" accept="image/*" multiple onChange={onAddPhotos} style={{ display: 'none' }} />
+              </label>
+              <label style={{ ...addBtnStyle, display: 'inline-block', cursor: 'pointer' }}>
+                Camera
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={onAddPhotos}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <label style={labelStyle}>Sampling Comments</label>
+            <textarea
+              value={sampling.comments || ''}
+              onChange={(e) => update('comments', e.target.value || null)}
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical' }}
+            />
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
 // PERN Audit Section
 function PernAuditSection({
   pern,
@@ -1555,6 +1829,22 @@ function PernAuditSection({
             <input
               value={pern.grades_supplied || ''}
               onChange={(e) => updateField('grades_supplied', e.target.value || null)}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Material Description</label>
+            <input
+              value={pern.product_description || ''}
+              onChange={(e) => updateField('product_description', e.target.value || null)}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Material Grade</label>
+            <input
+              value={pern.product_grade || ''}
+              onChange={(e) => updateField('product_grade', e.target.value || null)}
               style={inputStyle}
             />
           </div>
@@ -1875,15 +2165,6 @@ function PernAuditSection({
       <Section title="Results & Follow-up">
         <div style={formGrid}>
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Bale Split Results</label>
-            <textarea
-              value={pern.bale_split_results || ''}
-              onChange={(e) => updateField('bale_split_results', e.target.value || null)}
-              rows={2}
-              style={{ ...inputStyle, resize: 'vertical' }}
-            />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Quality Discussion</label>
             <textarea
               value={pern.quality_discussion || ''}
@@ -2095,4 +2376,27 @@ const photoRemoveBtn: React.CSSProperties = {
   lineHeight: '22px',
   textAlign: 'center',
   padding: 0,
+};
+
+const samplingRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  padding: '6px 0',
+};
+
+const samplingPercentStyle: React.CSSProperties = {
+  width: 90,
+  textAlign: 'right',
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const samplingWarningStyle: React.CSSProperties = {
+  marginTop: 8,
+  padding: '8px 12px',
+  borderRadius: 8,
+  background: '#fef9e7',
+  border: '1px solid #f1c40f',
+  color: '#8a6d1b',
+  fontSize: 13,
 };

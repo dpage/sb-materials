@@ -930,3 +930,152 @@ describe('test deployment watermark', () => {
     expect(extractPdfText(buffer)).not.toContain('PRE-PROD');
   });
 });
+
+describe('sampling section', () => {
+  let tmpDir: string;
+
+  const sampling = {
+    sample_size_kg: 500,
+    in_scope_kg: 440,
+    out_of_scope_kg: 30,
+    contamination_kg: 25,
+    prohibited_kg: 5,
+    prohibited_items: 'Aerosol can',
+    pern_prn_claimed_percent: 95,
+    contamination_limit_percent: 4,
+    comments: 'Bale broken in the yard',
+  };
+
+  function reportFor(reportType: string, overrides: any = {}) {
+    return {
+      id: 7,
+      report_type: reportType,
+      customer_name: 'Acme Recycling Ltd',
+      site_address: '1 Example Way',
+      inspection_date: '2026-10-13',
+      inspector_name: 'Insp',
+      inspection_details: {},
+      pern_details: {},
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [],
+      sampling,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-sampling-'));
+  });
+
+  it.each(['loading_inspection', 'quarterly_pern', 'pern_audit', 'loading_quarterly_pern', 'sampling'])(
+    'prints the weights and their percentages on a %s report',
+    async (reportType) => {
+      const text = extractPdfText(await generatePdf(reportFor(reportType) as any, tmpDir));
+      expect(text).toContain('Sampling');
+      expect(text).toContain('Sample Size');
+      expect(text).toContain('500 kg');
+      expect(text).toContain('Post Consumer Packaging In Scope');
+      expect(text).toContain('88.0%');
+      expect(text).toContain('Post Consumer Packaging NOT In Scope');
+      expect(text).toContain('Prohibited Items');
+      expect(text).toContain('Total Accounted For');
+      expect(text).toContain('PERN/PRN % Claimed');
+      expect(text).toContain('Contamination Maximum Limit %');
+      expect(text).toContain('Bale broken in the yard');
+      expect(text).toContain('Aerosol can');
+    },
+  );
+
+  it('prints the reason instead of the figures when sampling was not carried out', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('quarterly_pern', {
+          sampling: { not_carried_out: 1, not_carried_out_reason: 'Area unsafe' },
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Sampling not carried out');
+    expect(text).toContain('Area unsafe');
+    expect(text).not.toContain('Total Accounted For');
+  });
+
+  it('prints nothing at all when a report has no sampling', async () => {
+    const text = extractPdfText(await generatePdf(reportFor('quarterly_pern', { sampling: null }) as any, tmpDir));
+    expect(text).not.toContain('Sample Size');
+  });
+
+  it('no longer prints bale break fields on a new report, but still does on an old one', async () => {
+    const fresh = extractPdfText(await generatePdf(reportFor('quarterly_pern') as any, tmpDir));
+    expect(fresh).not.toContain('Bale Break');
+
+    const legacy = extractPdfText(
+      await generatePdf(
+        reportFor('quarterly_pern', {
+          inspection_details: { bale_break: 1, bale_break_results: '5% contamination' },
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(legacy).toContain('Bale Break Results');
+    expect(legacy).toContain('5% contamination');
+  });
+
+  it('prints the loading and quarterly sections together on the combined report', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('loading_quarterly_pern', {
+          inspection_details: { loading_reference: 'LR-1', product_description: 'Baled OCC', stock_bale_count: '50' },
+          unwanted_materials: [{ material: 'Cores' }],
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Loading & Quarterly PERN Inspection');
+    expect(text).toContain('Time Of Inspection / First Loading');
+    expect(text).toContain('Loading Reference Number');
+    expect(text).toContain('Stock & Bale Count');
+    expect(text).toContain('Unwanted Materials');
+    expect(text).toContain('Compliance');
+    expect(text).toContain('Sampling');
+  });
+
+  it('prints the material description and grade on a PERN audit', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('pern_audit', {
+          pern_details: { product_description: 'Baled OCC', product_grade: 'Grade A' },
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Material Description');
+    expect(text).toContain('Baled OCC');
+    expect(text).toContain('Material Grade');
+    expect(text).toContain('Grade A');
+    expect(text).not.toContain('Bale Split Results');
+  });
+
+  it('keeps the bale split results on an older PERN audit that has them', async () => {
+    const text = extractPdfText(
+      await generatePdf(reportFor('pern_audit', { pern_details: { bale_split_results: '50/50' } }) as any, tmpDir),
+    );
+    expect(text).toContain('Bale Split Results');
+    expect(text).toContain('50/50');
+  });
+
+  it('renders the standalone sampling report as the header, the block and the notes', async () => {
+    const text = extractPdfText(
+      await generatePdf(reportFor('sampling', { other_information: 'Yard was busy' }) as any, tmpDir),
+    );
+    expect(text).toContain('Sampling Report');
+    expect(text).toContain('Date of Sampling');
+    expect(text).toContain('Acme Recycling Ltd');
+    expect(text).toContain('Yard was busy');
+    expect(text).toContain('Signature');
+    expect(text).not.toContain('Compliance');
+    expect(text).not.toContain('Unwanted Materials');
+  });
+});

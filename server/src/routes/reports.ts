@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { requireAuth } from '../middleware/auth';
 import { loadReportWithDetails, INSPECTION_REPORT_TYPES } from '../utils/report-loader';
+import { isSamplingEmpty, toWeight } from '../utils/sampling';
 import { config } from '../config';
 import { removeUploadDir } from '../utils/uploads';
 
@@ -137,6 +138,7 @@ export function reportRoutes(db: Database.Database): Router {
       contaminants,
       containers,
       pern_details,
+      sampling,
     } = req.body;
 
     if (!report_type || !customer_id || !site_id || !inspection_date || !inspector_name) {
@@ -179,6 +181,9 @@ export function reportRoutes(db: Database.Database): Router {
       }
       if (report_type === 'pern_audit' && pern_details) {
         savePernDetails(db, reportId, pern_details);
+      }
+      if (sampling && !isSamplingEmpty(sampling)) {
+        saveSampling(db, reportId, sampling);
       }
 
       // Save unwanted materials
@@ -247,6 +252,7 @@ export function reportRoutes(db: Database.Database): Router {
       contaminants,
       containers,
       pern_details,
+      sampling,
     } = req.body;
 
     const reportId = parseInt(req.params.id, 10);
@@ -306,6 +312,16 @@ export function reportRoutes(db: Database.Database): Router {
       if (rType === 'pern_audit' && pern_details) {
         db.prepare('DELETE FROM report_pern_details WHERE report_id = ?').run(reportId);
         savePernDetails(db, reportId, pern_details);
+      }
+
+      // Sampling is replaced wholesale when the client sends it, and cleared
+      // when what it sends is empty, so unticking "not carried out" and wiping
+      // the weights leaves no orphaned row behind.
+      if (sampling !== undefined) {
+        db.prepare('DELETE FROM report_sampling WHERE report_id = ?').run(reportId);
+        if (sampling && !isSamplingEmpty(sampling)) {
+          saveSampling(db, reportId, sampling);
+        }
       }
 
       // Replace unwanted materials
@@ -450,6 +466,30 @@ export function reportRoutes(db: Database.Database): Router {
   return router;
 }
 
+function saveSampling(db: Database.Database, reportId: number, d: any): void {
+  db.prepare(
+    `INSERT INTO report_sampling (
+      report_id, not_carried_out, not_carried_out_reason, sample_size_kg,
+      in_scope_kg, out_of_scope_kg, contamination_kg, prohibited_kg,
+      prohibited_items, pern_prn_claimed_percent, contamination_limit_percent,
+      comments
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    reportId,
+    d.not_carried_out ? 1 : 0,
+    d.not_carried_out_reason ?? null,
+    toWeight(d.sample_size_kg),
+    toWeight(d.in_scope_kg),
+    toWeight(d.out_of_scope_kg),
+    toWeight(d.contamination_kg),
+    toWeight(d.prohibited_kg),
+    d.prohibited_items ?? null,
+    toWeight(d.pern_prn_claimed_percent),
+    toWeight(d.contamination_limit_percent),
+    d.comments ?? null,
+  );
+}
+
 function saveInspectionDetails(db: Database.Database, reportId: number, d: any): void {
   db.prepare(
     `INSERT INTO report_inspection_details (
@@ -507,8 +547,9 @@ function savePernDetails(db: Database.Database, reportId: number, d: any): void 
       prn_claimed_once, training_types, training_scope,
       training_recording, training_review_frequency, training_records_inspected,
       workers_consistent, bale_split_results, quality_discussion,
-      follow_up, notes, auditor_position, intro_letter
-    ) VALUES (${Array(48).fill('?').join(', ')})`,
+      follow_up, notes, auditor_position, intro_letter,
+      product_description, product_grade
+    ) VALUES (${Array(50).fill('?').join(', ')})`,
   ).run(
     reportId,
     d.company_name_address ?? null,
@@ -558,5 +599,7 @@ function savePernDetails(db: Database.Database, reportId: number, d: any): void 
     d.notes ?? null,
     d.auditor_position ?? null,
     d.intro_letter ?? null,
+    d.product_description ?? null,
+    d.product_grade ?? null,
   );
 }

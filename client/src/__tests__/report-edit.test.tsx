@@ -469,15 +469,15 @@ describe('ReportEdit - New Report', () => {
     expect(screen.getByText('OCC exceeds 80%')).toBeInTheDocument();
   });
 
-  it('Quarterly PERN reveals bale-break fields when toggled on', async () => {
+  it('offers the packaging content checkboxes on a quarterly report in their own right', async () => {
     renderNew();
     await screen.findByText('New Report');
     fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
-    const toggle = await screen.findByLabelText('Bale break performed?');
-    expect(screen.queryByText('Bale Break Results')).not.toBeInTheDocument();
-    fireEvent.click(toggle);
-    expect(await screen.findByText('Bale Break Results')).toBeInTheDocument();
+    expect(await screen.findByText('Packaging Content')).toBeInTheDocument();
     expect(screen.getByText('OCC exceeds 97.5%')).toBeInTheDocument();
+    // The bale break has been replaced by the sampling section.
+    expect(screen.queryByLabelText('Bale break performed?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bale Break Results')).not.toBeInTheDocument();
   });
 
   it('should save as draft', async () => {

@@ -5,6 +5,22 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import { logger } from './logger';
 import { SB_LOGO_DATA_URL } from './logo';
 import { imageFileToJpegDataUrl, PDF_MAX_DIM, PDF_QUALITY } from './image';
+import {
+  SAMPLING_COMPONENTS,
+  SAMPLING_PHOTO_LABEL,
+  SAMPLING_HEADING,
+  SAMPLING_NOT_CARRIED_OUT_LABEL,
+  SAMPLING_SAMPLE_SIZE_LABEL,
+  SAMPLING_TOTAL_LABEL,
+  SAMPLING_PROHIBITED_ITEMS_LABEL,
+  SAMPLING_CLAIMED_LABEL,
+  SAMPLING_LIMIT_LABEL,
+  SAMPLING_COMMENTS_LABEL,
+  formatSamplingPercent,
+  isSamplingEmpty,
+  samplingTotals,
+  toWeight,
+} from './sampling';
 import type { PdfOptions } from './watermark';
 import {
   UNWANTED_MATERIAL_QUESTION,
@@ -15,7 +31,18 @@ import {
   notifySiteLine,
 } from './wording';
 
-const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern'];
+const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern', 'loading_quarterly_pern'];
+
+// Which sections a report shows, rather than which type it is: the combined
+// Loading & Quarterly PERN report shows both sets, so every test of the type
+// that used to gate a section goes through these instead.
+function showsLoading(type: string): boolean {
+  return type === 'loading_inspection' || type === 'loading_quarterly_pern';
+}
+
+function showsQuarterly(type: string): boolean {
+  return type === 'quarterly_pern' || type === 'loading_quarterly_pern';
+}
 
 // A4 portrait in PDF points, and the page margins every report shares.
 const PAGE_HEIGHT = 841.89;
@@ -63,6 +90,8 @@ function formatReportType(type: string): string {
     loading_inspection: 'Loading & Inspection',
     quarterly_pern: 'Quarterly PERN Inspection',
     pern_audit: 'Packaging Regulations Supplier Declaration & Audit Form',
+    loading_quarterly_pern: 'Loading & Quarterly PERN Inspection',
+    sampling: 'Sampling Report',
   };
   return map[type] || type;
 }
@@ -178,6 +207,8 @@ export async function generatePdf(report: any, uploadsDir: string, options: PdfO
 
   if (report.report_type === 'pern_audit') {
     buildPernAudit(content, report, uploadsDir, photoData);
+  } else if (report.report_type === 'sampling') {
+    buildSamplingReport(content, report, uploadsDir, photoData);
   } else if (INSPECTION_TYPES.includes(report.report_type) || report.report_type.startsWith('inspection_')) {
     buildInspectionReport(content, report, uploadsDir, photoData);
   }
@@ -244,8 +275,9 @@ export async function generatePdf(report: any, uploadsDir: string, options: PdfO
 
 function buildInspectionReport(content: Content[], report: any, uploadsDir: string, photoData: Map<string, string>) {
   const d = report.inspection_details || {};
-  const isLoading = report.report_type === 'loading_inspection';
-  const isQuarterlyPern = report.report_type === 'quarterly_pern';
+  const isLoading = showsLoading(report.report_type);
+  const isQuarterlyPern = showsQuarterly(report.report_type);
+  const isCombined = isLoading && isQuarterlyPern;
 
   // Header fields
   const headerRows: TableCell[][] = [
@@ -261,7 +293,10 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
 
   headerRows.push(
     ...fieldRow('Date of Inspection', report.inspection_date),
-    ...fieldRow(isLoading ? 'Time Of First Loading' : 'Time Of Inspection', report.inspection_time || '-'),
+    ...fieldRow(
+      isCombined ? 'Time Of Inspection / First Loading' : isLoading ? 'Time Of First Loading' : 'Time Of Inspection',
+      report.inspection_time || '-',
+    ),
     ...fieldRow('Inspector', report.inspector_name),
   );
 
@@ -284,9 +319,12 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     headerRows.push(...fieldRow('Rejected Bales', d.rejected_bales));
   }
 
-  if (isQuarterlyPern) {
+  // The bale break has been superseded by the sampling section at the foot of
+  // every report, so these are printed only for reports filed before the
+  // change that actually carry a value.
+  if (d.bale_break || d.bale_break_results) {
     headerRows.push(...fieldRow('Bale Break Performed', yesNo(d.bale_break)));
-    if (d.bale_break) {
+    if (d.bale_break_results) {
       headerRows.push(...fieldRow('Bale Break Results', d.bale_break_results));
     }
   }
@@ -422,7 +460,7 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
 
   // General photos (moisture-grouped photos are shown in their own section above)
   const generalPhotos = (report.photos || []).filter(
-    (p: any) => !p.container_id && p.photo_label !== 'Moisture Readings',
+    (p: any) => !p.container_id && p.photo_label !== 'Moisture Readings' && p.photo_label !== SAMPLING_PHOTO_LABEL,
   );
   if (generalPhotos.length) {
     content.push({
@@ -448,6 +486,8 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     });
     content.push({ text: report.other_information, margin: [0, 0, 0, 10] as [number, number, number, number] });
   }
+
+  appendSamplingSection(content, report, photoData);
 
   // Signature & completion
   appendSignatureBlock(content, report, uploadsDir);
@@ -520,6 +560,8 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     ...fieldRow('Email', p.email),
     ...fieldRow('Phone', p.phone),
     ...fieldRow('Grades Supplied', p.grades_supplied),
+    ...fieldRow('Material Description', p.product_description),
+    ...fieldRow('Material Grade', p.product_grade),
     ...fieldRow('Inspector / Auditor', report.inspector_name),
   ];
 
@@ -617,14 +659,16 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     margin: [0, 0, 0, 10] as [number, number, number, number],
   });
 
-  // Bale Split & Quality
+  // Quality discussion. The bale split results that used to head this section
+  // are now the sampling section at the foot of the report, and are printed
+  // here only for audits filed before the change.
   content.push({
-    text: 'Bale Split & Quality Discussion',
+    text: 'Quality Discussion',
     style: 'subheader',
     margin: [0, 10, 0, 5] as [number, number, number, number],
   });
   const resultRows: TableCell[][] = [
-    ...fieldRow('Bale Split Results', p.bale_split_results),
+    ...(p.bale_split_results ? fieldRow('Bale Split Results', p.bale_split_results) : []),
     ...fieldRow('Quality Discussion', p.quality_discussion),
     ...fieldRow('Follow Up', p.follow_up),
     ...fieldRow('Notes', p.notes),
@@ -636,7 +680,7 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
   });
 
   // Photos
-  const photos = report.photos || [];
+  const photos = (report.photos || []).filter((p: any) => p.photo_label !== SAMPLING_PHOTO_LABEL);
   if (photos.length) {
     content.push({
       text: 'Photos & Supporting Documents',
@@ -665,6 +709,164 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     layout: 'lightHorizontalLines',
     margin: [0, 0, 0, 10] as [number, number, number, number],
   });
+
+  appendSamplingSection(content, report, photoData);
+
+  appendSignatureBlock(content, report, uploadsDir);
+}
+
+// ─── Sampling ───
+
+/**
+ * The sampling section, printed at the foot of every report type: the weights
+ * with their percentage of the sample size alongside, the claimed and limit
+ * percentages, the comments, and the sampling photos. Nothing is printed when
+ * the report carries no sampling row at all, so reports filed before the
+ * change are unaffected.
+ */
+function appendSamplingSection(content: Content[], report: any, photoData: Map<string, string>) {
+  const s = report.sampling;
+  if (isSamplingEmpty(s)) return;
+
+  content.push({
+    text: SAMPLING_HEADING,
+    style: 'subheader',
+    margin: [0, 15, 0, 5] as [number, number, number, number],
+  });
+
+  if (s.not_carried_out) {
+    content.push({
+      table: {
+        widths: [220, '*'],
+        body: [...fieldRow(SAMPLING_NOT_CARRIED_OUT_LABEL, s.not_carried_out_reason || 'YES')],
+      },
+      layout: 'lightHorizontalLines',
+      margin: [0, 0, 0, 10] as [number, number, number, number],
+    });
+    return;
+  }
+
+  const sampleSize = toWeight(s.sample_size_kg);
+  const kg = (value: number | null) => (value === null ? '-' : `${value} kg`);
+  const body: TableCell[][] = [
+    [
+      { text: '', bold: true },
+      { text: 'Weight', bold: true, alignment: 'right' as const },
+      { text: '% of Sample', bold: true, alignment: 'right' as const },
+    ],
+    [
+      { text: SAMPLING_SAMPLE_SIZE_LABEL, bold: true },
+      { text: kg(sampleSize), alignment: 'right' as const },
+      { text: '', alignment: 'right' as const },
+    ],
+  ];
+  for (const component of SAMPLING_COMPONENTS) {
+    const weight = toWeight(s[component.key]);
+    body.push([
+      { text: component.label },
+      { text: kg(weight), alignment: 'right' as const },
+      { text: formatSamplingPercent(weight, sampleSize) || '-', alignment: 'right' as const },
+    ]);
+  }
+
+  const totals = samplingTotals(s);
+  body.push([
+    { text: SAMPLING_TOTAL_LABEL, bold: true },
+    { text: kg(totals.accountedKg), bold: true, alignment: 'right' as const },
+    {
+      text: totals.accountedPercent === null ? '-' : `${totals.accountedPercent.toFixed(1)}%`,
+      bold: true,
+      alignment: 'right' as const,
+    },
+  ]);
+
+  content.push({
+    table: { widths: ['*', 90, 90], headerRows: 1, body },
+    layout: 'lightHorizontalLines',
+    margin: [0, 0, 0, 10] as [number, number, number, number],
+  });
+
+  const detailRows: TableCell[][] = [];
+  if (s.prohibited_items) {
+    detailRows.push(...fieldRow(SAMPLING_PROHIBITED_ITEMS_LABEL, s.prohibited_items));
+  }
+  const percent = (value: any) => {
+    const num = toWeight(value);
+    return num === null ? '-' : `${num}%`;
+  };
+  detailRows.push(
+    ...fieldRow(SAMPLING_CLAIMED_LABEL, percent(s.pern_prn_claimed_percent)),
+    ...fieldRow(SAMPLING_LIMIT_LABEL, percent(s.contamination_limit_percent)),
+  );
+  if (s.comments) {
+    detailRows.push(...fieldRow(SAMPLING_COMMENTS_LABEL, s.comments));
+  }
+  content.push({
+    table: { widths: [220, '*'], body: detailRows },
+    layout: 'lightHorizontalLines',
+    margin: [0, 0, 0, 10] as [number, number, number, number],
+  });
+
+  const samplingPhotos = (report.photos || []).filter((p: any) => p.photo_label === SAMPLING_PHOTO_LABEL);
+  if (samplingPhotos.length) {
+    content.push({
+      text: 'Sampling Photos',
+      style: 'subheader',
+      margin: [0, 10, 0, 5] as [number, number, number, number],
+    });
+    for (const photo of samplingPhotos) {
+      const base64 = photoData.get(photo.file_path) ?? null;
+      if (base64) content.push(photoBlock(base64, null));
+    }
+  }
+}
+
+/**
+ * The standalone sampling report: the usual report header, the sampling
+ * section, the notes, and the signature. Used at sites where sampling is all
+ * that is required.
+ */
+function buildSamplingReport(content: Content[], report: any, uploadsDir: string, photoData: Map<string, string>) {
+  const headerRows: TableCell[][] = [
+    ...fieldRow('Report Reference', `SBM-${String(report.id).padStart(5, '0')}`),
+    ...fieldRow('Status', (report.status || 'draft').charAt(0).toUpperCase() + (report.status || 'draft').slice(1)),
+    ...fieldRow('Supplier Name', report.customer_name),
+    ...fieldRow('Site Address', report.site_address),
+    ...(report.on_behalf_of ? fieldRow('On Behalf Of', report.on_behalf_of) : []),
+    ...fieldRow('Date of Sampling', report.inspection_date),
+    ...fieldRow('Time Of Sampling', report.inspection_time || '-'),
+    ...fieldRow('Inspector', report.inspector_name),
+  ];
+  content.push({
+    table: { widths: [180, '*'], body: headerRows },
+    layout: 'lightHorizontalLines',
+    margin: [0, 0, 0, 10] as [number, number, number, number],
+  });
+
+  appendSamplingSection(content, report, photoData);
+
+  // Any photo that is not sampling evidence still belongs in the document.
+  const otherPhotos = (report.photos || []).filter((p: any) => p.photo_label !== SAMPLING_PHOTO_LABEL);
+  if (otherPhotos.length) {
+    content.push({
+      text: 'Photos',
+      style: 'subheader',
+      margin: [0, 10, 0, 5] as [number, number, number, number],
+    });
+    for (const photo of otherPhotos) {
+      const base64 = photoData.get(photo.file_path) ?? null;
+      if (base64) content.push(photoBlock(base64, photo.photo_label));
+    }
+  }
+
+  if (report.other_information) {
+    content.push({
+      text: 'Notes',
+      style: 'subheader',
+      margin: [0, 15, 0, 5] as [number, number, number, number],
+    });
+    content.push({ text: report.other_information, margin: [0, 0, 0, 10] as [number, number, number, number] });
+  }
 
   appendSignatureBlock(content, report, uploadsDir);
 }
