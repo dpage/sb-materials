@@ -12,6 +12,8 @@ import {
   SAMPLING_NOT_CARRIED_OUT_LABEL,
   SAMPLING_SAMPLE_SIZE_LABEL,
   SAMPLING_TOTAL_LABEL,
+  SAMPLING_PRODUCT_DESCRIPTION_LABEL,
+  SAMPLING_PRODUCT_GRADE_LABEL,
   SAMPLING_PROHIBITED_ITEMS_LABEL,
   SAMPLING_CLAIMED_LABEL,
   SAMPLING_LIMIT_LABEL,
@@ -744,6 +746,23 @@ function appendSamplingSection(content: Content[], report: any, photoData: Map<s
       margin: [0, 0, 0, 10] as [number, number, number, number],
     });
     return;
+  }
+
+  // What was sampled, before the weights: the grade and description are
+  // properties of the material, so they read as the heading to the table
+  // rather than as another figure in it.
+  if (s.product_description || s.product_grade) {
+    content.push({
+      table: {
+        widths: [220, '*'],
+        body: [
+          ...(s.product_description ? fieldRow(SAMPLING_PRODUCT_DESCRIPTION_LABEL, s.product_description) : []),
+          ...(s.product_grade ? fieldRow(SAMPLING_PRODUCT_GRADE_LABEL, s.product_grade) : []),
+        ],
+      },
+      layout: 'lightHorizontalLines',
+      margin: [0, 0, 0, 10] as [number, number, number, number],
+    });
   }
 
   const sampleSize = toWeight(s.sample_size_kg);

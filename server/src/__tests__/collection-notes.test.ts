@@ -124,8 +124,8 @@ describe('collection note schema', () => {
       .prepare('INSERT INTO collection_notes (reference, customer_id) VALUES (?, ?)')
       .run('SBM1', cust.lastInsertRowid);
     db.prepare(
-      'INSERT INTO collection_note_items (note_id, quantity, description, collection_point, sort_order) VALUES (?, ?, ?, ?, ?)',
-    ).run(note.lastInsertRowid, '1x', 'Poly cup reels', 'Bay 3', 0);
+      'INSERT INTO collection_note_items (note_id, quantity, description, reference, sort_order) VALUES (?, ?, ?, ?, ?)',
+    ).run(note.lastInsertRowid, '1x', 'Poly cup reels', 'REF-1', 0);
 
     db.prepare('DELETE FROM collection_notes WHERE id = ?').run(note.lastInsertRowid);
 
@@ -162,8 +162,14 @@ describe('collection note routes', () => {
     collection_date: '2026-08-03',
     transport_company: 'Test Haulage',
     items: [
-      { quantity: '1x', description: 'Poly cup reels', nett_weight: '1250', collection_point: 'Bay 3' },
-      { quantity: '2x', description: 'Mixed paper bales', nett_weight: '980', collection_point: 'Yard' },
+      {
+        quantity: '1x',
+        description: 'Poly cup reels',
+        nett_weight: '1250',
+        reference: 'REF-1',
+        vehicle_registration: 'AB12 CDE',
+      },
+      { quantity: '2x', description: 'Mixed paper bales', nett_weight: '980', reference: 'REF-2' },
     ],
   });
 
@@ -190,7 +196,105 @@ describe('collection note routes', () => {
     expect(fetched.body.items).toHaveLength(2);
     expect(fetched.body.items[0].description).toBe('Poly cup reels');
     expect(fetched.body.items[0].nett_weight).toBe('1250');
+    expect(fetched.body.items[0].reference).toBe('REF-1');
+    expect(fetched.body.items[0].vehicle_registration).toBe('AB12 CDE');
     expect(fetched.body.items[1].sort_order).toBe(1);
+  });
+
+  it('stores the container details on a containerised line', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        items: [
+          {
+            quantity: '1x',
+            description: 'Poly cup reels',
+            reference: 'REF-1',
+            is_container: 1,
+            container_number: 'ABCU1234567',
+            seal_number: 'SEAL-9',
+          },
+        ],
+      })
+      .expect(200);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.items[0]).toMatchObject({
+      is_container: 1,
+      container_number: 'ABCU1234567',
+      seal_number: 'SEAL-9',
+    });
+  });
+
+  it('forgets the container number and seal once a line is no longer a container', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        items: [
+          {
+            quantity: '1x',
+            description: 'Poly cup reels',
+            is_container: 1,
+            container_number: 'ABCU1234567',
+            seal_number: 'SEAL-9',
+          },
+        ],
+      })
+      .expect(200);
+
+    await supertest(app)
+      .put(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        items: [
+          {
+            quantity: '1x',
+            description: 'Poly cup reels',
+            is_container: 0,
+            container_number: 'ABCU1234567',
+            seal_number: 'SEAL-9',
+          },
+        ],
+      })
+      .expect(200);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.items[0]).toMatchObject({
+      is_container: 0,
+      container_number: null,
+      seal_number: null,
+    });
+  });
+
+  it('keeps a line that says nothing but its vehicle registration or container details', async () => {
+    const created = await supertest(app)
+      .post('/api/collection-notes')
+      .set('Cookie', cookie)
+      .send({
+        ...validNote(),
+        items: [
+          { quantity: '', description: '', vehicle_registration: 'AB12 CDE' },
+          { quantity: '', description: '', is_container: 1, container_number: 'ABCU1234567' },
+        ],
+      })
+      .expect(200);
+
+    const fetched = await supertest(app)
+      .get(`/api/collection-notes/${created.body.id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(fetched.body.items).toHaveLength(2);
   });
 
   it('records the creating user', async () => {
@@ -249,7 +353,7 @@ describe('collection note routes', () => {
       .send({
         ...validNote(),
         minimum_weight: '26t',
-        items: [{ quantity: '5x', description: 'Shrink wrap', collection_point: 'Bay 1' }],
+        items: [{ quantity: '5x', description: 'Shrink wrap', reference: 'REF-5' }],
       })
       .expect(200);
 
@@ -273,9 +377,9 @@ describe('collection note routes', () => {
       .send({
         ...validNote(),
         items: [
-          { quantity: '1x', description: 'Poly cup reels', collection_point: 'Bay 3' },
-          { quantity: '', description: '', collection_point: '' },
-          { quantity: null, description: null, collection_point: null },
+          { quantity: '1x', description: 'Poly cup reels', reference: 'REF-1' },
+          { quantity: '', description: '', reference: '' },
+          { quantity: null, description: null, reference: null },
         ],
       })
       .expect(200);
@@ -292,7 +396,7 @@ describe('collection note routes', () => {
     const created = await supertest(app)
       .post('/api/collection-notes')
       .set('Cookie', cookie)
-      .send({ ...validNote(), items: [{ quantity: '', description: '', collection_point: '' }] })
+      .send({ ...validNote(), items: [{ quantity: '', description: '', reference: '' }] })
       .expect(200);
 
     const fetched = await supertest(app)
@@ -425,7 +529,7 @@ describe('collection note routes', () => {
       .send({
         ...validNote(),
         reference: 'SBM77',
-        items: [{ quantity: '1x', description: 'Widget offcuts', collection_point: 'Bay 9' }],
+        items: [{ quantity: '1x', description: 'Widget offcuts', reference: 'REF-9' }],
       })
       .expect(200);
 

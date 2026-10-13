@@ -62,6 +62,18 @@ const LOOKUP_SOURCE_TYPES: Partial<Record<ReportType, ReportType[]>> = {
   loading_quarterly_pern: ['loading_inspection', 'quarterly_pern'],
 };
 
+/**
+ * The values to offer in a lookup dropdown: the list, plus whatever is already
+ * stored on the record, so a value that has since been deactivated (or was
+ * entered against another report type) still shows rather than reading as
+ * blank and being lost on the next save.
+ */
+function lookupOptions(values: LookupValue[], current: string | null | undefined): string[] {
+  const options = values.map((v) => v.value);
+  if (current && !options.some((v) => v.toLowerCase() === current.toLowerCase())) options.unshift(current);
+  return options;
+}
+
 function dedupeLookups(lists: LookupValue[][]): LookupValue[] {
   const seen = new Set<string>();
   const out: LookupValue[] = [];
@@ -155,6 +167,12 @@ export function ReportEdit() {
   const [sites, setSites] = useState<CustomerSite[]>([]);
   const [productDescs, setProductDescs] = useState<LookupValue[]>([]);
   const [productGrades, setProductGrades] = useState<LookupValue[]>([]);
+  // The sampling block appears on every report type, including the standalone
+  // Sampling report, which has no product lists of its own, so its two
+  // dropdowns offer every value entered against any type rather than the
+  // per-type lists the inspection sections use.
+  const [allProductDescs, setAllProductDescs] = useState<LookupValue[]>([]);
+  const [allProductGrades, setAllProductGrades] = useState<LookupValue[]>([]);
   const [storageModes, setStorageModes] = useState<LookupValue[]>([]);
   const [unwantedOptions, setUnwantedOptions] = useState<LookupValue[]>([]);
   const [contaminantOptions, setContaminantOptions] = useState<LookupValue[]>([]);
@@ -213,6 +231,8 @@ export function ReportEdit() {
   // Load global lookups once on mount
   useEffect(() => {
     api.getLookups('lookup_clients').then(setClientOptions);
+    api.getLookups('lookup_product_descriptions').then((values) => setAllProductDescs(dedupeLookups([values])));
+    api.getLookups('lookup_product_grades').then((values) => setAllProductGrades(dedupeLookups([values])));
   }, []);
 
   // Load lookups when report type changes. Lookup values are stored per report
@@ -1273,6 +1293,8 @@ export function ReportEdit() {
         <SamplingSection
           sampling={sampling}
           setSampling={setSampling}
+          productDescriptions={allProductDescs}
+          productGrades={allProductGrades}
           photos={photos}
           newPhotos={newPhotos}
           onAddPhotos={handleSamplingPhotoAdd}
@@ -1506,6 +1528,8 @@ export function ReportEdit() {
 function SamplingSection({
   sampling,
   setSampling,
+  productDescriptions,
+  productGrades,
   photos,
   newPhotos,
   onAddPhotos,
@@ -1514,6 +1538,8 @@ function SamplingSection({
 }: {
   sampling: ReportSampling;
   setSampling: React.Dispatch<React.SetStateAction<ReportSampling>>;
+  productDescriptions: LookupValue[];
+  productGrades: LookupValue[];
   photos: ReportPhoto[];
   newPhotos: { file: File; label: string; containerId: number | null; previewUrl: string }[];
   onAddPhotos: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -1572,6 +1598,41 @@ function SamplingSection({
         </div>
       ) : (
         <>
+          <div style={{ ...formGrid, marginBottom: 14 }}>
+            <div>
+              <label style={labelStyle}>Product Description</label>
+              <select
+                aria-label="Sampling Product Description"
+                value={sampling.product_description || ''}
+                onChange={(e) => update('product_description', e.target.value || null)}
+                style={inputStyle}
+              >
+                <option value="">Select...</option>
+                {lookupOptions(productDescriptions, sampling.product_description).map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Product Grade</label>
+              <select
+                aria-label="Sampling Product Grade"
+                value={sampling.product_grade || ''}
+                onChange={(e) => update('product_grade', e.target.value || null)}
+                style={inputStyle}
+              >
+                <option value="">Select...</option>
+                {lookupOptions(productGrades, sampling.product_grade).map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div style={samplingRowStyle}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>Sample Size</label>
             <input

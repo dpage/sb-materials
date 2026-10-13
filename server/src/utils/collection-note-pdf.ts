@@ -22,9 +22,9 @@ export const GOODS_DISPATCHED_LABEL = 'Goods Dispatched';
 // the whole width: the leader is a single unbreakable run, so pdfmake sizes the
 // column to fit it, and an over-long leader pushes the QUANTITY + DESCRIPTION +
 // NETT WEIGHT columns it spans past the page margin. At the document's 10pt
-// default font those three columns give 395pt, "Signed" takes 31.13pt, and each
-// leader glyph takes 10pt, so 36 glyphs is the ceiling; 30 leaves a comfortable
-// margin for cell padding and font-metric rounding.
+// default font the columns it now spans give 425pt, "Signed" takes 31.13pt, and
+// each leader glyph takes 10pt, so 39 glyphs is the ceiling; 30 leaves a
+// comfortable margin for cell padding and font-metric rounding.
 export const SIGNED_RULE = `Signed${'…'.repeat(30)}`;
 export const DATE_LABEL = 'Date;';
 export const WASTE_BROKER_LINE = 'NRW Waste brokers registration CBDU027716';
@@ -42,11 +42,32 @@ export const HEADER_CELLS = [
   'MINIMUM WEIGHT TO BE LOADED',
   'DATE OF COLLECTION',
 ];
-const ITEM_HEADER_CELLS = ['QUANTITY', 'DESCRIPTION', 'NETT WEIGHT (KG)', 'COLLECTION POINT'];
+// The collection point is gone: each line now carries SB Materials' own
+// reference for the consignment and the registration of the vehicle it went
+// on, both of which vary line by line where the collection point did not.
+const ITEM_HEADER_CELLS = ['QUANTITY', 'DESCRIPTION', 'NETT WEIGHT (KG)', 'REFERENCE', 'VEHICLE REG'];
 
 // The line-item table's fixed columns. The description column is elastic and
-// takes whatever is left, which at A4 with 45pt margins is 240pt.
-const ITEM_COLUMN_WIDTHS: (number | string)[] = [70, '*', 85, 110];
+// takes whatever is left, which at A4 with 45pt margins is 165pt.
+const ITEM_COLUMN_WIDTHS: (number | string)[] = [55, '*', 75, 80, 80];
+
+/**
+ * The container number and seal, as they appear beneath the description of a
+ * containerised line: on their own line rather than in columns of their own,
+ * because only some lines are containerised and two more columns would leave
+ * the description too narrow to read on every other line.
+ */
+export function containerLine(item: {
+  is_container?: number | null;
+  container_number?: string | null;
+  seal_number?: string | null;
+}): string {
+  if (!item.is_container) return '';
+  const parts: string[] = [];
+  parts.push(`Container ${item.container_number || ''}`.trim());
+  if (item.seal_number) parts.push(`Seal ${item.seal_number}`);
+  return parts.join('  ');
+}
 
 const LOGO_IMAGE_KEY = 'sbLogo';
 
@@ -82,7 +103,8 @@ export function collectionNoteItemRows(note: CollectionNoteRecord): string[][] {
     item.quantity ?? '',
     item.description ?? '',
     item.nett_weight ?? '',
-    item.collection_point ?? '',
+    item.reference ?? '',
+    item.vehicle_registration ?? '',
   ]);
 }
 
@@ -125,8 +147,9 @@ function signatureImage(uploadsDir: string, relPath: string | null): string | nu
 /**
  * The signature box: the captured signature when there is one, and the
  * original's dotted rule when there is not. Returned as a `TableCell` (not bare
- * `Content`) with `colSpan: 3` so callers can drop it straight into the
- * QUANTITY+DESCRIPTION+NETT WEIGHT columns of the shared line-item table;
+ * `Content`) with `colSpan: 4` so callers can drop it straight into the
+ * QUANTITY+DESCRIPTION+NETT WEIGHT+REFERENCE columns of the shared line-item
+ * table;
  * pdfmake requires matching empty placeholder cells (`{}`) immediately after a
  * colSpan cell in the same row, one per column spanned beyond the first.
  */
@@ -138,7 +161,7 @@ function signatureCell(label: string, image: string | null): TableCell {
   } else {
     stack.push({ text: SIGNED_RULE, margin: [0, 0, 0, 4] as [number, number, number, number] });
   }
-  return { stack, colSpan: 3 };
+  return { stack, colSpan: 4 };
 }
 
 function dateCell(value: string | null): Content {
@@ -208,11 +231,26 @@ export async function generateCollectionNotePdf(
   const itemBody: TableCell[][] = [
     ITEM_HEADER_CELLS.map((text) => ({ text, bold: true, alignment: 'center' as const })),
   ];
-  for (const row of collectionNoteItemRows(note)) {
-    itemBody.push([{ text: row[0] }, { text: row[1], bold: true }, { text: row[2] }, { text: row[3] }]);
-  }
+  const items = note.items || [];
+  collectionNoteItemRows(note).forEach((row, index) => {
+    const container = containerLine(items[index]);
+    itemBody.push([
+      { text: row[0] },
+      container
+        ? {
+            stack: [
+              { text: row[1], bold: true },
+              { text: container, fontSize: 8 },
+            ],
+          }
+        : { text: row[1], bold: true },
+      { text: row[2] },
+      { text: row[3] },
+      { text: row[4] },
+    ]);
+  });
   if (itemBody.length === 1) {
-    itemBody.push([{ text: '' }, { text: '' }, { text: '' }, { text: '' }]);
+    itemBody.push(ITEM_COLUMN_WIDTHS.map(() => ({ text: '' })));
   }
   // The transport company is a property of the collection, not of any one line
   // item, so it gets a full-width row of its own beneath the items: a bold
@@ -231,13 +269,13 @@ export async function generateCollectionNotePdf(
 
   // The Goods Dispatched row is appended to this same table, rather than
   // emitted as a second table, so the whole document is one continuous grid
-  // with a single right-hand edge: the signature cell spans the QUANTITY,
-  // DESCRIPTION, and NETT WEIGHT columns (colSpan requires an empty
+  // with a single right-hand edge: the signature cell spans every column but
+  // the last (colSpan requires an empty
   // placeholder cell per further column spanned), and the date falls in the
   // last column, which already matches the standalone signature table's own
   // right-hand width.
   const dispatched = signatureImage(uploadsDir, note.dispatched_signature_path);
-  itemBody.push([signatureCell(GOODS_DISPATCHED_LABEL, dispatched), {}, {}, dateCell(note.dispatched_signed_date)]);
+  itemBody.push([signatureCell(GOODS_DISPATCHED_LABEL, dispatched), {}, {}, {}, dateCell(note.dispatched_signed_date)]);
 
   content.push({
     table: { widths: ITEM_COLUMN_WIDTHS, headerRows: 1, body: itemBody },

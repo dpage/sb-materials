@@ -12,18 +12,22 @@ export interface SamplingRow {
   sample_size_kg?: number | null;
   in_scope_kg?: number | null;
   out_of_scope_kg?: number | null;
+  non_packaging_kg?: number | null;
   contamination_kg?: number | null;
   prohibited_kg?: number | null;
   prohibited_items?: string | null;
+  product_description?: string | null;
+  product_grade?: string | null;
   pern_prn_claimed_percent?: number | null;
   contamination_limit_percent?: number | null;
   comments?: string | null;
 }
 
-/** The four component weights, in the order they are shown and printed. */
+/** The component weights, in the order they are shown and printed. */
 export const SAMPLING_COMPONENTS = [
   { key: 'in_scope_kg', label: 'Post Consumer Packaging In Scope' },
   { key: 'out_of_scope_kg', label: 'Post Consumer Packaging NOT In Scope' },
+  { key: 'non_packaging_kg', label: 'Non-Packaging' },
   { key: 'contamination_kg', label: 'Contamination' },
   { key: 'prohibited_kg', label: 'Prohibited Items' },
 ] as const;
@@ -70,7 +74,7 @@ export function formatSamplingPercent(value: number | null | undefined, sampleSi
 export const SAMPLING_BALANCE_TOLERANCE_KG = 0.1;
 
 export interface SamplingTotals {
-  /** The four component weights summed, or null when none of them is filled in. */
+  /** The component weights summed, or null when none of them is filled in. */
   accountedKg: number | null;
   /** That sum as a percentage of the sample size. */
   accountedPercent: number | null;
@@ -108,9 +112,12 @@ export function isSamplingEmpty(sampling: SamplingRow | null | undefined): boole
     'sample_size_kg',
     'in_scope_kg',
     'out_of_scope_kg',
+    'non_packaging_kg',
     'contamination_kg',
     'prohibited_kg',
     'prohibited_items',
+    'product_description',
+    'product_grade',
     'pern_prn_claimed_percent',
     'contamination_limit_percent',
     'comments',
@@ -131,6 +138,8 @@ export const SAMPLING_HEADING = 'Sampling';
 export const SAMPLING_NOT_CARRIED_OUT_LABEL = 'Sampling not carried out';
 export const SAMPLING_SAMPLE_SIZE_LABEL = 'Sample Size';
 export const SAMPLING_TOTAL_LABEL = 'Total Accounted For';
+export const SAMPLING_PRODUCT_DESCRIPTION_LABEL = 'Product Description';
+export const SAMPLING_PRODUCT_GRADE_LABEL = 'Product Grade';
 export const SAMPLING_PROHIBITED_ITEMS_LABEL = 'Prohibited Items Found';
 export const SAMPLING_CLAIMED_LABEL = 'PERN/PRN % Claimed';
 export const SAMPLING_LIMIT_LABEL = 'Contamination Maximum Limit %';

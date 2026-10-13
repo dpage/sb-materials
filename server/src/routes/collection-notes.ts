@@ -378,14 +378,25 @@ export function collectionNoteRoutes(db: Database.Database): Router {
 
 function isBlankItem(item: any): boolean {
   const blank = (v: unknown) => v === null || v === undefined || String(v).trim() === '';
-  return blank(item?.quantity) && blank(item?.description) && blank(item?.nett_weight) && blank(item?.collection_point);
+  return (
+    blank(item?.quantity) &&
+    blank(item?.description) &&
+    blank(item?.nett_weight) &&
+    blank(item?.reference) &&
+    blank(item?.vehicle_registration) &&
+    !item?.is_container &&
+    blank(item?.container_number) &&
+    blank(item?.seal_number)
+  );
 }
 
 function insertItems(db: Database.Database, noteId: number, items: any): void {
   if (!Array.isArray(items) || !items.length) return;
   const stmt = db.prepare(
-    `INSERT INTO collection_note_items (note_id, quantity, description, nett_weight, collection_point, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO collection_note_items (
+       note_id, quantity, description, nett_weight, reference, vehicle_registration,
+       is_container, container_number, seal_number, sort_order
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   // The form always starts with (and can be left with) one blank line item,
   // so skip rows where every field is empty rather than storing and later
@@ -398,7 +409,13 @@ function insertItems(db: Database.Database, noteId: number, items: any): void {
       item?.quantity ?? null,
       item?.description ?? null,
       item?.nett_weight ?? null,
-      item?.collection_point ?? null,
+      item?.reference ?? null,
+      item?.vehicle_registration ?? null,
+      item?.is_container ? 1 : 0,
+      // The container number and seal only mean anything on a containerised
+      // line, so a line that has been unticked does not keep them.
+      item?.is_container ? (item?.container_number ?? null) : null,
+      item?.is_container ? (item?.seal_number ?? null) : null,
       sortOrder,
     );
     sortOrder += 1;

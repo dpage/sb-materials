@@ -187,9 +187,12 @@ export interface ReportSampling {
   sample_size_kg?: number | string | null;
   in_scope_kg?: number | string | null;
   out_of_scope_kg?: number | string | null;
+  non_packaging_kg?: number | string | null;
   contamination_kg?: number | string | null;
   prohibited_kg?: number | string | null;
   prohibited_items?: string | null;
+  product_description?: string | null;
+  product_grade?: string | null;
   pern_prn_claimed_percent?: number | string | null;
   contamination_limit_percent?: number | string | null;
   comments?: string | null;
@@ -242,7 +245,11 @@ export interface CollectionNoteItem {
   quantity: string | null;
   description: string | null;
   nett_weight: string | null;
-  collection_point: string | null;
+  reference: string | null;
+  vehicle_registration: string | null;
+  is_container?: number | boolean | null;
+  container_number: string | null;
+  seal_number: string | null;
   sort_order?: number;
 }
 

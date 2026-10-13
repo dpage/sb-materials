@@ -41,8 +41,9 @@ describe('sampling arithmetic', () => {
   it('totals the components and reports them as a share of the sample', () => {
     const totals = samplingTotals({
       sample_size_kg: 100,
-      in_scope_kg: 60,
+      in_scope_kg: 50,
       out_of_scope_kg: 20,
+      non_packaging_kg: 10,
       contamination_kg: 15,
       prohibited_kg: 5,
     });
@@ -72,6 +73,20 @@ describe('sampling arithmetic', () => {
     expect(totals.outOfBalance).toBe(false);
   });
 
+  it('counts the non-packaging weight towards the total, like any other component', () => {
+    const without = samplingTotals({ sample_size_kg: 100, in_scope_kg: 90 });
+    const with_ = samplingTotals({ sample_size_kg: 100, in_scope_kg: 90, non_packaging_kg: 10 });
+    expect(without.accountedKg).toBe(90);
+    expect(with_.accountedKg).toBe(100);
+    expect(with_.outOfBalance).toBe(false);
+  });
+
+  it('treats a block holding only a non-packaging weight, description or grade as worth keeping', () => {
+    expect(isSamplingEmpty({ non_packaging_kg: 12 })).toBe(false);
+    expect(isSamplingEmpty({ product_description: 'Mixed paper' })).toBe(false);
+    expect(isSamplingEmpty({ product_grade: 'Grade A' })).toBe(false);
+  });
+
   it('recognises an empty block, and one that only says sampling was skipped', () => {
     expect(isSamplingEmpty(null)).toBe(true);
     expect(isSamplingEmpty({})).toBe(true);
@@ -99,11 +114,14 @@ describe('sampling through the reports API', () => {
 
   const sampling = {
     sample_size_kg: 500,
-    in_scope_kg: 440,
+    in_scope_kg: 420,
     out_of_scope_kg: 30,
+    non_packaging_kg: 20,
     contamination_kg: 25,
     prohibited_kg: 5,
     prohibited_items: 'Aerosol can',
+    product_description: 'Mixed paper',
+    product_grade: 'Grade A',
     pern_prn_claimed_percent: 95,
     contamination_limit_percent: 4,
     comments: 'Bale broken in the yard',
@@ -131,7 +149,10 @@ describe('sampling through the reports API', () => {
       expect(fetched.status).toBe(200);
       expect(fetched.body.sampling).toMatchObject({
         sample_size_kg: 500,
-        in_scope_kg: 440,
+        in_scope_kg: 420,
+        non_packaging_kg: 20,
+        product_description: 'Mixed paper',
+        product_grade: 'Grade A',
         prohibited_items: 'Aerosol can',
         pern_prn_claimed_percent: 95,
         contamination_limit_percent: 4,

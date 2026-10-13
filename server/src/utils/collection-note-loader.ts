@@ -6,7 +6,11 @@ export interface CollectionNoteItemRow {
   quantity: string | null;
   description: string | null;
   nett_weight: string | null;
-  collection_point: string | null;
+  reference: string | null;
+  vehicle_registration: string | null;
+  is_container: number | null;
+  container_number: string | null;
+  seal_number: string | null;
   sort_order: number;
 }
 

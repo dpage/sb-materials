@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { HelpProvider } from '../components/HelpContext';
@@ -121,6 +121,58 @@ describe('sampling section', () => {
     expect(screen.getByLabelText('Total accounted for percentage')).toHaveTextContent('93.0%');
   });
 
+  it('counts the non-packaging weight alongside the other components', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+
+    fireEvent.change(await screen.findByLabelText('Sample Size (kg)'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Post Consumer Packaging In Scope (kg)'), { target: { value: '90' } });
+    fireEvent.change(screen.getByLabelText('Non-Packaging (kg)'), { target: { value: '10' } });
+
+    expect(screen.getByLabelText('Non-Packaging percentage')).toHaveTextContent('10.0%');
+    expect(screen.getByLabelText('Total accounted for')).toHaveTextContent('100 kg');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('offers a product description and grade, from the lookups, on the standalone sampling form', async () => {
+    (api.getLookups as any).mockImplementation((table: string) =>
+      Promise.resolve(
+        table === 'lookup_product_descriptions'
+          ? [{ id: 1, value: 'Mixed paper', is_active: 1 }]
+          : table === 'lookup_product_grades'
+            ? [{ id: 2, value: 'Grade A', is_active: 1 }]
+            : [],
+      ),
+    );
+
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getAllByText('Sampling')[0]);
+
+    const description = await screen.findByLabelText('Sampling Product Description');
+    const grade = screen.getByLabelText('Sampling Product Grade');
+    await waitFor(() => expect(within(description).getByRole('option', { name: 'Mixed paper' })).toBeInTheDocument());
+    expect(within(grade).getByRole('option', { name: 'Grade A' })).toBeInTheDocument();
+  });
+
+  it('sends the sampling product description, grade and non-packaging weight', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getAllByText('Sampling')[0]);
+
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: '1' } });
+    await waitFor(() => expect(api.getSites).toHaveBeenCalledWith(1));
+    fireEvent.change(document.querySelectorAll('select')[1], { target: { value: '1' } });
+
+    fireEvent.change(screen.getByLabelText('Sample Size (kg)'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Non-Packaging (kg)'), { target: { value: '10' } });
+    fireEvent.click(screen.getByText('Save as Draft'));
+
+    await waitFor(() => expect(api.createReport).toHaveBeenCalled());
+    expect((api.createReport as any).mock.calls[0][0].sampling).toMatchObject({ non_packaging_kg: '10' });
+  });
+
   it('warns when the weights do not add up to the sample size, without blocking', async () => {
     renderNew();
     await screen.findByText('New Report');
@@ -216,7 +268,13 @@ describe('the four report types', () => {
     });
 
     await waitFor(() => {
-      const grades = screen.getAllByRole('option').filter((o) => ['OCC', 'occ'].includes(o.textContent || ''));
+      // The sampling block has a product grade select of its own, reading
+      // every grade regardless of report type, so only the per-type selects
+      // are counted here.
+      const grades = screen
+        .getAllByRole('option')
+        .filter((o) => ['OCC', 'occ'].includes(o.textContent || ''))
+        .filter((o) => !o.closest('select')?.getAttribute('aria-label')?.startsWith('Sampling Product'));
       expect(grades).toHaveLength(1);
     });
   });

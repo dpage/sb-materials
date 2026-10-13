@@ -335,6 +335,60 @@ describe('CollectionNoteEdit form', () => {
     );
   });
 
+  it('sends the per-line reference, vehicle registration and container details', async () => {
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.change(screen.getAllByLabelText(/nett weight/i)[0], { target: { value: '1250' } });
+    fireEvent.change(screen.getByLabelText(/vehicle registration/i), { target: { value: 'AB12 CDE' } });
+    fireEvent.change(screen.getByLabelText(/item reference/i), { target: { value: 'REF-1' } });
+    fireEvent.click(screen.getByLabelText(/container, line 1/i));
+    fireEvent.change(screen.getByLabelText(/container number/i), { target: { value: 'ABCU1234567' } });
+    fireEvent.change(screen.getByLabelText(/seal number/i), { target: { value: 'SEAL-9' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() =>
+      expect(api.createCollectionNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              reference: 'REF-1',
+              vehicle_registration: 'AB12 CDE',
+              is_container: 1,
+              container_number: 'ABCU1234567',
+              seal_number: 'SEAL-9',
+            }),
+          ],
+        }),
+      ),
+    );
+  });
+
+  it('hides and clears the container details when the line is unticked', async () => {
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.change(screen.getAllByLabelText(/nett weight/i)[0], { target: { value: '1250' } });
+    fireEvent.click(screen.getByLabelText(/container, line 1/i));
+    fireEvent.change(screen.getByLabelText(/container number/i), { target: { value: 'ABCU1234567' } });
+    fireEvent.change(screen.getByLabelText(/seal number/i), { target: { value: 'SEAL-9' } });
+    fireEvent.click(screen.getByLabelText(/container, line 1/i));
+    expect(screen.queryByLabelText(/container number/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() =>
+      expect(api.createCollectionNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [expect.objectContaining({ is_container: 0, container_number: null, seal_number: null })],
+        }),
+      ),
+    );
+  });
+
+  it('no longer offers a collection point on a line', async () => {
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
+    expect(screen.queryByLabelText(/collection point/i)).toBeNull();
+  });
+
   it('adds a product description from the form and selects it into the item', async () => {
     vi.mocked(api.createLookup).mockResolvedValue({ id: 3, value: 'Baled PET', is_active: 1 } as never);
     render(<CollectionNoteEdit />, { wrapper: TestWrapper });
@@ -408,7 +462,19 @@ describe('CollectionNoteEdit form', () => {
       created_by_id: 1,
       created_at: '2026-07-01T00:00:00Z',
       updated_at: '2026-07-01T00:00:00Z',
-      items: [{ id: 1, quantity: '2x', description: 'Poly cup reels', nett_weight: '1250', collection_point: 'Bay 1' }],
+      items: [
+        {
+          id: 1,
+          quantity: '2x',
+          description: 'Poly cup reels',
+          nett_weight: '1250',
+          reference: 'REF-1',
+          vehicle_registration: 'AB12 CDE',
+          is_container: 1,
+          container_number: 'ABCU1234567',
+          seal_number: 'SEAL-9',
+        },
+      ],
     } as never);
 
     render(
@@ -427,6 +493,11 @@ describe('CollectionNoteEdit form', () => {
     expect(screen.getByLabelText(/buyer reference/i)).toHaveValue('BR-1');
     expect(screen.getByLabelText(/minimum weight/i)).toHaveValue('24 Tonnes');
     expect(screen.getByLabelText(/nett weight/i)).toHaveValue('1250');
+    expect(screen.getByLabelText(/item reference/i)).toHaveValue('REF-1');
+    expect(screen.getByLabelText(/vehicle registration/i)).toHaveValue('AB12 CDE');
+    expect(screen.getByLabelText(/container, line 1/i)).toBeChecked();
+    expect(screen.getByLabelText(/container number/i)).toHaveValue('ABCU1234567');
+    expect(screen.getByLabelText(/seal number/i)).toHaveValue('SEAL-9');
     expect(screen.getAllByText(/current signature/i).length).toBe(1);
 
     fireEvent.click(screen.getByRole('button', { name: /save/i }));

@@ -11,6 +11,7 @@ import {
   generateCollectionNotePdf,
   collectionNotePdfFilename,
   collectionNoteItemRows,
+  containerLine,
   formatUkDate,
   HEADER_CELLS,
 } from '../utils/collection-note-pdf';
@@ -701,9 +702,24 @@ describe('collection note PDF', () => {
         collection_date: '2026-08-03',
         transport_company: 'Test Haulage',
         items: [
-          { quantity: '1x', description: 'Poly cup reels', nett_weight: '1250', collection_point: 'Bay 3' },
-          { quantity: '2x', description: 'Mixed paper bales', nett_weight: '980', collection_point: 'Yard' },
-          { quantity: '3x', description: 'Shrink wrap', nett_weight: '640', collection_point: 'Bay 1' },
+          {
+            quantity: '1x',
+            description: 'Poly cup reels',
+            nett_weight: '1250',
+            reference: 'REF-1',
+            vehicle_registration: 'AB12 CDE',
+          },
+          {
+            quantity: '2x',
+            description: 'Mixed paper bales',
+            nett_weight: '980',
+            reference: 'REF-2',
+            vehicle_registration: 'FG34 HIJ',
+            is_container: 1,
+            container_number: 'ABCU1234567',
+            seal_number: 'SEAL-9',
+          },
+          { quantity: '3x', description: 'Shrink wrap', nett_weight: '640', reference: 'REF-3' },
         ],
       })
       .expect(200);
@@ -739,7 +755,8 @@ describe('collection note PDF', () => {
     expect(rows).toHaveLength(3);
     expect(rows[2][1]).toBe('Shrink wrap');
     expect(rows[2][2]).toBe('640');
-    expect(rows[2][3]).toBe('Bay 1');
+    expect(rows[2][3]).toBe('REF-3');
+    expect(rows[0][4]).toBe('AB12 CDE');
   });
 
   it('renders every line item', async () => {
@@ -753,6 +770,25 @@ describe('collection note PDF', () => {
     expect(text).toContain('Poly cup reels');
     expect(text).toContain('Mixed paper bales');
     expect(text).toContain('Shrink wrap');
+    expect(text).toContain('REF-2');
+    expect(text).toContain('AB12 CDE');
+  });
+
+  it('prints the container and seal beneath the line they belong to', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const text = extractPdfText(await generateCollectionNotePdf(note, '/tmp/does-not-exist'));
+    expect(text).toContain('Container ABCU1234567');
+    expect(text).toContain('Seal SEAL-9');
+    // The line that is not containerised gets no stray heading of its own.
+    expect(containerLine({ is_container: 0, container_number: 'X', seal_number: 'Y' })).toBe('');
+    expect(containerLine({ is_container: 1, container_number: 'ABCU1', seal_number: null })).toBe('Container ABCU1');
+  });
+
+  it('no longer prints a collection point column', async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const text = extractPdfText(await generateCollectionNotePdf(note, '/tmp/does-not-exist'));
+    expect(text).not.toContain('COLLECTION POINT');
+    expect(text).toContain('VEHICLE REG');
   });
 
   it('renders the heading, reference, and footer lines', async () => {

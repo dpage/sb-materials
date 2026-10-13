@@ -10,6 +10,7 @@ export const SAMPLING_PHOTO_LABEL = 'Sampling';
 export const SAMPLING_COMPONENTS = [
   { key: 'in_scope_kg', label: 'Post Consumer Packaging In Scope' },
   { key: 'out_of_scope_kg', label: 'Post Consumer Packaging NOT In Scope' },
+  { key: 'non_packaging_kg', label: 'Non-Packaging' },
   { key: 'contamination_kg', label: 'Contamination' },
   { key: 'prohibited_kg', label: 'Prohibited Items' },
 ] as const;

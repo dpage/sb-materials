@@ -17,7 +17,11 @@ const emptyItem = (): CollectionNoteItem => ({
   quantity: '',
   description: '',
   nett_weight: '',
-  collection_point: '',
+  reference: '',
+  vehicle_registration: '',
+  is_container: 0,
+  container_number: '',
+  seal_number: '',
 });
 
 // The current local date and time as a datetime-local input value
@@ -171,7 +175,7 @@ export function CollectionNoteEdit() {
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (index: number) => setItems((prev) => prev.filter((_, i) => i !== index));
-  const updateItem = (index: number, field: keyof CollectionNoteItem, value: string) => {
+  const updateItem = (index: number, field: keyof CollectionNoteItem, value: string | number) => {
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)));
   };
 
@@ -210,7 +214,11 @@ export function CollectionNoteEdit() {
           quantity: it.quantity || null,
           description: it.description || null,
           nett_weight: it.nett_weight || null,
-          collection_point: it.collection_point || null,
+          reference: it.reference || null,
+          vehicle_registration: it.vehicle_registration || null,
+          is_container: it.is_container ? 1 : 0,
+          container_number: it.is_container ? it.container_number || null : null,
+          seal_number: it.is_container ? it.seal_number || null : null,
         })),
       };
 
@@ -475,14 +483,28 @@ export function CollectionNoteEdit() {
                   style={inputStyle}
                 />
               </div>
-              <div style={{ flex: 1, minWidth: 140 }}>
-                <label style={labelStyle} htmlFor={`cn-item-point-${i}`}>
-                  Collection Point
+              <div style={{ flex: '0 0 130px' }}>
+                {/* "Item Reference" rather than plain "Reference", since the
+                    note carries one of its own at the top and the two would
+                    otherwise be indistinguishable on the form. */}
+                <label style={labelStyle} htmlFor={`cn-item-reference-${i}`}>
+                  Item Reference
                 </label>
                 <input
-                  id={`cn-item-point-${i}`}
-                  value={item.collection_point || ''}
-                  onChange={(e) => updateItem(i, 'collection_point', e.target.value)}
+                  id={`cn-item-reference-${i}`}
+                  value={item.reference || ''}
+                  onChange={(e) => updateItem(i, 'reference', e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ flex: '0 0 140px' }}>
+                <label style={labelStyle} htmlFor={`cn-item-vehicle-${i}`}>
+                  Vehicle Registration
+                </label>
+                <input
+                  id={`cn-item-vehicle-${i}`}
+                  value={item.vehicle_registration || ''}
+                  onChange={(e) => updateItem(i, 'vehicle_registration', e.target.value)}
                   style={inputStyle}
                 />
               </div>
@@ -494,6 +516,47 @@ export function CollectionNoteEdit() {
               >
                 Remove Item
               </button>
+
+              {/* The container number and seal only appear once the line is
+                  marked as containerised, so an ordinary line is not cluttered
+                  with two boxes that will never be filled in. */}
+              <div style={{ flexBasis: '100%', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Container, line ${i + 1}`}
+                    checked={!!item.is_container}
+                    onChange={(e) => updateItem(i, 'is_container', e.target.checked ? 1 : 0)}
+                  />
+                  Container
+                </label>
+                {!!item.is_container && (
+                  <>
+                    <div style={{ flex: '0 0 170px' }}>
+                      <label style={labelStyle} htmlFor={`cn-item-container-no-${i}`}>
+                        Container Number
+                      </label>
+                      <input
+                        id={`cn-item-container-no-${i}`}
+                        value={item.container_number || ''}
+                        onChange={(e) => updateItem(i, 'container_number', e.target.value)}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ flex: '0 0 150px' }}>
+                      <label style={labelStyle} htmlFor={`cn-item-seal-no-${i}`}>
+                        Seal Number
+                      </label>
+                      <input
+                        id={`cn-item-seal-no-${i}`}
+                        value={item.seal_number || ''}
+                        onChange={(e) => updateItem(i, 'seal_number', e.target.value)}
+                        style={inputStyle}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ))}
           <button type="button" onClick={addItem} style={primaryBtnStyle}>

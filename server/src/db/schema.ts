@@ -25,7 +25,7 @@ import { logger } from '../utils/logger';
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 4;
+export const DB_SCHEMA_VERSION = 5;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -331,7 +331,11 @@ export function createSchema(db: Database.Database): void {
       quantity TEXT,
       description TEXT,
       nett_weight TEXT,
-      collection_point TEXT,
+      reference TEXT,
+      vehicle_registration TEXT,
+      is_container INTEGER DEFAULT 0,
+      container_number TEXT,
+      seal_number TEXT,
       sort_order INTEGER DEFAULT 0
     );
 
@@ -349,8 +353,11 @@ export function createSchema(db: Database.Database): void {
       sample_size_kg REAL,
       in_scope_kg REAL,
       out_of_scope_kg REAL,
+      non_packaging_kg REAL,
       contamination_kg REAL,
       prohibited_kg REAL,
+      product_description TEXT,
+      product_grade TEXT,
       prohibited_items TEXT,
       pern_prn_claimed_percent REAL,
       contamination_limit_percent REAL,
@@ -462,7 +469,25 @@ export function createSchema(db: Database.Database): void {
   `);
 
   addColumns('users', [{ name: 'phone', type: 'TEXT' }]);
-  addColumns('collection_note_items', [{ name: 'nett_weight', type: 'TEXT' }]);
+  addColumns('collection_note_items', [
+    { name: 'nett_weight', type: 'TEXT' },
+    // The collection point was dropped from the note in favour of a reference
+    // and a vehicle registration per line, and the container details that go
+    // with a containerised line. Databases from before the change keep their
+    // collection_point column, which nothing reads any more, for the same
+    // reason the superseded signature columns are left in place above.
+    { name: 'reference', type: 'TEXT' },
+    { name: 'vehicle_registration', type: 'TEXT' },
+    { name: 'is_container', type: 'INTEGER DEFAULT 0' },
+    { name: 'container_number', type: 'TEXT' },
+    { name: 'seal_number', type: 'TEXT' },
+  ]);
+
+  addColumns('report_sampling', [
+    { name: 'non_packaging_kg', type: 'REAL' },
+    { name: 'product_description', type: 'TEXT' },
+    { name: 'product_grade', type: 'TEXT' },
+  ]);
 
   // The two fields the collection note carried under their original Word
   // document names were renamed once their real use was settled: the PO

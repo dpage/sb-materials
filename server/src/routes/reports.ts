@@ -494,10 +494,11 @@ function saveSampling(db: Database.Database, reportId: number, d: any): void {
   db.prepare(
     `INSERT INTO report_sampling (
       report_id, not_carried_out, not_carried_out_reason, sample_size_kg,
-      in_scope_kg, out_of_scope_kg, contamination_kg, prohibited_kg,
-      prohibited_items, pern_prn_claimed_percent, contamination_limit_percent,
+      in_scope_kg, out_of_scope_kg, non_packaging_kg, contamination_kg, prohibited_kg,
+      prohibited_items, product_description, product_grade,
+      pern_prn_claimed_percent, contamination_limit_percent,
       comments
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     reportId,
     d.not_carried_out ? 1 : 0,
@@ -505,9 +506,12 @@ function saveSampling(db: Database.Database, reportId: number, d: any): void {
     toWeight(d.sample_size_kg),
     toWeight(d.in_scope_kg),
     toWeight(d.out_of_scope_kg),
+    toWeight(d.non_packaging_kg),
     toWeight(d.contamination_kg),
     toWeight(d.prohibited_kg),
     d.prohibited_items ?? null,
+    d.product_description ?? null,
+    d.product_grade ?? null,
     toWeight(d.pern_prn_claimed_percent),
     toWeight(d.contamination_limit_percent),
     d.comments ?? null,

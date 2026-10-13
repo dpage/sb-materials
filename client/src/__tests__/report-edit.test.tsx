@@ -269,7 +269,9 @@ describe('ReportEdit - New Report', () => {
   it('should show Product Grade field for fibre', async () => {
     renderNew();
     await screen.findByText('New Report');
-    expect(screen.getByText('Product Grade')).toBeInTheDocument();
+    // The sampling block carries a product grade of its own, so there are two
+    // labels of this name on the form, one per section.
+    expect(screen.getAllByText('Product Grade').length).toBeGreaterThan(0);
   });
 
   it('should show Mode of Storage for fibre', async () => {
