@@ -43,10 +43,15 @@ export function travelRoutes(db: Database.Database): Router {
     const journeys = journeysFor(sheet.id);
     const broughtForward = milesBroughtForward(db, sheet.user_id, sheet);
     const miles = totalJourneyMiles(journeys);
+    const rates = mileageRates(db);
+    // The rates go out with the sheet so the form can total as you type
+    // without asking what they are, and without hardcoding a figure that the
+    // settings page can change.
     return {
       ...sheet,
       journeys,
-      totals: mileagePayment(broughtForward, miles, mileageRates(db)),
+      rates,
+      totals: mileagePayment(broughtForward, miles, rates),
     };
   };
 

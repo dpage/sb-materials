@@ -23,6 +23,14 @@ export function Layout() {
       setTopic('collection-note-edit');
     } else if (path === '/collection-notes') {
       setTopic('collection-notes');
+    } else if (path.startsWith('/travel/')) {
+      setTopic('travel-edit');
+    } else if (path === '/travel') {
+      setTopic('travel');
+    } else if (path.startsWith('/expenses/')) {
+      setTopic('expense-edit');
+    } else if (path === '/expenses') {
+      setTopic('expenses');
     } else if (path === '/customers') {
       setTopic('customers');
     } else if (path === '/users') {
@@ -104,6 +112,12 @@ export function Layout() {
             </NavLink>
             <NavLink to="/collection-notes" style={({ isActive }) => navStyle(isActive)}>
               Collection Notes
+            </NavLink>
+            <NavLink to="/travel" style={({ isActive }) => navStyle(isActive)}>
+              Travel
+            </NavLink>
+            <NavLink to="/expenses" style={({ isActive }) => navStyle(isActive)}>
+              Expenses
             </NavLink>
             <NavLink to="/customers" style={({ isActive }) => navStyle(isActive)}>
               Customers
@@ -208,6 +222,12 @@ export function Layout() {
             onClick={() => setMenuOpen(false)}
           >
             Collection Notes
+          </NavLink>
+          <NavLink to="/travel" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
+            Travel
+          </NavLink>
+          <NavLink to="/expenses" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
+            Expenses
           </NavLink>
           <NavLink to="/customers" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
             Customers

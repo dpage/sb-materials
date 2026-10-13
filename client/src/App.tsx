@@ -16,6 +16,10 @@ import { Lookups } from './pages/Lookups';
 import { CollectionNotes } from './pages/CollectionNotes';
 import { CollectionNoteEdit } from './pages/CollectionNoteEdit';
 import { Backups } from './pages/Backups';
+import { Travel } from './pages/Travel';
+import { TravelEdit } from './pages/TravelEdit';
+import { Expenses } from './pages/Expenses';
+import { ExpenseEdit } from './pages/ExpenseEdit';
 
 interface AuthContextType {
   user: User | null;
@@ -88,6 +92,10 @@ export function App() {
                 <Route path="collection-notes" element={<CollectionNotes />} />
                 <Route path="collection-notes/new" element={<CollectionNoteEdit />} />
                 <Route path="collection-notes/:id" element={<CollectionNoteEdit />} />
+                <Route path="travel" element={<Travel />} />
+                <Route path="travel/:id" element={<TravelEdit />} />
+                <Route path="expenses" element={<Expenses />} />
+                <Route path="expenses/:id" element={<ExpenseEdit />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="users" element={<Users />} />
                 <Route path="lookups" element={<Lookups />} />

@@ -149,6 +149,90 @@ export const helpTopics: Record<string, HelpTopic> = {
     ],
   },
 
+  travel: {
+    heading: 'Travel & Mileage',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Travel page holds one mileage sheet per person per month. Pick a month and year and use "Open sheet" to start one, or to go back into the one you already have: there is only ever a single sheet for a given month, so opening it twice does not create a duplicate.',
+      },
+      {
+        title: 'What the list shows',
+        body: 'Each row shows the month, the number of journeys, the total miles, and the amount claimed, newest month first. A superuser also sees a "Person" column and a filter to switch between their own sheets, everyone\u2019s, or one particular person\u2019s.',
+      },
+      {
+        title: 'Rates and the 10,000 mile band',
+        body: 'Mileage is paid at the higher rate (55p by default) for the first 10,000 miles of the tax year, which runs from 6 April to 5 April, and at the lower rate (25p) thereafter. The band is worked out per person across the whole tax year, so a sheet is priced against the miles already claimed on earlier months. A superuser can change both rates and the band on the Lookups page.',
+      },
+      {
+        title: 'Actions',
+        body: 'Each row has actions:\n\n- Edit: open the sheet and enter journeys\n- PDF: download the sheet as a formatted PDF on the company letterhead\n- Delete: permanently remove the sheet and its journeys (you will be asked to confirm)',
+      },
+    ],
+  },
+
+  'travel-edit': {
+    heading: 'Travel Sheet',
+    sections: [
+      {
+        title: 'Entering journeys',
+        body: 'Each leg of each trip gets its own row: the date, what the job was, where you went from and to, the customer if the journey was for one, and the miles. Use "+ Add journey" for another row, and "Remove" to take one out.',
+      },
+      {
+        title: 'Round trips',
+        body: 'Tick "Round trip" and enter the one-way mileage: the sheet doubles it for you, both in the totals and on the PDF. For a multi-leg run, enter each leg as its own row rather than ticking round trip.',
+      },
+      {
+        title: 'Customers',
+        body: 'The customer is chosen from the customer list, and the "+" button beside it adds a new customer without leaving the form. The name is stored on the journey as well as the link, so renaming a customer later does not rewrite your old sheets.',
+      },
+      {
+        title: 'Totals',
+        body: 'The totals under the table update as you type, showing the miles brought forward from earlier in the tax year, the miles at each rate, and the payment due. Nothing is stored until you press Save.',
+      },
+    ],
+  },
+
+  expenses: {
+    heading: 'Expenses',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Expenses page holds one expenses sheet per person per month. Pick a month and year and use "Open sheet" to start one, or to go back into the one you already have.',
+      },
+      {
+        title: 'What the list shows',
+        body: 'Each row shows the month, the number of items, the total spent, the VAT included in that total, and the net figure, newest month first. A superuser also sees a "Person" column and a filter to switch between their own sheets, everyone\u2019s, or one particular person\u2019s.',
+      },
+      {
+        title: 'Actions',
+        body: 'Each row has actions:\n\n- Edit: open the sheet, enter items and attach receipts\n- PDF: download the sheet as a formatted PDF, with the receipt photographs at the bottom\n- Delete: permanently remove the sheet, its items and its receipts (you will be asked to confirm)',
+      },
+    ],
+  },
+
+  'expense-edit': {
+    heading: 'Expenses Sheet',
+    sections: [
+      {
+        title: 'Entering expenses',
+        body: 'Each item gets a row: the date, what it was, and what it cost. Use "+ Add expense" for another row, and "Remove" to take one out.',
+      },
+      {
+        title: 'VAT',
+        body: 'Tick "VAT?" where VAT can be reclaimed, then either type the VAT shown on the receipt or press the "20%" button to work it out of the cost at the standard rate. The totals split the VAT out, and switching an item back to no VAT clears the figure.',
+      },
+      {
+        title: 'Receipts',
+        body: 'Choose a file to add a photograph of a receipt. A receipt can be attached to a particular item, which captions it on the PDF, or left against the whole sheet. Saving happens automatically before the upload, since a receipt is attached to a saved item. Deleting an item leaves its receipts on the sheet rather than taking them with it.',
+      },
+      {
+        title: 'Saving',
+        body: 'The totals under the table update as you type, but nothing is stored until you press Save.',
+      },
+    ],
+  },
+
   customers: {
     heading: 'Customers',
     sections: [

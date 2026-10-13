@@ -73,6 +73,8 @@ describe('travel sheets', () => {
     expect(saved.body.totals.miles).toBe(266);
     expect(saved.body.totals.highMiles).toBe(266);
     expect(saved.body.totals.total).toBe(146.3);
+    // The rates travel with the sheet so the form can total as you type.
+    expect(saved.body.rates).toEqual({ high: 0.55, low: 0.25, bandMiles: 10000 });
   });
 
   it('keeps the order the legs were entered in', async () => {

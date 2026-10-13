@@ -16,6 +16,10 @@ import type {
   AppInfo,
   AppSettings,
   Backup,
+  TravelSheet,
+  TravelJourney,
+  ExpenseSheet,
+  ExpenseItem,
 } from '../types';
 
 const BASE = '/api';
@@ -224,6 +228,56 @@ export const api = {
     return res.json();
   },
   downloadCollectionNotePdf: (id: number) => `${BASE}/pdf/collection-note/${id}`,
+
+  // Travel sheets. A regular user always gets their own; a superuser may ask
+  // for somebody else's with user_id, or for everyone's with all=1.
+  getTravelSheets: (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(params);
+    return request<TravelSheet[]>(`/travel?${qs}`);
+  },
+  getTravelSheet: (id: number) => request<TravelSheet>(`/travel/${id}`),
+  openTravelSheet: (year: number, month: number, userId?: number) =>
+    request<TravelSheet>('/travel', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, ...(userId ? { user_id: userId } : {}) }),
+    }),
+  saveTravelSheet: (id: number, data: { notes?: string | null; journeys?: TravelJourney[] }) =>
+    request<TravelSheet>(`/travel/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteTravelSheet: (id: number) => request(`/travel/${id}`, { method: 'DELETE' }),
+  downloadTravelSheetPdf: (id: number) => `${BASE}/pdf/travel/${id}`,
+
+  // Expense sheets
+  getExpenseSheets: (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(params);
+    return request<ExpenseSheet[]>(`/expenses?${qs}`);
+  },
+  getExpenseSheet: (id: number) => request<ExpenseSheet>(`/expenses/${id}`),
+  openExpenseSheet: (year: number, month: number, userId?: number) =>
+    request<ExpenseSheet>('/expenses', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, ...(userId ? { user_id: userId } : {}) }),
+    }),
+  saveExpenseSheet: (id: number, data: { notes?: string | null; items?: ExpenseItem[] }) =>
+    request<ExpenseSheet>(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExpenseSheet: (id: number) => request(`/expenses/${id}`, { method: 'DELETE' }),
+  uploadReceipts: async (sheetId: number, files: File[], itemIds?: (number | null)[]) => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('photos', f));
+    itemIds?.forEach((id) => formData.append('item_ids', id?.toString() || ''));
+    const res = await fetch(`${BASE}/expenses/${sheetId}/photos`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    return res.json() as Promise<{ id: number; file_path: string; item_id: number | null }[]>;
+  },
+  deleteReceipt: (sheetId: number, photoId: number) =>
+    request(`/expenses/${sheetId}/photos/${photoId}`, { method: 'DELETE' }),
+  // Receipts are served through the sheet, not the shared photo route, so that
+  // reading one obeys the same ownership rule as reading the sheet.
+  getReceiptUrl: (sheetId: number, photoId: number) => `${BASE}/expenses/${sheetId}/photos/${photoId}/file`,
+  downloadExpenseSheetPdf: (id: number) => `${BASE}/pdf/expenses/${id}`,
 
   // Deployment
   getAppInfo: () => request<AppInfo>('/app-info'),

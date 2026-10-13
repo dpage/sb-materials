@@ -314,3 +314,93 @@ export interface Backup {
   photoCount: number | null;
   collectionNoteCount: number | null;
 }
+
+// Monthly travel and expenses sheets. One sheet per person per month, with the
+// figures worked out server side and sent alongside so a list can show a total
+// without the client re-deriving it.
+
+export interface MileageRates {
+  high: number;
+  low: number;
+  bandMiles: number;
+}
+
+export interface MileageTotals {
+  milesBroughtForward: number;
+  miles: number;
+  highMiles: number;
+  lowMiles: number;
+  highPay: number;
+  lowPay: number;
+  total: number;
+}
+
+export interface TravelJourney {
+  id?: number;
+  sheet_id?: number;
+  journey_date: string | null;
+  customer_id: number | null;
+  customer_name: string | null;
+  job: string | null;
+  from_location: string | null;
+  to_location: string | null;
+  miles: number | null;
+  round_trip: number | boolean | null;
+  sort_order?: number;
+}
+
+export interface TravelSheet {
+  id: number;
+  user_id: number;
+  year: number;
+  month: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string | null;
+  display_name?: string;
+  journeys?: TravelJourney[];
+  journey_count?: number;
+  rates?: MileageRates;
+  totals: MileageTotals;
+}
+
+export interface ExpenseItem {
+  id?: number;
+  sheet_id?: number;
+  item_date: string | null;
+  description: string | null;
+  cost: number | null;
+  vat_applicable: number | boolean | null;
+  vat_amount: number | null;
+  sort_order?: number;
+}
+
+export interface ExpensePhoto {
+  id: number;
+  sheet_id: number;
+  item_id: number | null;
+  file_path: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface ExpenseTotals {
+  gross: number;
+  vat: number;
+  net: number;
+}
+
+export interface ExpenseSheet {
+  id: number;
+  user_id: number;
+  year: number;
+  month: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string | null;
+  display_name?: string;
+  items?: ExpenseItem[];
+  photos?: ExpensePhoto[];
+  item_count?: number;
+  totals: ExpenseTotals;
+}

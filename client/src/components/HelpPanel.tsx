@@ -200,6 +200,8 @@ function TopicNav({ currentTopic }: { currentTopic: string }) {
   const topics = [
     { key: 'reports', label: 'Reports' },
     { key: 'report-edit', label: 'Report Form' },
+    { key: 'travel', label: 'Travel' },
+    { key: 'expenses', label: 'Expenses' },
     { key: 'customers', label: 'Customers' },
     { key: 'lookups', label: 'Lookups' },
     { key: 'users', label: 'Users' },

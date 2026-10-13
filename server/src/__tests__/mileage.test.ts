@@ -204,11 +204,12 @@ describe('milesBroughtForward', () => {
 
   it('counts a round trip twice and leaves other people out of it', () => {
     const otherUser = db
-      .prepare("INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES ('stew', 'x', 'Stew', 0)")
+      .prepare(
+        "INSERT INTO users (username, password_hash, display_name, is_superuser) VALUES ('otheruser', 'x', 'Other User', 0)",
+      )
       .run().lastInsertRowid as number;
-    const sheetId = db
-      .prepare('INSERT INTO travel_sheets (user_id, year, month) VALUES (?, 2026, 9)')
-      .run(otherUser).lastInsertRowid as number;
+    const sheetId = db.prepare('INSERT INTO travel_sheets (user_id, year, month) VALUES (?, 2026, 9)').run(otherUser)
+      .lastInsertRowid as number;
     db.prepare('INSERT INTO travel_journeys (sheet_id, miles, round_trip) VALUES (?, 400, 0)').run(sheetId);
 
     db.prepare('INSERT INTO travel_sheets (user_id, year, month) VALUES (1, 2026, 9)').run();
