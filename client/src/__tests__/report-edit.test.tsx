@@ -156,7 +156,7 @@ describe('ReportEdit - New Report', () => {
     renderNew();
     await screen.findByText('New Report');
     fireEvent.click(screen.getByText('PERN Audit'));
-    expect(await screen.findByText(/Company Name/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Supplier & Address/i)).toBeInTheDocument();
   });
 
   it('shows the On Behalf Of dropdown on the PERN Audit form', async () => {
@@ -213,6 +213,37 @@ describe('ReportEdit - New Report', () => {
   it('should show Signature section', async () => {
     renderNew();
     expect(await screen.findByText('Signature')).toBeInTheDocument();
+  });
+
+  it('takes the signatory name and position beside the signature pad', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    const name = (await screen.findByLabelText('Name')) as HTMLInputElement;
+    // The name starts as the logged-in user, since that is normally who signs.
+    expect(name.value).toBe('Administrator');
+    const position = screen.getByLabelText('Position') as HTMLInputElement;
+    fireEvent.change(position, { target: { value: 'Senior Inspector' } });
+
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: '1' } });
+    await waitFor(() => expect(api.getSites).toHaveBeenCalled());
+    fireEvent.change(document.querySelectorAll('select')[1], { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Save as Draft'));
+
+    await waitFor(() => expect(api.createReport).toHaveBeenCalled());
+    expect((api.createReport as any).mock.calls[0][0]).toMatchObject({
+      inspector_name: 'Administrator',
+      inspector_position: 'Senior Inspector',
+    });
+  });
+
+  it('offers moisture high and low boxes on the PERN audit', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getByText('PERN Audit'));
+    await screen.findByText('Company Details');
+    expect(screen.getAllByText('Moisture Reading Low').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Moisture Reading High').length).toBeGreaterThan(0);
   });
 
   it('should show Photos section', async () => {
@@ -344,7 +375,7 @@ describe('ReportEdit - New Report', () => {
     await screen.findByText('New Report');
     fireEvent.click(screen.getByText('PERN Audit'));
     expect(await screen.findByText('Company Details')).toBeInTheDocument();
-    expect(screen.getByText(/Company Name/i)).toBeInTheDocument();
+    expect(screen.getByText(/Supplier & Address/i)).toBeInTheDocument();
     expect(screen.getByText(/Contact Name/i)).toBeInTheDocument();
     expect(screen.getByText(/Email/i)).toBeInTheDocument();
     expect(screen.getByText(/Phone/i)).toBeInTheDocument();
@@ -379,11 +410,15 @@ describe('ReportEdit - New Report', () => {
     expect(await screen.findByText('Training')).toBeInTheDocument();
   });
 
-  it('should show PERN results & follow-up section', async () => {
+  it('keeps the PERN notes box but drops the results and follow-up boxes', async () => {
     renderNew();
     await screen.findByText('New Report');
     fireEvent.click(screen.getByText('PERN Audit'));
-    expect(await screen.findByText('Results & Follow-up')).toBeInTheDocument();
+    expect(await screen.findByText('Notes')).toBeInTheDocument();
+    expect(screen.queryByText('Results & Follow-up')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bale Split Results')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quality Discussion')).not.toBeInTheDocument();
+    expect(screen.queryByText('Follow Up')).not.toBeInTheDocument();
   });
 
   it('should show PERN photo section', async () => {
@@ -463,20 +498,21 @@ describe('ReportEdit - New Report', () => {
     expect(await screen.findByText('Time Of Inspection')).toBeInTheDocument();
   });
 
-  it('should show fibre packaging content checkboxes', async () => {
+  it('no longer offers the packaging content checkboxes', async () => {
     renderNew();
     await screen.findByText('New Report');
-    expect(await screen.findByText('Packaging Content')).toBeInTheDocument();
-    expect(screen.getByText('Mixed Paper exceeds 34.5%')).toBeInTheDocument();
-    expect(screen.getByText('OCC exceeds 80%')).toBeInTheDocument();
+    expect(screen.queryByText('Packaging Content')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mixed Paper exceeds 34.5%')).not.toBeInTheDocument();
+    expect(screen.queryByText('OCC exceeds 80%')).not.toBeInTheDocument();
   });
 
-  it('offers the packaging content checkboxes on a quarterly report in their own right', async () => {
+  it('drops the packaging content checkboxes from a quarterly report as well', async () => {
     renderNew();
     await screen.findByText('New Report');
     fireEvent.click(screen.getByText('Quarterly PERN Inspection'));
-    expect(await screen.findByText('Packaging Content')).toBeInTheDocument();
-    expect(screen.getByText('OCC exceeds 97.5%')).toBeInTheDocument();
+    await screen.findByText('Compliance');
+    expect(screen.queryByText('Packaging Content')).not.toBeInTheDocument();
+    expect(screen.queryByText('OCC exceeds 97.5%')).not.toBeInTheDocument();
     // The bale break has been replaced by the sampling section.
     expect(screen.queryByLabelText('Bale break performed?')).not.toBeInTheDocument();
     expect(screen.queryByText('Bale Break Results')).not.toBeInTheDocument();
@@ -687,7 +723,7 @@ describe('ReportEdit - Edit Report', () => {
 
     renderEdit();
     await screen.findByText('Edit Report');
-    expect(await screen.findByText(/Company Name/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Supplier & Address/i)).toBeInTheDocument();
   });
 
   it('should update report on save', async () => {
@@ -890,8 +926,6 @@ describe('ReportEdit - Edit Report', () => {
         training_recording: '["HARD COPIES"]',
         total_employees: '50',
         fire_risk_assessment: 'YES',
-        quality_discussion: 'Good quality',
-        follow_up_actions: 'None needed',
       },
       photos: [],
     });
@@ -902,7 +936,7 @@ describe('ReportEdit - Edit Report', () => {
     expect(screen.getByText('Site Information')).toBeInTheDocument();
     expect(screen.getByText('Safety & Workers')).toBeInTheDocument();
     expect(screen.getByText('Training')).toBeInTheDocument();
-    expect(screen.getByText('Results & Follow-up')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
   });
 
   it('should show Completion section', async () => {

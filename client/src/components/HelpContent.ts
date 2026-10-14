@@ -71,10 +71,6 @@ export const helpTopics: Record<string, HelpTopic> = {
         body: 'For Loading & Inspection reports you can track individual containers. Click "+ Add Container" to record the container number, seal number, and the load details: number of bales, weighbridge ticket, and weight. Photos can be associated with specific containers.',
       },
       {
-        title: 'Bale Break (Quarterly PERN)',
-        body: 'On a Quarterly PERN Inspection, use the "Bale break performed?" toggle. When switched on it reveals the bale-break results field and the packaging-content checks (e.g. "OCC exceeds 97.5%"). Leave it off and those extra fields stay hidden.',
-      },
-      {
         title: 'Assigning to an Inspector',
         body: 'Superusers can hand a report to another inspector. Fill in the header (date, site, contact, what is being inspected), pick the inspector in the "Assign To" dropdown, and use "Save & Assign". The inspector finds it under the "Assigned to me" filter, completes it on site, signs, and taps "Submit" to send it back marked Completed. Assigning is optional: leave it unassigned and complete the report yourself if you prefer.',
       },
@@ -88,7 +84,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Signature',
-        body: 'Use the signature pad at the bottom of the form to capture the inspector\'s signature. Click and drag (or use your finger on a touchscreen) to sign. Use the "Clear" button to start over.',
+        body: 'Fill in the name and position of whoever is signing (the name defaults to the logged-in user, and both are printed beside the signature on the PDF), then use the signature pad to capture the signature itself. Click and drag (or use your finger on a touchscreen) to sign. Use the "Clear" button to start over.',
       },
       {
         title: 'Saving',

@@ -29,15 +29,6 @@ import {
 
 const YES_NO = ['YES', 'NO'];
 const YES_NO_NA = ['YES', 'NO', 'N/A'];
-const PACKAGING_THRESHOLDS = [
-  'OCC exceeds 97.5%',
-  'OCC exceeds 80%',
-  'Fruitbox exceeds 97.5%',
-  'Mixed Paper exceeds 34.5%',
-  'HDPE exceeds 97.5%',
-  'PET exceeds 97.5%',
-  'Aluminium exceeds 97.5%',
-];
 // Reserved photo_label used to group moisture-reading evidence photos
 const MOISTURE_PHOTO_LABEL = 'Moisture Readings';
 
@@ -115,6 +106,7 @@ export function ReportEdit() {
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
   const [inspectionTime, setInspectionTime] = useState('');
   const [inspectorName, setInspectorName] = useState(user?.displayName || '');
+  const [inspectorPosition, setInspectorPosition] = useState('');
   const [qualityScore, setQualityScore] = useState<number | ''>('');
   const [inspectionPassed, setInspectionPassed] = useState<string>('');
   const [otherInfo, setOtherInfo] = useState('');
@@ -217,7 +209,10 @@ export function ReportEdit() {
       if (cust && !isEdit) {
         setPern((p) => ({
           ...p,
-          company_name_address: p.company_name_address || cust.address || null,
+          // The field is labelled "Supplier & Address", so it is filled with
+          // both: it used to pull the address through on its own, which is
+          // what prompted the relabelling.
+          company_name_address: p.company_name_address || [cust.name, cust.address].filter(Boolean).join('\n') || null,
           contact_name: p.contact_name || cust.contact_name || null,
           email: p.email || cust.email || null,
           phone: p.phone || cust.phone || null,
@@ -267,6 +262,7 @@ export function ReportEdit() {
         setInspectionDate(report.inspection_date);
         setInspectionTime(report.inspection_time || '');
         setInspectorName(report.inspector_name);
+        setInspectorPosition(report.inspector_position || '');
         setQualityScore(report.quality_score ?? '');
         setInspectionPassed(report.inspection_passed === 1 ? 'YES' : report.inspection_passed === 0 ? 'NO' : '');
         setOtherInfo(report.other_information || '');
@@ -342,6 +338,7 @@ export function ReportEdit() {
         inspection_date: inspectionDate,
         inspection_time: inspectionTime || null,
         inspector_name: inspectorName,
+        inspector_position: inspectorPosition || null,
         quality_score: qualityScore || null,
         inspection_passed: inspectionPassed === 'YES' ? true : inspectionPassed === 'NO' ? false : null,
         other_information: otherInfo || null,
@@ -468,14 +465,6 @@ export function ReportEdit() {
     });
   };
 
-  const togglePackaging = (value: string) => {
-    setDetails((d) => {
-      const current = Array.isArray(d.packaging_thresholds) ? d.packaging_thresholds : [];
-      const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
-      return { ...d, packaging_thresholds: next };
-    });
-  };
-
   const addContainer = () => {
     const tempId = nextTempId.current--;
     setContainers((prev) => [
@@ -553,27 +542,6 @@ export function ReportEdit() {
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>;
-
-  const packagingCheckboxes = (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {PACKAGING_THRESHOLDS.map((t) => {
-        const checked = Array.isArray(details.packaging_thresholds) && details.packaging_thresholds.includes(t);
-        return (
-          <label
-            key={t}
-            style={{
-              ...checkboxLabel,
-              background: checked ? '#ebf5fb' : '#f8f9fa',
-              borderColor: checked ? '#2980b9' : '#dde',
-            }}
-          >
-            <input type="checkbox" checked={!!checked} onChange={() => togglePackaging(t)} style={{ marginRight: 6 }} />
-            {t}
-          </label>
-        );
-      })}
-    </div>
-  );
 
   // Which sections this report shows, rather than which type it is: the
   // combined Loading & Qtr PERN report shows both sets.
@@ -1098,11 +1066,6 @@ export function ReportEdit() {
               </div>
             </Section>
 
-            {/* Packaging Content used to be buried inside the bale break on a
-                quarterly report; with the bale break replaced by the sampling
-                section it stands on its own for every inspection type. */}
-            <Section title="Packaging Content">{packagingCheckboxes}</Section>
-
             {/* Quality Score */}
             <Section title="Quality & Result">
               <div style={formGrid}>
@@ -1385,6 +1348,34 @@ export function ReportEdit() {
 
         {/* Signature */}
         <Section title="Signature">
+          {/* Who signed and in what capacity, printed beside the signature on
+              every report type. The name starts as the logged-in user's, since
+              that is who is normally signing. */}
+          <div style={{ ...formGrid, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle} htmlFor="report-signatory-name">
+                Name
+              </label>
+              <input
+                id="report-signatory-name"
+                value={inspectorName}
+                onChange={(e) => setInspectorName(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle} htmlFor="report-signatory-position">
+                Position
+              </label>
+              <input
+                id="report-signatory-position"
+                value={inspectorPosition}
+                onChange={(e) => setInspectorPosition(e.target.value)}
+                style={inputStyle}
+                placeholder="e.g. Inspector"
+              />
+            </div>
+          </div>
           {existingSignature && (
             <div style={{ marginBottom: 12 }}>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>Current signature:</p>
@@ -1853,11 +1844,14 @@ function PernAuditSection({
       <Section title="Company Details">
         <div style={formGrid}>
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Company Name & Address</label>
-            <input
+            <label style={labelStyle}>Supplier & Address</label>
+            {/* A textarea rather than a single line, since it now holds the
+                supplier's name above their address. */}
+            <textarea
               value={pern.company_name_address || ''}
               onChange={(e) => updateField('company_name_address', e.target.value || null)}
-              style={inputStyle}
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical' }}
             />
           </div>
           <div>
@@ -1907,6 +1901,24 @@ function PernAuditSection({
               value={pern.product_grade || ''}
               onChange={(e) => updateField('product_grade', e.target.value || null)}
               style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Moisture Reading Low</label>
+            <input
+              value={pern.moisture_reading_low || ''}
+              onChange={(e) => updateField('moisture_reading_low', e.target.value || null)}
+              style={inputStyle}
+              placeholder="e.g. 9.3%"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Moisture Reading High</label>
+            <input
+              value={pern.moisture_reading_high || ''}
+              onChange={(e) => updateField('moisture_reading_high', e.target.value || null)}
+              style={inputStyle}
+              placeholder="e.g. 14.2%"
             />
           </div>
         </div>
@@ -2223,41 +2235,16 @@ function PernAuditSection({
         </div>
       </Section>
 
-      <Section title="Results & Follow-up">
+      <Section title="Notes">
         <div style={formGrid}>
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Quality Discussion</label>
+            {/* The section heading is the label: the box is the only field in it. */}
             <textarea
-              value={pern.quality_discussion || ''}
-              onChange={(e) => updateField('quality_discussion', e.target.value || null)}
-              rows={2}
-              style={{ ...inputStyle, resize: 'vertical' }}
-            />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Follow Up</label>
-            <textarea
-              value={pern.follow_up || ''}
-              onChange={(e) => updateField('follow_up', e.target.value || null)}
-              rows={2}
-              style={{ ...inputStyle, resize: 'vertical' }}
-            />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Notes</label>
-            <textarea
+              aria-label="Notes"
               value={pern.notes || ''}
               onChange={(e) => updateField('notes', e.target.value || null)}
               rows={3}
               style={{ ...inputStyle, resize: 'vertical' }}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Auditor Position</label>
-            <input
-              value={pern.auditor_position || ''}
-              onChange={(e) => updateField('auditor_position', e.target.value || null)}
-              style={inputStyle}
             />
           </div>
         </div>

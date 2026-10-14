@@ -127,6 +127,7 @@ export function reportRoutes(db: Database.Database): Router {
       inspection_date,
       inspection_time,
       inspector_name,
+      inspector_position,
       quality_score,
       inspection_passed,
       other_information,
@@ -151,9 +152,9 @@ export function reportRoutes(db: Database.Database): Router {
       const result = db
         .prepare(
           `INSERT INTO reports (report_type, customer_id, site_id, inspection_date, inspection_time,
-         inspector_id, inspector_name, quality_score, inspection_passed, other_information,
+         inspector_id, inspector_name, inspector_position, quality_score, inspection_passed, other_information,
          date_completed, status, on_behalf_of, assigned_to_id, created_by_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           report_type,
@@ -163,6 +164,7 @@ export function reportRoutes(db: Database.Database): Router {
           inspection_time,
           req.session.userId,
           inspector_name,
+          inspector_position ?? null,
           quality_score,
           inspection_passed !== undefined ? (inspection_passed ? 1 : 0) : null,
           other_information,
@@ -247,6 +249,7 @@ export function reportRoutes(db: Database.Database): Router {
       inspection_date,
       inspection_time,
       inspector_name,
+      inspector_position,
       quality_score,
       inspection_passed,
       other_information,
@@ -280,6 +283,7 @@ export function reportRoutes(db: Database.Database): Router {
          inspection_time = COALESCE(?, inspection_time),
          inspector_id = ?,
          inspector_name = COALESCE(?, inspector_name),
+         inspector_position = ?,
          quality_score = ?,
          inspection_passed = ?,
          other_information = ?,
@@ -297,6 +301,7 @@ export function reportRoutes(db: Database.Database): Router {
         inspection_time,
         req.session.userId,
         inspector_name,
+        inspector_position ?? null,
         quality_score ?? null,
         inspection_passed !== undefined ? (inspection_passed ? 1 : 0) : null,
         other_information ?? null,
@@ -562,7 +567,8 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
 function savePernDetails(db: Database.Database, reportId: number, d: any): void {
   db.prepare(
     `INSERT INTO report_pern_details (
-      report_id, company_name_address, contact_name, email, phone,
+      report_id, company_name_address, moisture_reading_low, moisture_reading_high,
+      contact_name, email, phone,
       grades_supplied, num_workers, site_type, safety_inducted,
       materials_handled, prn_accredited, prn_numbers, permits_licences,
       accreditations, site_facilities, area_size, process_flow,
@@ -574,13 +580,14 @@ function savePernDetails(db: Database.Database, reportId: number, d: any): void 
       packaging_identification, non_uk_packaging, non_uk_comments,
       prn_claimed_once, training_types, training_scope,
       training_recording, training_review_frequency, training_records_inspected,
-      workers_consistent, bale_split_results, quality_discussion,
-      follow_up, notes, auditor_position, intro_letter,
+      workers_consistent, notes, intro_letter,
       product_description, product_grade
-    ) VALUES (${Array(50).fill('?').join(', ')})`,
+    ) VALUES (${Array(48).fill('?').join(', ')})`,
   ).run(
     reportId,
     d.company_name_address ?? null,
+    d.moisture_reading_low ?? null,
+    d.moisture_reading_high ?? null,
     d.contact_name ?? null,
     d.email ?? null,
     d.phone ?? null,
@@ -621,11 +628,11 @@ function savePernDetails(db: Database.Database, reportId: number, d: any): void 
     d.training_review_frequency ?? null,
     d.training_records_inspected ?? null,
     d.workers_consistent ?? null,
-    d.bale_split_results ?? null,
-    d.quality_discussion ?? null,
-    d.follow_up ?? null,
+    // The bale split results, quality discussion and follow-up boxes were
+    // dropped at Stew's request, and the auditor's position became
+    // reports.inspector_position, which every report type carries; the
+    // columns stay on existing databases, unread.
     d.notes ?? null,
-    d.auditor_position ?? null,
     d.intro_letter ?? null,
     d.product_description ?? null,
     d.product_grade ?? null,

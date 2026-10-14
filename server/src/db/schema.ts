@@ -26,7 +26,7 @@ import { allocateLineReferences, takenLineReferences } from '../utils/collection
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 7;
+export const DB_SCHEMA_VERSION = 8;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -70,6 +70,10 @@ export function createSchema(db: Database.Database): void {
       inspection_time TEXT,
       inspector_id INTEGER NOT NULL REFERENCES users(id),
       inspector_name TEXT NOT NULL,
+      -- The position the inspector signs in, printed beside their name in the
+      -- signature block of every report type. Superseded the PERN audit's own
+      -- auditor_position, whose values were migrated across.
+      inspector_position TEXT,
       quality_score INTEGER,
       inspection_passed INTEGER,
       other_information TEXT,
@@ -137,6 +141,8 @@ export function createSchema(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       report_id INTEGER NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
       company_name_address TEXT,
+      moisture_reading_low TEXT,
+      moisture_reading_high TEXT,
       contact_name TEXT,
       email TEXT,
       phone TEXT,
@@ -506,6 +512,13 @@ export function createSchema(db: Database.Database): void {
     { name: 'paid_date', type: 'TEXT' },
   ]);
 
+  addColumns('reports', [{ name: 'inspector_position', type: 'TEXT' }]);
+
+  addColumns('report_pern_details', [
+    { name: 'moisture_reading_low', type: 'TEXT' },
+    { name: 'moisture_reading_high', type: 'TEXT' },
+  ]);
+
   addColumns('report_sampling', [
     { name: 'non_packaging_kg', type: 'REAL' },
     { name: 'product_description', type: 'TEXT' },
@@ -532,6 +545,29 @@ export function createSchema(db: Database.Database): void {
   );
 
   backfillLineReferences(db);
+  adoptAuditorPosition(db);
+}
+
+/**
+ * The PERN audit's auditor_position became reports.inspector_position, which
+ * every report type now carries, so the positions already recorded against
+ * audits are moved across once. The old column is left on databases that have
+ * it, unread, as the other superseded columns are.
+ */
+function adoptAuditorPosition(db: Database.Database): void {
+  const columns = (db.prepare('PRAGMA table_info(report_pern_details)').all() as { name: string }[]).map((c) => c.name);
+  if (!columns.includes('auditor_position')) return;
+
+  db.exec(
+    `UPDATE reports SET inspector_position = (
+       SELECT auditor_position FROM report_pern_details WHERE report_id = reports.id
+     )
+     WHERE inspector_position IS NULL
+       AND EXISTS (
+         SELECT 1 FROM report_pern_details
+         WHERE report_id = reports.id AND auditor_position IS NOT NULL AND auditor_position != ''
+       )`,
+  );
 }
 
 /**

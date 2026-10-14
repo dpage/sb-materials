@@ -118,6 +118,40 @@ describe('refined schema', () => {
       .get();
     expect(lookupClients).toBeDefined();
   });
+
+  it('carries an old PERN audit position across to the report', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+
+    db.prepare(`INSERT INTO customers (name) VALUES ('Acme Recycling Ltd')`).run();
+    db.prepare(`INSERT INTO customer_sites (customer_id, address) VALUES (1, '1 Example Way')`).run();
+    db.prepare(`INSERT INTO users (username, password_hash, display_name) VALUES ('tester', 'x', 'Test User')`).run();
+    const withPosition = db
+      .prepare(
+        `INSERT INTO reports (report_type, customer_id, site_id, inspection_date, inspector_id, inspector_name)
+         VALUES ('pern_audit', 1, 1, '2026-10-13', 1, 'Test User')`,
+      )
+      .run().lastInsertRowid as number;
+    const without = db
+      .prepare(
+        `INSERT INTO reports (report_type, customer_id, site_id, inspection_date, inspector_id, inspector_name)
+         VALUES ('pern_audit', 1, 1, '2026-10-13', 1, 'Test User')`,
+      )
+      .run().lastInsertRowid as number;
+    db.prepare(`INSERT INTO report_pern_details (report_id, auditor_position) VALUES (?, 'Senior Inspector')`).run(
+      withPosition,
+    );
+    db.prepare(`INSERT INTO report_pern_details (report_id, auditor_position) VALUES (?, '')`).run(without);
+
+    // Re-running the schema runs the migration over the rows just inserted.
+    createSchema(db);
+
+    const position = (id: number) =>
+      (db.prepare('SELECT inspector_position FROM reports WHERE id = ?').get(id) as any).inspector_position;
+    expect(position(withPosition)).toBe('Senior Inspector');
+    expect(position(without)).toBeNull();
+  });
 });
 
 describe('ensureReferenceData', () => {

@@ -316,7 +316,8 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     );
   }
 
-  headerRows.push(...fieldRow('Packaging Content', parseJsonField(d.packaging_thresholds)));
+  // Packaging Content was dropped at Stew's request: the sampling section at
+  // the foot of every report covers the same ground.
   if (d.rejected_bales) {
     headerRows.push(...fieldRow('Rejected Bales', d.rejected_bales));
   }
@@ -555,7 +556,7 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
   const headerRows: TableCell[][] = [
     ...fieldRow('Report Reference', `SBM-${String(report.id).padStart(5, '0')}`),
     ...fieldRow('Status', (report.status || 'draft').charAt(0).toUpperCase() + (report.status || 'draft').slice(1)),
-    ...fieldRow('Company Name & Address', p.company_name_address),
+    ...fieldRow('Supplier & Address', p.company_name_address),
     ...(report.on_behalf_of ? fieldRow('On Behalf Of', report.on_behalf_of) : []),
     ...fieldRow('Audit Date', report.inspection_date),
     ...fieldRow('Contact Name', p.contact_name),
@@ -564,6 +565,8 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     ...fieldRow('Grades Supplied', p.grades_supplied),
     ...fieldRow('Material Description', p.product_description),
     ...fieldRow('Material Grade', p.product_grade),
+    ...fieldRow('Moisture Reading Low', p.moisture_reading_low),
+    ...fieldRow('Moisture Reading High', p.moisture_reading_high),
     ...fieldRow('Inspector / Auditor', report.inspector_name),
   ];
 
@@ -661,20 +664,16 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     margin: [0, 0, 0, 10] as [number, number, number, number],
   });
 
-  // Quality discussion. The bale split results that used to head this section
-  // are now the sampling section at the foot of the report, and are printed
-  // here only for audits filed before the change.
+  // The bale split results, quality discussion and follow-up boxes that used
+  // to make up this section were dropped at Stew's request, the first of them
+  // superseded by the sampling section at the foot of the report, leaving the
+  // auditor's notes.
   content.push({
-    text: 'Quality Discussion',
+    text: 'Notes',
     style: 'subheader',
     margin: [0, 10, 0, 5] as [number, number, number, number],
   });
-  const resultRows: TableCell[][] = [
-    ...(p.bale_split_results ? fieldRow('Bale Split Results', p.bale_split_results) : []),
-    ...fieldRow('Quality Discussion', p.quality_discussion),
-    ...fieldRow('Follow Up', p.follow_up),
-    ...fieldRow('Notes', p.notes),
-  ];
+  const resultRows: TableCell[][] = [...fieldRow('Notes', p.notes)];
   content.push({
     table: { widths: [220, '*'], body: resultRows },
     layout: 'lightHorizontalLines',
@@ -698,20 +697,9 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     }
   }
 
-  // Signature & completion
-  content.push({ text: '', margin: [0, 10, 0, 0] as [number, number, number, number] });
-
-  const sigRows: TableCell[][] = [
-    ...fieldRow('Name of Auditor', report.inspector_name),
-    ...fieldRow('Position', p.auditor_position),
-    ...fieldRow('Date', report.date_completed || report.inspection_date),
-  ];
-  content.push({
-    table: { widths: [180, '*'], body: sigRows },
-    layout: 'lightHorizontalLines',
-    margin: [0, 0, 0, 10] as [number, number, number, number],
-  });
-
+  // The auditor's name, position and date used to be a table of their own
+  // here; they are part of the shared signature block below now, which every
+  // report type prints.
   appendSamplingSection(content, report, photoData);
 
   appendSignatureBlock(content, report, uploadsDir);
@@ -918,8 +906,13 @@ function appendSignatureBlock(content: Content[], report: any, uploadsDir: strin
   }
 
   sigItems.push({
-    text: report.inspector_name || '_______________',
-    margin: [0, 2, 0, 5] as [number, number, number, number],
+    text: `Name: ${report.inspector_name || '_______________'}`,
+    margin: [0, 2, 0, 2] as [number, number, number, number],
+  });
+
+  sigItems.push({
+    text: `Position: ${report.inspector_position || '_______________'}`,
+    margin: [0, 0, 0, 5] as [number, number, number, number],
   });
 
   if (report.date_completed) {

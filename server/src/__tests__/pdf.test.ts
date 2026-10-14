@@ -1093,12 +1093,79 @@ describe('sampling section', () => {
     expect(text).not.toContain('Bale Split Results');
   });
 
-  it('keeps the bale split results on an older PERN audit that has them', async () => {
+  it('drops the results and follow-up boxes from the PERN audit, keeping the notes', async () => {
     const text = extractPdfText(
-      await generatePdf(reportFor('pern_audit', { pern_details: { bale_split_results: '50/50' } }) as any, tmpDir),
+      await generatePdf(
+        reportFor('pern_audit', {
+          pern_details: {
+            bale_split_results: '50/50',
+            quality_discussion: 'Discussed standards',
+            follow_up: 'None required',
+            notes: 'All satisfactory',
+          },
+        }) as any,
+        tmpDir,
+      ),
     );
-    expect(text).toContain('Bale Split Results');
-    expect(text).toContain('50/50');
+    expect(text).toContain('Notes');
+    expect(text).toContain('All satisfactory');
+    // Removed at Stew's request; the columns survive on old databases unread.
+    expect(text).not.toContain('Bale Split Results');
+    expect(text).not.toContain('Quality Discussion');
+    expect(text).not.toContain('Follow Up');
+    expect(text).not.toContain('50/50');
+  });
+
+  it('labels the PERN audit address block Supplier & Address', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('pern_audit', { pern_details: { company_name_address: 'Acme Recycling Ltd' } }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Supplier & Address');
+    expect(text).not.toContain('Company Name & Address');
+  });
+
+  it('prints the moisture high and low readings on the PERN audit', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('pern_audit', {
+          pern_details: { moisture_reading_low: '8%', moisture_reading_high: '12%' },
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Moisture Reading Low');
+    expect(text).toContain('8%');
+    expect(text).toContain('Moisture Reading High');
+    expect(text).toContain('12%');
+  });
+
+  it('signs every report type with the name and position of the signatory', async () => {
+    for (const type of ['loading_inspection', 'quarterly_pern', 'pern_audit', 'sampling'] as const) {
+      const text = extractPdfText(
+        await generatePdf(
+          reportFor(type, { inspector_name: 'Test User', inspector_position: 'Senior Inspector' }) as any,
+          tmpDir,
+        ),
+      );
+      expect(text, type).toContain('Name: Test User');
+      expect(text, type).toContain('Position: Senior Inspector');
+    }
+  });
+
+  it('no longer prints the packaging content checks', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('quarterly_pern', {
+          inspection_details: { packaging_thresholds: JSON.stringify(['OCC exceeds 97.5%']) },
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).not.toContain('Packaging Content');
+    expect(text).not.toContain('OCC exceeds 97.5%');
   });
 
   it('renders the standalone sampling report as the header, the block and the notes', async () => {

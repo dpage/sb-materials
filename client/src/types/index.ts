@@ -45,6 +45,7 @@ export interface Report {
   inspection_time: string | null;
   inspector_id: number;
   inspector_name: string;
+  inspector_position: string | null;
   quality_score: number | null;
   inspection_passed: number | null;
   other_information: string | null;
@@ -124,6 +125,8 @@ export interface PernDetails {
   id?: number;
   report_id?: number;
   company_name_address: string | null;
+  moisture_reading_low: string | null;
+  moisture_reading_high: string | null;
   contact_name: string | null;
   email: string | null;
   phone: string | null;
@@ -164,11 +167,7 @@ export interface PernDetails {
   training_review_frequency: string | null;
   training_records_inspected: string | null;
   workers_consistent: string | null;
-  bale_split_results: string | null;
-  quality_discussion: string | null;
-  follow_up: string | null;
   notes: string | null;
-  auditor_position: string | null;
   intro_letter: string | null;
   product_description: string | null;
   product_grade: string | null;

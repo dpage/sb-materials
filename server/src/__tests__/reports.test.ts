@@ -81,9 +81,12 @@ describe('Report Routes', () => {
       site_id: siteId,
       inspection_date: '2025-03-15',
       inspector_name: 'Auditor Name',
+      inspector_position: 'Senior Inspector',
       status: 'draft',
       pern_details: {
         company_name_address: 'Test Company, 123 St',
+        moisture_reading_low: '8%',
+        moisture_reading_high: '12%',
         contact_name: 'John',
         email: 'john@test.com',
         phone: '12345',
@@ -100,7 +103,6 @@ describe('Report Routes', () => {
         worker_recording: ['Clocking in', 'Sign in'],
         training_types: ['Manual Handling', 'Fire Safety'],
         training_recording: ['Digital', 'Paper'],
-        auditor_position: 'Inspector',
       },
       ...overrides,
     };
@@ -148,8 +150,15 @@ describe('Report Routes', () => {
 
       const pern = db.prepare('SELECT * FROM report_pern_details WHERE report_id = ?').get(res.body.id) as any;
       expect(pern.company_name_address).toBe('Test Company, 123 St');
+      expect(pern.moisture_reading_low).toBe('8%');
+      expect(pern.moisture_reading_high).toBe('12%');
       expect(JSON.parse(pern.site_type)).toEqual(['MRF', 'Transfer Station']);
       expect(JSON.parse(pern.accreditations)).toEqual(['ISO 9001', 'ISO 14001']);
+
+      // The signatory's position lives on the report, not the audit, since
+      // every report type signs the same way.
+      const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(res.body.id) as any;
+      expect(report.inspector_position).toBe('Senior Inspector');
     });
 
     it('should reject missing required fields', async () => {
