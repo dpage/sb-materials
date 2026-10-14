@@ -59,7 +59,7 @@ export function allocateLineReferences(
   return lines.map((line) => {
     const existing = (line.line_reference ?? '').trim();
     if (existing) return existing;
-    let candidate = '';
+    let candidate: string;
     do {
       next += 1;
       candidate = `${noteReference}-${next}`;
