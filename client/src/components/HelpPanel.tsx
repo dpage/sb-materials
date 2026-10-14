@@ -205,6 +205,7 @@ function TopicNav({ currentTopic }: { currentTopic: string }) {
     { key: 'customers', label: 'Customers' },
     { key: 'lookups', label: 'Lookups' },
     { key: 'users', label: 'Users' },
+    { key: 'sales', label: 'Sales' },
     { key: 'audit', label: 'Audit Log' },
   ];
 

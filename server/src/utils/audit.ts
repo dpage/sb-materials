@@ -22,7 +22,9 @@ export type AuditAction =
   | 'login'
   | 'login-failed'
   | 'logout'
-  | 'restore';
+  | 'restore'
+  | 'mark-paid'
+  | 'mark-unpaid';
 
 export interface AuditEntry {
   action: AuditAction;

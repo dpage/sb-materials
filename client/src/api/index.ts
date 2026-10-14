@@ -13,6 +13,7 @@ import type {
   PernDetails,
   CollectionNote,
   CollectionNoteData,
+  SalesPage,
   AppInfo,
   AppSettings,
   Backup,
@@ -230,6 +231,17 @@ export const api = {
     return res.json();
   },
   downloadCollectionNotePdf: (id: number) => `${BASE}/pdf/collection-note/${id}`,
+
+  // Sales. Superuser only, since every line carries the prices.
+  getSales: (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<SalesPage>(`/sales${qs ? `?${qs}` : ''}`);
+  },
+  setSalePaid: (id: number, isPaid: boolean) =>
+    request<{ is_paid: number; paid_date: string | null }>(`/sales/${id}/paid`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_paid: isPaid }),
+    }),
 
   // Travel sheets. A regular user always gets their own; a superuser may ask
   // for somebody else's with user_id, or for everyone's with all=1.

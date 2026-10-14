@@ -68,10 +68,18 @@ vi.mock('../api', () => ({
 
 import { api } from '../api';
 
-// Mock useAuth (consumed indirectly via components under test)
+// Mock useAuth (consumed indirectly via components under test). The logged-in
+// user is mutable so that a test can take the superuser flag away, which is
+// what decides whether the sale section appears at all.
+const authUser = {
+  current: { id: 1, username: 'admin', displayName: 'Administrator', phone: '07700 900123', isSuperuser: true },
+};
+
 vi.mock('../App', () => ({
   useAuth: () => ({
-    user: { id: 1, username: 'admin', displayName: 'Administrator', phone: '07700 900123', isSuperuser: true },
+    get user() {
+      return authUser.current;
+    },
     loading: false,
     login: vi.fn(),
     logout: vi.fn(),
@@ -223,6 +231,13 @@ describe('CollectionNoteEdit form', () => {
     // clean call history; the mocks are shared vi.fn() instances across the
     // whole file, so clear them before re-arranging their resolved values.
     vi.clearAllMocks();
+    authUser.current = {
+      id: 1,
+      username: 'admin',
+      displayName: 'Administrator',
+      phone: '07700 900123',
+      isSuperuser: true,
+    };
     signatureCanvasState.isEmpty = [true];
     vi.mocked(api.getNextCollectionNoteReference).mockResolvedValue({ reference: 'SBM1061', prefix: 'SBM' });
     vi.mocked(api.getLookups).mockResolvedValue([
@@ -383,6 +398,30 @@ describe('CollectionNoteEdit form', () => {
     );
   });
 
+  it('sends the buyer and the two prices from the sale section', async () => {
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/^buyer$/i), { target: { value: 'Test Buyer' } });
+    fireEvent.change(screen.getByLabelText(/buy price/i), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText(/sale price/i), { target: { value: '150' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() =>
+      expect(api.createCollectionNote).toHaveBeenCalledWith(
+        expect.objectContaining({ buyer: 'Test Buyer', buy_price: '100', sale_price: '150' }),
+      ),
+    );
+  });
+
+  it('hides the sale section from anybody who is not a superuser', async () => {
+    authUser.current = { ...authUser.current, isSuperuser: false };
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
+    expect(screen.queryByLabelText(/^buyer$/i)).toBeNull();
+    expect(screen.queryByLabelText(/sale price/i)).toBeNull();
+    expect(screen.queryByText(/not shown on the note/i)).toBeNull();
+  });
+
   it('no longer offers a collection point on a line', async () => {
     render(<CollectionNoteEdit />, { wrapper: TestWrapper });
     await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
@@ -457,6 +496,10 @@ describe('CollectionNoteEdit form', () => {
       minimum_weight: '24 Tonnes',
       collection_date: '2026-07-01',
       transport_company: 'Test Haulage',
+      buyer: 'Test Buyer',
+      buy_price: 100,
+      sale_price: 150,
+      is_paid: 0,
       dispatched_signature_path: 'collection-notes/5/dispatched.png',
       dispatched_signed_date: '2026-07-01',
       created_by_id: 1,
@@ -498,6 +541,9 @@ describe('CollectionNoteEdit form', () => {
     expect(screen.getByLabelText(/container, line 1/i)).toBeChecked();
     expect(screen.getByLabelText(/container number/i)).toHaveValue('ABCU1234567');
     expect(screen.getByLabelText(/seal number/i)).toHaveValue('SEAL-9');
+    expect(screen.getByLabelText(/^buyer$/i)).toHaveValue('Test Buyer');
+    expect(screen.getByLabelText(/buy price/i)).toHaveValue(100);
+    expect(screen.getByLabelText(/sale price/i)).toHaveValue(150);
     expect(screen.getAllByText(/current signature/i).length).toBe(1);
 
     fireEvent.click(screen.getByRole('button', { name: /save/i }));

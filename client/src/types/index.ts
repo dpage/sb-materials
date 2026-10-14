@@ -268,6 +268,13 @@ export interface CollectionNote {
   transport_company: string | null;
   dispatched_signature_path: string | null;
   dispatched_signed_date: string | null;
+  // The sale side of the note. Absent entirely for a user who is not a
+  // superuser, since the server strips these fields rather than nulling them.
+  buyer?: string | null;
+  buy_price?: number | null;
+  sale_price?: number | null;
+  is_paid?: number | null;
+  paid_date?: string | null;
   created_by_id: number | null;
   created_at: string;
   updated_at: string;
@@ -290,7 +297,28 @@ export interface CollectionNoteData {
   collection_date?: string | null;
   transport_company?: string | null;
   dispatched_signed_date?: string | null;
+  buyer?: string | null;
+  buy_price?: number | string | null;
+  sale_price?: number | string | null;
   items?: CollectionNoteItem[];
+}
+
+/** A line on the sales list: one consignment, and whether it has been paid. */
+export interface Sale {
+  id: number;
+  reference: string;
+  collection_date: string | null;
+  customer_name: string;
+  buyer: string | null;
+  buy_price: number | null;
+  sale_price: number | null;
+  is_paid: number;
+  paid_date: string | null;
+}
+
+export interface SalesPage {
+  data: Sale[];
+  outstanding: number;
 }
 
 /**

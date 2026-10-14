@@ -12,6 +12,7 @@ import { reportRoutes } from '../routes/reports';
 import { photoRoutes } from '../routes/photos';
 import { pdfRoutes } from '../routes/pdf';
 import { collectionNoteRoutes } from '../routes/collection-notes';
+import { salesRoutes } from '../routes/sales';
 import { settingsRoutes } from '../routes/settings';
 import { appInfoRoutes } from '../routes/app-info';
 import { travelRoutes } from '../routes/travel';
@@ -47,6 +48,7 @@ export function createTestApp(db: Database.Database) {
   app.use('/api/photos', photoRoutes(db));
   app.use('/api/pdf', pdfRoutes(db));
   app.use('/api/collection-notes', collectionNoteRoutes(db));
+  app.use('/api/sales', salesRoutes(db));
   app.use('/api/settings', settingsRoutes(db));
   app.use('/api/travel', travelRoutes(db));
   app.use('/api/expenses', expenseRoutes(db));

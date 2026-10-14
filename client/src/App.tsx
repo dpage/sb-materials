@@ -17,6 +17,7 @@ import { CollectionNotes } from './pages/CollectionNotes';
 import { CollectionNoteEdit } from './pages/CollectionNoteEdit';
 import { Backups } from './pages/Backups';
 import { Audit } from './pages/Audit';
+import { Sales } from './pages/Sales';
 import { Travel } from './pages/Travel';
 import { TravelEdit } from './pages/TravelEdit';
 import { Expenses } from './pages/Expenses';
@@ -93,6 +94,7 @@ export function App() {
                 <Route path="collection-notes" element={<CollectionNotes />} />
                 <Route path="collection-notes/new" element={<CollectionNoteEdit />} />
                 <Route path="collection-notes/:id" element={<CollectionNoteEdit />} />
+                <Route path="sales" element={<Sales />} />
                 <Route path="travel" element={<Travel />} />
                 <Route path="travel/:id" element={<TravelEdit />} />
                 <Route path="expenses" element={<Expenses />} />

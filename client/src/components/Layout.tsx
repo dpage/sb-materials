@@ -41,6 +41,8 @@ export function Layout() {
       setTopic('backups');
     } else if (path === '/audit') {
       setTopic('audit');
+    } else if (path === '/sales') {
+      setTopic('sales');
     } else {
       setTopic('reports');
     }
@@ -115,6 +117,11 @@ export function Layout() {
             <NavLink to="/collection-notes" style={({ isActive }) => navStyle(isActive)}>
               Collection Notes
             </NavLink>
+            {user?.isSuperuser && (
+              <NavLink to="/sales" style={({ isActive }) => navStyle(isActive)}>
+                Sales
+              </NavLink>
+            )}
             <NavLink to="/travel" style={({ isActive }) => navStyle(isActive)}>
               Travel
             </NavLink>
@@ -230,6 +237,11 @@ export function Layout() {
           >
             Collection Notes
           </NavLink>
+          {user?.isSuperuser && (
+            <NavLink to="/sales" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
+              Sales
+            </NavLink>
+          )}
           <NavLink to="/travel" style={({ isActive }) => navStyle(isActive)} onClick={() => setMenuOpen(false)}>
             Travel
           </NavLink>

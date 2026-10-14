@@ -93,6 +93,9 @@ export function CollectionNoteEdit() {
   const [minimumWeight, setMinimumWeight] = useState('');
   const [collectionDate, setCollectionDate] = useState(isEdit ? '' : nowForDatetimeLocal());
   const [transportCompany, setTransportCompany] = useState('');
+  const [buyer, setBuyer] = useState('');
+  const [buyPrice, setBuyPrice] = useState('');
+  const [salePrice, setSalePrice] = useState('');
   const [items, setItems] = useState<CollectionNoteItem[]>([emptyItem()]);
 
   const [dispatchedSignedDate, setDispatchedSignedDate] = useState('');
@@ -166,6 +169,11 @@ export function CollectionNoteEdit() {
         setMinimumWeight(note.minimum_weight || '');
         setCollectionDate(toDatetimeLocalValue(note.collection_date || ''));
         setTransportCompany(note.transport_company || '');
+        // Absent rather than null for anyone who may not see them, so an
+        // ordinary user's form simply has nothing to fill in.
+        setBuyer(note.buyer || '');
+        setBuyPrice(note.buy_price === null || note.buy_price === undefined ? '' : String(note.buy_price));
+        setSalePrice(note.sale_price === null || note.sale_price === undefined ? '' : String(note.sale_price));
         setDispatchedSignedDate(note.dispatched_signed_date || '');
         setExistingDispatchedSignature(note.dispatched_signature_path || null);
         setItems(note.items && note.items.length > 0 ? note.items : [emptyItem()]);
@@ -210,6 +218,11 @@ export function CollectionNoteEdit() {
         collection_date: collectionDate || null,
         transport_company: transportCompany || null,
         dispatched_signed_date: dispatchedSignedDate || null,
+        // The server ignores these from a user who may not see them, so there
+        // is no harm in the shape of the payload being the same for everybody.
+        buyer: buyer || null,
+        buy_price: buyPrice === '' ? null : buyPrice,
+        sale_price: salePrice === '' ? null : salePrice,
         items: items.map((it) => ({
           quantity: it.quantity || null,
           description: it.description || null,
@@ -563,6 +576,47 @@ export function CollectionNoteEdit() {
             + Add Item
           </button>
         </Section>
+
+        {/* The sale behind the collection. Superuser only, and never printed
+            on the PDF, which travels with the load. */}
+        {user?.isSuperuser && (
+          <Section title="Sale (not shown on the note)">
+            <div style={formGrid}>
+              <div>
+                <label style={labelStyle} htmlFor="cn-buyer">
+                  Buyer
+                </label>
+                <input id="cn-buyer" value={buyer} onChange={(e) => setBuyer(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle} htmlFor="cn-buy-price">
+                  Buy Price (£)
+                </label>
+                <input
+                  id="cn-buy-price"
+                  type="number"
+                  step="0.01"
+                  value={buyPrice}
+                  onChange={(e) => setBuyPrice(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle} htmlFor="cn-sale-price">
+                  Sale Price (£)
+                </label>
+                <input
+                  id="cn-sale-price"
+                  type="number"
+                  step="0.01"
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+          </Section>
+        )}
 
         <Section title="Goods Dispatched">
           {existingDispatchedSignature && (

@@ -143,6 +143,10 @@ export const helpTopics: Record<string, HelpTopic> = {
         body: 'List the items being collected, each with a quantity, description, nett weight in kilogrammes, your own item reference, and the registration of the vehicle carrying it. The description is chosen from the shared product description list, and the "+" button beside it adds a new description without leaving the form. Tick "Container" on a line that travels in a container, and boxes appear for the container number and seal number; untick it and those are forgotten. These appear on the PDF and in the item summary shown on the list page.',
       },
       {
+        title: 'Sale (superusers only)',
+        body: 'The "Sale (not shown on the note)" section holds the buyer, the buy price and the sale price. Only a superuser sees it, and none of it is printed on the PDF, which travels with the load; a save by anyone else leaves what is already there untouched. Whatever is entered here feeds the Sales page, where the sale is ticked off once it has been paid.',
+      },
+      {
         title: 'Signature',
         body: 'The goods dispatched signature may be captured on screen using the signature pad, or left blank if the note is to be signed on paper instead. There is no goods received signature: the note travels with the load and never comes back.',
       },
@@ -319,6 +323,24 @@ export const helpTopics: Record<string, HelpTopic> = {
       {
         title: 'Collection Notes (superusers only)',
         body: 'A "Collection Notes" card at the top of this page lets a superuser set the number for the next new collection note reference (e.g. the 1061 in SBM1061). Use it to carry the sequence on from numbers already used outside the app. Creating a note always advances the stored number automatically, so it will not go backwards on its own, but a superuser can still set it to any positive whole number by hand here.',
+      },
+    ],
+  },
+
+  sales: {
+    heading: 'Sales',
+    sections: [
+      {
+        title: 'Overview',
+        body: 'The Sales page lists one line per consignment, newest collection date first, and shows the reference, date, customer, buyer, buy price and sale price. It is fed by the collection notes themselves rather than entered separately: raise a note, fill in its Sale section, and the line appears here. Superusers only, since every line carries the prices.',
+      },
+      {
+        title: 'Marking a Sale Paid',
+        body: 'Tick the box in the Paid column once the money has arrived and the line drops off the list. The date it was ticked is recorded, and the tick can be taken off again if it was a mistake. Both are written to the audit log.',
+      },
+      {
+        title: 'What the List Shows',
+        body: 'The list shows the unpaid sales by default, which is the point of the screen: what is still owed. Use the dropdown to show the paid ones instead, or all of them. "Outstanding" at the top right totals the sale prices of everything not yet ticked. "Open" takes you to the collection note behind a line.',
       },
     ],
   },

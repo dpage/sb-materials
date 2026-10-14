@@ -15,6 +15,7 @@ import { getSetting } from '../utils/settings';
 import { loadCollectionNote } from '../utils/collection-note-loader';
 import { removeUploadDir } from '../utils/uploads';
 import { describeCollectionNote, recordAudit } from '../utils/audit';
+import { canSeeSale, stripSaleFields, stripSaleFieldsFromAll, toPrice } from '../utils/collection-note-sales';
 
 const SIGNATURE_SUBDIR = 'collection-notes';
 // Only the dispatching signature is captured: the note leaves with the load and
@@ -114,7 +115,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       )
       .all(...params, parsedLimit, offset);
 
-    res.json({ data: rows, total: countRow.total, page: parseInt(page as string, 10) || 1, limit: parsedLimit });
+    res.json({
+      data: stripSaleFieldsFromAll(rows as Record<string, unknown>[], canSeeSale(req)),
+      total: countRow.total,
+      page: parseInt(page as string, 10) || 1,
+      limit: parsedLimit,
+    });
   });
 
   router.get('/:id', (req, res) => {
@@ -123,7 +129,7 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       res.status(404).json({ error: 'Collection note not found' });
       return;
     }
-    res.json(note);
+    res.json(stripSaleFields(note as unknown as Record<string, unknown>, canSeeSale(req)));
   });
 
   router.post('/', (req, res) => {
@@ -146,8 +152,9 @@ export function collectionNoteRoutes(db: Database.Database): Router {
              reference, customer_id, site_id, collect_from_address, comments,
              contact_name, contact_phone, buyer_reference, minimum_weight,
              collection_date, transport_company, dispatched_signed_date,
+             buyer, buy_price, sale_price,
              created_by_id
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           reference,
@@ -162,6 +169,11 @@ export function collectionNoteRoutes(db: Database.Database): Router {
           body.collection_date ?? null,
           body.transport_company ?? null,
           body.dispatched_signed_date ?? null,
+          // The sale details are a superuser's to record, so an ordinary user
+          // creating a note simply stores none.
+          canSeeSale(req) ? (body.buyer ?? null) : null,
+          canSeeSale(req) ? toPrice(body.buy_price) : null,
+          canSeeSale(req) ? toPrice(body.sale_price) : null,
           req.session.userId,
         );
 
@@ -207,6 +219,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       return;
     }
 
+    // An ordinary user's save must leave the sale details exactly as they were
+    // rather than writing nulls over them, so those columns are only part of
+    // the statement when a superuser is saving.
+    const saleColumns = canSeeSale(req) ? 'buyer = ?, buy_price = ?, sale_price = ?,' : '';
+    const saleValues = canSeeSale(req) ? [body.buyer ?? null, toPrice(body.buy_price), toPrice(body.sale_price)] : [];
+
     const update = db.transaction(() => {
       db.prepare(
         `UPDATE collection_notes SET
@@ -214,6 +232,7 @@ export function collectionNoteRoutes(db: Database.Database): Router {
            comments = ?, contact_name = ?, contact_phone = ?, buyer_reference = ?,
            minimum_weight = ?, collection_date = ?, transport_company = ?,
            dispatched_signed_date = ?,
+           ${saleColumns}
            updated_at = datetime('now')
          WHERE id = ?`,
       ).run(
@@ -229,6 +248,7 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         body.collection_date ?? null,
         body.transport_company ?? null,
         body.dispatched_signed_date ?? null,
+        ...saleValues,
         noteId,
       );
 
@@ -260,7 +280,9 @@ export function collectionNoteRoutes(db: Database.Database): Router {
   // Duplicate a note. The same load often goes out a dozen times over, so the
   // whole note is copied bar the things that must not be shared: the copy takes
   // the next reference in the sequence, today's collection date, and no
-  // signature, since a signature belongs to the load it was given for.
+  // signature, since a signature belongs to the load it was given for. The
+  // sale details are not copied either: the copy is a new consignment, which
+  // has not been sold, priced or paid for yet.
   router.post('/:id/duplicate', (req, res) => {
     const source = loadCollectionNote(db, parseInt(req.params.id, 10));
     if (!source) {

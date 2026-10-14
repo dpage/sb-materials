@@ -25,7 +25,7 @@ import { logger } from '../utils/logger';
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 5;
+export const DB_SCHEMA_VERSION = 6;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -320,6 +320,15 @@ export function createSchema(db: Database.Database): void {
       transport_company TEXT,
       dispatched_signature_path TEXT,
       dispatched_signed_date TEXT,
+      -- The sale behind the collection: who bought the load, what it cost and
+      -- what it went for, and whether the money has arrived. Read and written
+      -- by superusers only (see stripSaleFields), and deliberately absent from
+      -- the PDF, which goes out with the load.
+      buyer TEXT,
+      buy_price REAL,
+      sale_price REAL,
+      is_paid INTEGER DEFAULT 0,
+      paid_date TEXT,
       created_by_id INTEGER REFERENCES users(id),
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -481,6 +490,14 @@ export function createSchema(db: Database.Database): void {
     { name: 'is_container', type: 'INTEGER DEFAULT 0' },
     { name: 'container_number', type: 'TEXT' },
     { name: 'seal_number', type: 'TEXT' },
+  ]);
+
+  addColumns('collection_notes', [
+    { name: 'buyer', type: 'TEXT' },
+    { name: 'buy_price', type: 'REAL' },
+    { name: 'sale_price', type: 'REAL' },
+    { name: 'is_paid', type: 'INTEGER DEFAULT 0' },
+    { name: 'paid_date', type: 'TEXT' },
   ]);
 
   addColumns('report_sampling', [

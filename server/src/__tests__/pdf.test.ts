@@ -791,6 +791,20 @@ describe('collection note PDF', () => {
     expect(text).toContain('VEHICLE REG');
   });
 
+  it('never prints the sale: the note travels with the load', async () => {
+    db.prepare('UPDATE collection_notes SET buyer = ?, buy_price = ?, sale_price = ? WHERE id = ?').run(
+      'Test Buyer',
+      100,
+      150,
+      noteId,
+    );
+    const note = loadCollectionNote(db, noteId)!;
+    const text = extractPdfText(await generateCollectionNotePdf(note, '/tmp/does-not-exist'));
+    expect(text).not.toContain('Test Buyer');
+    expect(text).not.toContain('150');
+    expect(text).not.toMatch(/SALE PRICE|BUY PRICE/i);
+  });
+
   it('renders the heading, reference, and footer lines', async () => {
     const note = loadCollectionNote(db, noteId)!;
     const buffer = await generateCollectionNotePdf(note, '/tmp/does-not-exist');
