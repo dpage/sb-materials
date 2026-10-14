@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
+import { allocateLineReferences, takenLineReferences } from '../utils/collection-note-line-reference';
 
 /**
  * Bump this whenever a table or column is added, removed or renamed below,
@@ -25,7 +26,7 @@ import { logger } from '../utils/logger';
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 6;
+export const DB_SCHEMA_VERSION = 7;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -337,6 +338,10 @@ export function createSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS collection_note_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       note_id INTEGER NOT NULL REFERENCES collection_notes(id) ON DELETE CASCADE,
+      -- The line's own unique reference, allocated by the app as the note's
+      -- reference plus a suffix (SBM1061-1). The reference column below is
+      -- separate: free text the user types for their own purposes.
+      line_reference TEXT,
       quantity TEXT,
       description TEXT,
       nett_weight TEXT,
@@ -490,6 +495,7 @@ export function createSchema(db: Database.Database): void {
     { name: 'is_container', type: 'INTEGER DEFAULT 0' },
     { name: 'container_number', type: 'TEXT' },
     { name: 'seal_number', type: 'TEXT' },
+    { name: 'line_reference', type: 'TEXT' },
   ]);
 
   addColumns('collection_notes', [
@@ -515,6 +521,56 @@ export function createSchema(db: Database.Database): void {
   renameColumn(db, 'collection_notes', 'packing_list_no', 'minimum_weight');
 
   ensureCaseInsensitiveReferenceIndex(db);
+
+  // Created here rather than alongside the tables, because on a database from
+  // before the column existed it is addColumns above that adds it. Line
+  // references are matched case-insensitively for the same reason the note's
+  // own reference is.
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_collection_note_items_line_reference
+       ON collection_note_items(line_reference COLLATE NOCASE)`,
+  );
+
+  backfillLineReferences(db);
+}
+
+/**
+ * Give the lines of existing notes the per-line references the column was
+ * added for, numbered in the order they appear on the note. Lines created
+ * before the column existed would otherwise stay blank for ever, since the
+ * references are only allocated when a note is saved.
+ *
+ * Cheap on every startup once done: a single count of the blank rows.
+ */
+function backfillLineReferences(db: Database.Database): void {
+  const blank = db.prepare('SELECT COUNT(*) AS n FROM collection_note_items WHERE line_reference IS NULL').get() as {
+    n: number;
+  };
+  if (!blank.n) return;
+
+  const fill = db.transaction(() => {
+    const notes = db
+      .prepare(
+        `SELECT DISTINCT n.id, n.reference
+         FROM collection_notes n
+         JOIN collection_note_items i ON i.note_id = n.id
+         WHERE i.line_reference IS NULL`,
+      )
+      .all() as { id: number; reference: string }[];
+    const update = db.prepare('UPDATE collection_note_items SET line_reference = ? WHERE id = ?');
+
+    for (const note of notes) {
+      const lines = db
+        .prepare('SELECT id, line_reference FROM collection_note_items WHERE note_id = ? ORDER BY sort_order, id')
+        .all(note.id) as { id: number; line_reference: string | null }[];
+      const references = allocateLineReferences(takenLineReferences(db), note.reference, lines);
+      lines.forEach((line, i) => {
+        if (!line.line_reference) update.run(references[i], line.id);
+      });
+    }
+  });
+
+  fill();
 }
 
 /**

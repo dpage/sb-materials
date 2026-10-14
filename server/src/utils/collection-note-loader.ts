@@ -3,6 +3,8 @@ import Database from 'better-sqlite3';
 export interface CollectionNoteItemRow {
   id: number;
   note_id: number;
+  /** The line's own unique reference, allocated as <note reference>-<n>. */
+  line_reference: string | null;
   quantity: string | null;
   description: string | null;
   nett_weight: string | null;

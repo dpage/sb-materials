@@ -242,6 +242,8 @@ export const TYPE_SHORT: Record<string, string> = {
 export interface CollectionNoteItem {
   id?: number;
   note_id?: number;
+  /** Allocated by the server as <note reference>-<n>; read-only on the form. */
+  line_reference?: string | null;
   quantity: string | null;
   description: string | null;
   nett_weight: string | null;

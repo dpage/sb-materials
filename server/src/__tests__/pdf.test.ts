@@ -12,6 +12,7 @@ import {
   collectionNotePdfFilename,
   collectionNoteItemRows,
   containerLine,
+  itemDetailLine,
   formatUkDate,
   HEADER_CELLS,
 } from '../utils/collection-note-pdf';
@@ -782,6 +783,16 @@ describe('collection note PDF', () => {
     // The line that is not containerised gets no stray heading of its own.
     expect(containerLine({ is_container: 0, container_number: 'X', seal_number: 'Y' })).toBe('');
     expect(containerLine({ is_container: 1, container_number: 'ABCU1', seal_number: null })).toBe('Container ABCU1');
+  });
+
+  it("prints each line's own reference beneath its description", async () => {
+    const note = loadCollectionNote(db, noteId)!;
+    const text = extractPdfText(await generateCollectionNotePdf(note, '/tmp/does-not-exist'));
+    expect(text).toContain(note.items[0].line_reference!);
+    expect(itemDetailLine({ line_reference: 'SBM1061-1' })).toBe('SBM1061-1');
+    expect(itemDetailLine({ line_reference: 'SBM1061-1', is_container: 1, container_number: 'ABCU1' })).toBe(
+      'SBM1061-1  Container ABCU1',
+    );
   });
 
   it('no longer prints a collection point column', async () => {

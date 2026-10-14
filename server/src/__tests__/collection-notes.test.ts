@@ -4,6 +4,8 @@ import Database from 'better-sqlite3';
 import { createTestDb, createTestApp, loginAsAdmin, loginAsRegularUser } from './helpers';
 import { getSetting, setSetting, getAllSettings } from '../utils/settings';
 import { allocateNextReference, recordReferenceUsed } from '../utils/collection-note-reference';
+import { allocateLineReferences, parseLineSuffix } from '../utils/collection-note-line-reference';
+import { createSchema } from '../db/schema';
 
 describe('settings store', () => {
   let db: Database.Database;
@@ -579,5 +581,160 @@ describe('collection note routes', () => {
     const res = await supertest(app).get('/api/collection-notes/next-reference').set('Cookie', cookie).expect(200);
     expect(res.body.reference).toBe('SBM2000');
     expect(res.body.prefix).toBe('SBM');
+  });
+});
+
+describe('per-line references', () => {
+  let db: Database.Database;
+  let app: ReturnType<typeof createTestApp>;
+  let cookie: string;
+  let customerId: number;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    app = createTestApp(db);
+    cookie = await loginAsAdmin(app);
+    const cust = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Acme Recycling Ltd');
+    customerId = cust.lastInsertRowid as number;
+  });
+
+  const note = (overrides: Record<string, unknown> = {}) => ({
+    reference: 'SBM1061',
+    customer_id: customerId,
+    collection_date: '2026-08-03',
+    items: [{ description: 'Poly cup reels' }, { description: 'Mixed paper bales' }],
+    ...overrides,
+  });
+
+  async function create(overrides: Record<string, unknown> = {}): Promise<number> {
+    const res = await supertest(app).post('/api/collection-notes').set('Cookie', cookie).send(note(overrides));
+    expect(res.status).toBe(200);
+    return res.body.id;
+  }
+
+  async function lineReferences(id: number): Promise<string[]> {
+    const res = await supertest(app).get(`/api/collection-notes/${id}`).set('Cookie', cookie).expect(200);
+    return res.body.items.map((i: { line_reference: string }) => i.line_reference);
+  }
+
+  it('numbers the lines of a new note from the note reference', async () => {
+    const id = await create();
+    expect(await lineReferences(id)).toEqual(['SBM1061-1', 'SBM1061-2']);
+  });
+
+  it('allocates nothing for a blank line that was dropped', async () => {
+    const id = await create({ items: [{ description: 'Poly cup reels' }, {}] });
+    expect(await lineReferences(id)).toEqual(['SBM1061-1']);
+  });
+
+  it('leaves the existing lines their references and carries on numbering', async () => {
+    const id = await create();
+    const existing = await supertest(app).get(`/api/collection-notes/${id}`).set('Cookie', cookie).expect(200);
+
+    await supertest(app)
+      .put(`/api/collection-notes/${id}`)
+      .set('Cookie', cookie)
+      .send({ ...note(), items: [...existing.body.items, { description: 'Shrink wrap' }] })
+      .expect(200);
+
+    expect(await lineReferences(id)).toEqual(['SBM1061-1', 'SBM1061-2', 'SBM1061-3']);
+  });
+
+  it('never renumbers the lines around one that was deleted, nor reissues its reference', async () => {
+    const id = await create();
+    const existing = await supertest(app).get(`/api/collection-notes/${id}`).set('Cookie', cookie).expect(200);
+
+    // Drop the first line and add a new one in its place.
+    await supertest(app)
+      .put(`/api/collection-notes/${id}`)
+      .set('Cookie', cookie)
+      .send({ ...note(), items: [existing.body.items[1], { description: 'Shrink wrap' }] })
+      .expect(200);
+
+    expect(await lineReferences(id)).toEqual(['SBM1061-2', 'SBM1061-3']);
+  });
+
+  it('gives a copy of a note fresh references under its own reference', async () => {
+    const id = await create();
+    const copy = await supertest(app).post(`/api/collection-notes/${id}/duplicate`).set('Cookie', cookie).expect(200);
+    expect(await lineReferences(copy.body.id)).toEqual(['SBM2000-1', 'SBM2000-2']);
+    expect(await lineReferences(id)).toEqual(['SBM1061-1', 'SBM1061-2']);
+  });
+
+  it('keeps the lines of two notes apart', async () => {
+    const first = await create();
+    const second = await create({ reference: 'SBM1062' });
+    expect(await lineReferences(first)).toEqual(['SBM1061-1', 'SBM1061-2']);
+    expect(await lineReferences(second)).toEqual(['SBM1062-1', 'SBM1062-2']);
+  });
+
+  it('skips a reference another line already holds, so renaming a note cannot collide', async () => {
+    const first = await create();
+    // The note is renamed to the reference a second note will take, leaving
+    // its lines holding SBM1062-1 and SBM1062-2 under their original numbers.
+    await supertest(app)
+      .put(`/api/collection-notes/${first}`)
+      .set('Cookie', cookie)
+      .send({
+        ...note({ reference: 'SBM1062' }),
+        items: [{ description: 'Poly cup reels' }, { description: 'Mixed paper bales' }],
+      })
+      .expect(200);
+    expect(await lineReferences(first)).toEqual(['SBM1062-1', 'SBM1062-2']);
+
+    const second = await create({ reference: 'SBM1062-ALT' });
+    await supertest(app)
+      .put(`/api/collection-notes/${second}`)
+      .set('Cookie', cookie)
+      .send({ ...note({ reference: 'SBM1062-ALT' }), items: [{ description: 'Shrink wrap' }] })
+      .expect(200);
+
+    const refs = await lineReferences(second);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).not.toBe('SBM1062-1');
+  });
+
+  it('gives the lines of an older note references on the next startup', () => {
+    // A database from before the column existed: the rows are inserted with
+    // no line reference at all, as the old code did.
+    const insert = db.prepare(
+      'INSERT INTO collection_notes (reference, customer_id, collection_date) VALUES (?, ?, ?)',
+    );
+    const noteId = insert.run('SBM1050', customerId, '2026-08-01').lastInsertRowid as number;
+    const item = db.prepare('INSERT INTO collection_note_items (note_id, description, sort_order) VALUES (?, ?, ?)');
+    item.run(noteId, 'Poly cup reels', 0);
+    item.run(noteId, 'Mixed paper bales', 1);
+
+    createSchema(db);
+
+    const rows = db
+      .prepare('SELECT line_reference FROM collection_note_items WHERE note_id = ? ORDER BY sort_order')
+      .all(noteId) as { line_reference: string }[];
+    expect(rows.map((r) => r.line_reference)).toEqual(['SBM1050-1', 'SBM1050-2']);
+  });
+});
+
+describe('line reference allocation', () => {
+  it('reads the suffix off a reference, and nothing off one that has none', () => {
+    expect(parseLineSuffix('SBM1061-3')).toBe(3);
+    expect(parseLineSuffix('  SBM1061-12  ')).toBe(12);
+    expect(parseLineSuffix('SBM1061')).toBeNull();
+    expect(parseLineSuffix('')).toBeNull();
+    expect(parseLineSuffix(null)).toBeNull();
+  });
+
+  it('carries on from the highest suffix on the note', () => {
+    const lines = [{ line_reference: 'SBM1061-2' }, { line_reference: null }, { line_reference: 'SBM1061-7' }, {}];
+    expect(allocateLineReferences(new Set(), 'SBM1061', lines)).toEqual([
+      'SBM1061-2',
+      'SBM1061-8',
+      'SBM1061-7',
+      'SBM1061-9',
+    ]);
+  });
+
+  it('steps over a reference already in use, whatever its case', () => {
+    const taken = new Set(['sbm1061-1', 'sbm1061-2']);
+    expect(allocateLineReferences(taken, 'SBM1061', [{}])).toEqual(['SBM1061-3']);
   });
 });

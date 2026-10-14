@@ -224,6 +224,9 @@ export function CollectionNoteEdit() {
         buy_price: buyPrice === '' ? null : buyPrice,
         sale_price: salePrice === '' ? null : salePrice,
         items: items.map((it) => ({
+          // Sent back as it came, so a saved line keeps the reference it was
+          // given; the server allocates one for any line that has none.
+          line_reference: it.line_reference || null,
           quantity: it.quantity || null,
           description: it.description || null,
           nett_weight: it.nett_weight || null,
@@ -446,6 +449,15 @@ export function CollectionNoteEdit() {
         <Section title="Items">
           {items.map((item, i) => (
             <div key={i} style={itemRowStyle}>
+              {/* Each line carries its own unique reference, allocated by the
+                  server from the note's reference when the note is saved, so
+                  there is nothing here to type or to overwrite. */}
+              <div
+                style={{ flexBasis: '100%', fontSize: 12, fontWeight: 600, color: '#7f8c8d' }}
+                aria-label={`Line reference, line ${i + 1}`}
+              >
+                {item.line_reference || 'Reference allocated when saved'}
+              </div>
               <div style={{ flex: '0 0 100px' }}>
                 <label style={labelStyle} htmlFor={`cn-item-qty-${i}`}>
                   Quantity

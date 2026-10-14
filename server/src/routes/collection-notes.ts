@@ -13,6 +13,7 @@ import {
 } from '../utils/collection-note-reference';
 import { getSetting } from '../utils/settings';
 import { loadCollectionNote } from '../utils/collection-note-loader';
+import { allocateLineReferences, takenLineReferences } from '../utils/collection-note-line-reference';
 import { removeUploadDir } from '../utils/uploads';
 import { describeCollectionNote, recordAudit } from '../utils/audit';
 import { canSeeSale, stripSaleFields, stripSaleFieldsFromAll, toPrice } from '../utils/collection-note-sales';
@@ -178,7 +179,7 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         );
 
       const noteId = result.lastInsertRowid as number;
-      insertItems(db, noteId, body.items);
+      insertItems(db, noteId, body.items, reference, takenLineReferences(db));
       recordReferenceUsed(db, reference);
       return noteId;
     });
@@ -253,9 +254,12 @@ export function collectionNoteRoutes(db: Database.Database): Router {
       );
 
       // Items carry no foreign keys of their own, so unlike report containers
-      // they are safe to replace wholesale.
+      // they are safe to replace wholesale. The line references in use are
+      // read before the delete, so that a reference belonging to a line being
+      // removed is not handed straight to a new one.
+      const taken = takenLineReferences(db);
       db.prepare('DELETE FROM collection_note_items WHERE note_id = ?').run(noteId);
-      insertItems(db, noteId, body.items);
+      insertItems(db, noteId, body.items, reference, taken);
       recordReferenceUsed(db, reference);
     });
 
@@ -315,7 +319,15 @@ export function collectionNoteRoutes(db: Database.Database): Router {
         );
 
       const noteId = result.lastInsertRowid as number;
-      insertItems(db, noteId, source.items);
+      // The copy's lines are new lines, so they take fresh line references
+      // under the copy's own reference rather than the original's.
+      insertItems(
+        db,
+        noteId,
+        source.items.map((item) => ({ ...item, line_reference: null })),
+        reference,
+        takenLineReferences(db),
+      );
       recordReferenceUsed(db, reference);
       return { id: noteId, reference };
     });
@@ -412,22 +424,30 @@ function isBlankItem(item: any): boolean {
   );
 }
 
-function insertItems(db: Database.Database, noteId: number, items: any): void {
+function insertItems(
+  db: Database.Database,
+  noteId: number,
+  items: any,
+  noteReference: string,
+  taken: Set<string>,
+): void {
   if (!Array.isArray(items) || !items.length) return;
   const stmt = db.prepare(
     `INSERT INTO collection_note_items (
-       note_id, quantity, description, nett_weight, reference, vehicle_registration,
+       note_id, line_reference, quantity, description, nett_weight, reference, vehicle_registration,
        is_container, container_number, seal_number, sort_order
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   // The form always starts with (and can be left with) one blank line item,
   // so skip rows where every field is empty rather than storing and later
   // printing an empty PDF table row.
+  const kept = items.filter((item: any) => !isBlankItem(item));
+  const lineReferences = allocateLineReferences(taken, noteReference, kept);
   let sortOrder = 0;
-  for (const item of items) {
-    if (isBlankItem(item)) continue;
+  for (const item of kept) {
     stmt.run(
       noteId,
+      lineReferences[sortOrder],
       item?.quantity ?? null,
       item?.description ?? null,
       item?.nett_weight ?? null,

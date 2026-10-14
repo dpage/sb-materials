@@ -69,6 +69,22 @@ export function containerLine(item: {
   return parts.join('  ');
 }
 
+/**
+ * The small line printed beneath a line item's description: the line's own
+ * reference, followed by the container details where it is containerised.
+ * Kept out of the columns deliberately, since a sixth column would leave the
+ * description too narrow to read.
+ */
+export function itemDetailLine(item: {
+  line_reference?: string | null;
+  is_container?: number | null;
+  container_number?: string | null;
+  seal_number?: string | null;
+}): string {
+  const parts = [item.line_reference || '', containerLine(item)].filter(Boolean);
+  return parts.join('  ');
+}
+
 const LOGO_IMAGE_KEY = 'sbLogo';
 
 const printer = new PdfPrinter({
@@ -233,14 +249,14 @@ export async function generateCollectionNotePdf(
   ];
   const items = note.items || [];
   collectionNoteItemRows(note).forEach((row, index) => {
-    const container = containerLine(items[index]);
+    const detail = itemDetailLine(items[index]);
     itemBody.push([
       { text: row[0] },
-      container
+      detail
         ? {
             stack: [
               { text: row[1], bold: true },
-              { text: container, fontSize: 8 },
+              { text: detail, fontSize: 8 },
             ],
           }
         : { text: row[1], bold: true },

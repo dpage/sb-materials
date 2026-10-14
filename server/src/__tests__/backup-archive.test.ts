@@ -64,6 +64,7 @@ describe('computeSchemaFingerprint', () => {
         'description',
         'id',
         'is_container',
+        'line_reference',
         'nett_weight',
         'note_id',
         'quantity',

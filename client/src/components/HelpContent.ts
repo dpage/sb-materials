@@ -140,7 +140,7 @@ export const helpTopics: Record<string, HelpTopic> = {
       },
       {
         title: 'Items',
-        body: 'List the items being collected, each with a quantity, description, nett weight in kilogrammes, your own item reference, and the registration of the vehicle carrying it. The description is chosen from the shared product description list, and the "+" button beside it adds a new description without leaving the form. Tick "Container" on a line that travels in a container, and boxes appear for the container number and seal number; untick it and those are forgotten. These appear on the PDF and in the item summary shown on the list page.',
+        body: 'Each line is given its own unique reference when the note is saved, shown at the top of the line: the note\'s reference with a number after it, such as SBM1061-1. It belongs to that line for good, so deleting a line never renumbers the others, and it is printed under the description on the PDF. List the items being collected, each with a quantity, description, nett weight in kilogrammes, your own item reference, and the registration of the vehicle carrying it. The description is chosen from the shared product description list, and the "+" button beside it adds a new description without leaving the form. Tick "Container" on a line that travels in a container, and boxes appear for the container number and seal number; untick it and those are forgotten. These appear on the PDF and in the item summary shown on the list page.',
       },
       {
         title: 'Sale (superusers only)',

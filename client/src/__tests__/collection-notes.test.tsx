@@ -378,6 +378,20 @@ describe('CollectionNoteEdit form', () => {
     );
   });
 
+  it('says a new line will be given its reference when the note is saved', async () => {
+    render(<CollectionNoteEdit />, { wrapper: TestWrapper });
+    await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
+    expect(screen.getByLabelText(/line reference, line 1/i)).toHaveTextContent(/allocated when saved/i);
+    fireEvent.change(screen.getByLabelText(/customer/i), { target: { value: '1' } });
+    fireEvent.change(screen.getAllByLabelText(/nett weight/i)[0], { target: { value: '1250' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() =>
+      expect(api.createCollectionNote).toHaveBeenCalledWith(
+        expect.objectContaining({ items: [expect.objectContaining({ line_reference: null })] }),
+      ),
+    );
+  });
+
   it('hides and clears the container details when the line is unticked', async () => {
     render(<CollectionNoteEdit />, { wrapper: TestWrapper });
     await waitFor(() => expect(screen.getByLabelText(/^reference$/i)).toBeInTheDocument());
@@ -508,6 +522,7 @@ describe('CollectionNoteEdit form', () => {
       items: [
         {
           id: 1,
+          line_reference: 'SBM1050-1',
           quantity: '2x',
           description: 'Poly cup reels',
           nett_weight: '1250',
@@ -537,6 +552,8 @@ describe('CollectionNoteEdit form', () => {
     expect(screen.getByLabelText(/minimum weight/i)).toHaveValue('24 Tonnes');
     expect(screen.getByLabelText(/nett weight/i)).toHaveValue('1250');
     expect(screen.getByLabelText(/item reference/i)).toHaveValue('REF-1');
+    // The line's own reference is shown, not typed, and goes back untouched.
+    expect(screen.getByLabelText(/line reference, line 1/i)).toHaveTextContent('SBM1050-1');
     expect(screen.getByLabelText(/vehicle registration/i)).toHaveValue('AB12 CDE');
     expect(screen.getByLabelText(/container, line 1/i)).toBeChecked();
     expect(screen.getByLabelText(/container number/i)).toHaveValue('ABCU1234567');
@@ -548,7 +565,13 @@ describe('CollectionNoteEdit form', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() =>
-      expect(api.updateCollectionNote).toHaveBeenCalledWith(5, expect.objectContaining({ reference: 'SBM1050' })),
+      expect(api.updateCollectionNote).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          reference: 'SBM1050',
+          items: [expect.objectContaining({ line_reference: 'SBM1050-1' })],
+        }),
+      ),
     );
   });
 
