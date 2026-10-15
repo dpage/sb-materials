@@ -308,7 +308,7 @@ export function CollectionNoteEdit() {
                     setCustomerId(parseInt(e.target.value) || '');
                     setSiteId('');
                   }}
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  style={{ ...selectStyle, flex: 1, minWidth: 0 }}
                 >
                   <option value="">Select customer...</option>
                   {customers.map((c) => (
@@ -332,7 +332,7 @@ export function CollectionNoteEdit() {
                   id="cn-site"
                   value={siteId}
                   onChange={(e) => setSiteId(parseInt(e.target.value) || '')}
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  style={{ ...selectStyle, flex: 1, minWidth: 0 }}
                   disabled={!customerId}
                 >
                   <option value="">Select site...</option>
@@ -478,7 +478,7 @@ export function CollectionNoteEdit() {
                     id={`cn-item-desc-${i}`}
                     value={item.description || ''}
                     onChange={(e) => updateItem(i, 'description', e.target.value)}
-                    style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                    style={{ ...selectStyle, flex: 1, minWidth: 0 }}
                   >
                     <option value="">Select description...</option>
                     {descriptionOptions(productDescriptions, item.description).map((value) => (
@@ -762,6 +762,13 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 6,
   fontSize: 14,
   boxSizing: 'border-box',
+};
+
+// Selects carry a caret painted as a background image by the global rule in
+// index.html; the padding shorthand above would overwrite the room left for it.
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  paddingRight: 28,
 };
 
 const primaryBtnStyle: React.CSSProperties = {

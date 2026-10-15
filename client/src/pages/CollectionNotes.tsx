@@ -120,15 +120,20 @@ export function CollectionNotes() {
 
         .search-row {
           display: flex; gap: 8px; margin-bottom: 12px; align-items: stretch;
+          flex-wrap: wrap;
         }
+        /* Wide enough that the customer filter wraps below it on a phone
+           rather than squeezing the placeholder out of sight. */
+        .search-row .search-input { min-width: 260px; }
         .search-input {
           flex: 1; padding: 10px 12px; border: 1px solid #dde1e6;
           border-radius: 8px; font-size: 15px; min-width: 0;
+          box-sizing: border-box;
         }
         .filter-group { display: flex; flex-direction: column; }
         .filter-group select {
-          padding: 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
-          font-size: 14px; background: #fff; box-sizing: border-box;
+          padding: 9px 28px 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
+          font-size: 14px; background-color: #fff; box-sizing: border-box;
         }
 
         .cn-table-wrap {

@@ -194,16 +194,35 @@ export function Layout() {
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="mobile-menu-btn"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
             style={{
               display: 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 36,
+              height: 36,
+              padding: 0,
               background: 'none',
               border: 'none',
               color: '#24292f',
-              fontSize: 24,
               cursor: 'pointer',
             }}
           >
-            ☰
+            {/* Drawn rather than the ☰ character, which has no glyph in some
+                of the fonts this ends up rendered with. */}
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 22 22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M3 6h16M3 11h16M3 16h16" />
+            </svg>
           </button>
         </div>
       </header>
@@ -276,7 +295,7 @@ export function Layout() {
         .brand-logo { height: 34px; }
         @media (max-width: 768px) {
           .desktop-nav { display: none !important; }
-          .mobile-menu-btn { display: block !important; }
+          .mobile-menu-btn { display: inline-flex !important; }
           .brand-logo { height: 26px; }
         }
         @media (max-width: 380px) {

@@ -311,7 +311,9 @@ export function Backups() {
       >
         <h3 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 600, color: '#2d3436' }}>Schedule</h3>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          {/* Height matched to the fields beside it, which carry a label above
+              them, so the checkbox lands on the same line as their inputs. */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', height: 38 }}>
             <input
               type="checkbox"
               checked={settings.enabled}
@@ -327,7 +329,14 @@ export function Backups() {
               max={23}
               value={settings.hour}
               onChange={(e) => setSettings((s) => ({ ...s, hour: parseInt(e.target.value, 10) || 0 }))}
-              style={{ width: 80, padding: '8px 10px', border: '1px solid #dde1e6', borderRadius: 6 }}
+              style={{
+                width: 80,
+                height: 38,
+                padding: '8px 10px',
+                border: '1px solid #dde1e6',
+                borderRadius: 6,
+                boxSizing: 'border-box',
+              }}
             />
           </div>
           <div>
@@ -337,14 +346,22 @@ export function Backups() {
               min={1}
               value={settings.keep}
               onChange={(e) => setSettings((s) => ({ ...s, keep: parseInt(e.target.value, 10) || 1 }))}
-              style={{ width: 80, padding: '8px 10px', border: '1px solid #dde1e6', borderRadius: 6 }}
+              style={{
+                width: 80,
+                height: 38,
+                padding: '8px 10px',
+                border: '1px solid #dde1e6',
+                borderRadius: 6,
+                boxSizing: 'border-box',
+              }}
             />
           </div>
           <button
             onClick={handleSaveSettings}
             disabled={savingSettings || !settingsLoaded}
             style={{
-              padding: '8px 20px',
+              height: 38,
+              padding: '0 20px',
               background: '#2980b9',
               color: '#fff',
               border: 'none',
@@ -360,9 +377,16 @@ export function Backups() {
       </div>
 
       <div
-        style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden' }}
+        style={{
+          background: '#fff',
+          borderRadius: 10,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+          // Scroll rather than clip, so the actions column stays reachable on a
+          // phone instead of disappearing past the right hand edge.
+          overflowX: 'auto',
+        }}
       >
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
           <thead>
             <tr>
               <th style={thStyle}>Date</th>

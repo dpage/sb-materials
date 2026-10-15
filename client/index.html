@@ -18,9 +18,14 @@
         box-sizing: border-box; background: #fff;
       }
       button:disabled, select:disabled, input:disabled { opacity: 0.4; cursor: default; }
+      /* The caret is drawn as a background image, so any rule that sets the
+         "background" shorthand on a select wipes it and leaves what looks like
+         a plain text box: always set background-color instead. Likewise the
+         "padding" shorthand undoes the room left here for the caret. */
       select { -webkit-appearance: none; -moz-appearance: none; appearance: none;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
         background-repeat: no-repeat; background-position: right 10px center;
+        background-color: #fff;
         padding-right: 28px;
       }
       @media (max-width: 768px) {

@@ -1963,8 +1963,7 @@ describe('Layout', () => {
       </TestWrapper>,
     );
 
-    // Mobile menu button with ☰
-    expect(screen.getByText('☰')).toBeInTheDocument();
+    expect(document.querySelector('.mobile-menu-btn')).toBeInTheDocument();
   });
 
   it('should toggle mobile menu', () => {
@@ -1979,7 +1978,7 @@ describe('Layout', () => {
     );
 
     // Click mobile menu button
-    fireEvent.click(screen.getByText('☰'));
+    fireEvent.click(document.querySelector('.mobile-menu-btn')!);
 
     // Mobile nav should now be rendered
     const mobileNav = document.querySelector('.mobile-nav');
@@ -1999,7 +1998,7 @@ describe('Layout', () => {
     );
 
     // Open mobile menu
-    fireEvent.click(screen.getByText('☰'));
+    fireEvent.click(document.querySelector('.mobile-menu-btn')!);
     const mobileNav = document.querySelector('.mobile-nav');
     expect(mobileNav).toBeInTheDocument();
 

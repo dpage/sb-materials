@@ -108,8 +108,14 @@ export function Lookups() {
           box-sizing: border-box;
         }
         .add-select {
-          padding: 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
+          padding: 9px 28px 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
           font-size: 14px; box-sizing: border-box;
+        }
+        .form-field {
+          display: flex; flex-direction: column; gap: 6px;
+        }
+        .form-field label {
+          font-weight: 500; font-size: 13px; color: #2c3e50;
         }
         .add-btn {
           padding: 8px 20px; background: #27ae60; color: #fff; border: none;
@@ -211,7 +217,7 @@ export function Lookups() {
                 style={{ padding: '9px 12px', border: '1px solid #dde1e6', borderRadius: 6, fontSize: 14 }}
               />
             </div>
-            <button className="add-btn" onClick={saveNextNumber}>
+            <button className="add-btn" style={{ height: 38 }} onClick={saveNextNumber}>
               Save number
             </button>
             {nextNumberSaved && <span style={{ color: '#27ae60', fontSize: 13 }}>Saved</span>}

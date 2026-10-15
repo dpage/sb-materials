@@ -613,7 +613,7 @@ export function ReportEdit() {
                     setCustomerId(parseInt(e.target.value) || '');
                     setSiteId('');
                   }}
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  style={{ ...selectStyle, flex: 1, minWidth: 0 }}
                 >
                   <option value="">Select customer...</option>
                   {customers.map((c) => (
@@ -633,7 +633,7 @@ export function ReportEdit() {
                 <select
                   value={siteId}
                   onChange={(e) => setSiteId(parseInt(e.target.value) || '')}
-                  style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                  style={{ ...selectStyle, flex: 1, minWidth: 0 }}
                   disabled={!customerId}
                 >
                   <option value="">Select site...</option>
@@ -685,7 +685,7 @@ export function ReportEdit() {
             </div>
             <div>
               <label style={labelStyle}>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle}>
                 <option value="draft">Draft</option>
                 <option value="completed">Completed</option>
               </select>
@@ -696,7 +696,7 @@ export function ReportEdit() {
                 <select
                   value={assignedToId}
                   onChange={(e) => setAssignedToId(parseInt(e.target.value) || '')}
-                  style={inputStyle}
+                  style={selectStyle}
                 >
                   <option value="">Unassigned (I'll complete it)</option>
                   {users
@@ -716,7 +716,7 @@ export function ReportEdit() {
                   <select
                     value={onBehalfOf}
                     onChange={(e) => setOnBehalfOf(e.target.value)}
-                    style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+                    style={{ ...selectStyle, flex: 1, minWidth: 0 }}
                   >
                     <option value="">Select client...</option>
                     {clientOptions.map((c) => (
@@ -768,7 +768,7 @@ export function ReportEdit() {
                     <select
                       value={details.product_description || ''}
                       onChange={(e) => setDetails((d) => ({ ...d, product_description: e.target.value || null }))}
-                      style={inputStyle}
+                      style={selectStyle}
                     >
                       <option value="">Select...</option>
                       {productDescs.map((p) => (
@@ -784,7 +784,7 @@ export function ReportEdit() {
                   <select
                     value={details.product_grade || ''}
                     onChange={(e) => setDetails((d) => ({ ...d, product_grade: e.target.value || null }))}
-                    style={inputStyle}
+                    style={selectStyle}
                   >
                     <option value="">Select...</option>
                     {productGrades.map((p) => (
@@ -800,7 +800,7 @@ export function ReportEdit() {
                     <select
                       value={details.mode_of_storage || ''}
                       onChange={(e) => setDetails((d) => ({ ...d, mode_of_storage: e.target.value || null }))}
-                      style={inputStyle}
+                      style={selectStyle}
                     >
                       <option value="">Select...</option>
                       {storageModes.map((s) => (
@@ -1547,18 +1547,20 @@ function SamplingSection({
 
   const weightRow = (label: string, field: keyof ReportSampling) => (
     <div key={field} style={samplingRowStyle}>
-      <label style={{ ...labelStyle, marginBottom: 0 }}>{label}</label>
-      <input
-        type="number"
-        inputMode="decimal"
-        step="any"
-        min="0"
-        aria-label={`${label} (kg)`}
-        value={(sampling[field] as number | string | null) ?? ''}
-        onChange={(e) => update(field, e.target.value === '' ? null : e.target.value)}
-        style={{ ...inputStyle, width: 120 }}
-        placeholder="kg"
-      />
+      <label style={{ ...labelStyle, ...samplingCellStyle, marginBottom: 0 }}>{label}</label>
+      <div style={samplingCellStyle}>
+        <input
+          type="number"
+          inputMode="decimal"
+          step="any"
+          min="0"
+          aria-label={`${label} (kg)`}
+          value={(sampling[field] as number | string | null) ?? ''}
+          onChange={(e) => update(field, e.target.value === '' ? null : e.target.value)}
+          style={inputStyle}
+          placeholder="kg"
+        />
+      </div>
       <div style={samplingPercentStyle} aria-label={`${label} percentage`}>
         {formatSamplingPercent(sampling[field], sampleSize) || '—'}
       </div>
@@ -1596,7 +1598,7 @@ function SamplingSection({
                 aria-label="Sampling Product Description"
                 value={sampling.product_description || ''}
                 onChange={(e) => update('product_description', e.target.value || null)}
-                style={inputStyle}
+                style={selectStyle}
               >
                 <option value="">Select...</option>
                 {lookupOptions(productDescriptions, sampling.product_description).map((value) => (
@@ -1612,7 +1614,7 @@ function SamplingSection({
                 aria-label="Sampling Product Grade"
                 value={sampling.product_grade || ''}
                 onChange={(e) => update('product_grade', e.target.value || null)}
-                style={inputStyle}
+                style={selectStyle}
               >
                 <option value="">Select...</option>
                 {lookupOptions(productGrades, sampling.product_grade).map((value) => (
@@ -1624,31 +1626,42 @@ function SamplingSection({
             </div>
           </div>
 
-          <div style={samplingRowStyle}>
-            <label style={{ ...labelStyle, marginBottom: 0 }}>Sample Size</label>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="any"
-              min="0"
-              aria-label="Sample Size (kg)"
-              value={sampleSize}
-              onChange={(e) => update('sample_size_kg', e.target.value === '' ? null : e.target.value)}
-              style={{ ...inputStyle, width: 120 }}
-              placeholder="kg"
-            />
-            <div style={{ ...samplingPercentStyle, color: '#95a5a6' }}>% of sample</div>
-          </div>
-
-          {SAMPLING_COMPONENTS.map((component) => weightRow(component.label, component.key))}
-
-          <div style={{ ...samplingRowStyle, borderTop: '1px solid #e4e7eb', paddingTop: 10, fontWeight: 700 }}>
-            <label style={{ ...labelStyle, marginBottom: 0, fontWeight: 700 }}>Total Accounted For</label>
-            <div style={{ width: 120 }} aria-label="Total accounted for">
-              {totals.accountedKg === null ? '—' : `${totals.accountedKg} kg`}
+          <div style={samplingGridStyle}>
+            <div style={samplingRowStyle}>
+              <label style={{ ...labelStyle, ...samplingCellStyle, marginBottom: 0 }}>Sample Size</label>
+              <div style={samplingCellStyle}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  min="0"
+                  aria-label="Sample Size (kg)"
+                  value={sampleSize}
+                  onChange={(e) => update('sample_size_kg', e.target.value === '' ? null : e.target.value)}
+                  style={inputStyle}
+                  placeholder="kg"
+                />
+              </div>
+              <div style={{ ...samplingPercentStyle, color: '#95a5a6', fontSize: 12 }}>% of sample</div>
             </div>
-            <div style={samplingPercentStyle} aria-label="Total accounted for percentage">
-              {totals.accountedPercent === null ? '—' : `${totals.accountedPercent.toFixed(1)}%`}
+
+            {SAMPLING_COMPONENTS.map((component) => weightRow(component.label, component.key))}
+
+            <div style={samplingRuleStyle} />
+
+            <div style={{ ...samplingRowStyle, fontWeight: 700 }}>
+              <label style={{ ...labelStyle, ...samplingTotalCellStyle, marginBottom: 0, fontWeight: 700 }}>
+                Total Accounted For
+              </label>
+              <div style={samplingTotalCellStyle} aria-label="Total accounted for">
+                {totals.accountedKg === null ? '—' : `${totals.accountedKg} kg`}
+              </div>
+              <div
+                style={{ ...samplingPercentStyle, ...samplingTotalCellStyle, textAlign: 'right' }}
+                aria-label="Total accounted for percentage"
+              >
+                {totals.accountedPercent === null ? '—' : `${totals.accountedPercent.toFixed(1)}%`}
+              </div>
             </div>
           </div>
 
@@ -2358,6 +2371,13 @@ const inputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
+// Selects carry a caret painted as a background image by the global rule in
+// index.html; the padding shorthand above would overwrite the room left for it.
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  paddingRight: 28,
+};
+
 const primaryBtnStyle: React.CSSProperties = {
   padding: '10px 24px',
   background: '#27ae60',
@@ -2426,15 +2446,39 @@ const photoRemoveBtn: React.CSSProperties = {
   padding: 0,
 };
 
-const samplingRowStyle: React.CSSProperties = {
-  display: 'flex',
+// The weight rows are a single three column grid (label, kg input, computed
+// percentage) rather than a flex row each, so that the inputs and the
+// percentages line up down the section however long the labels run.
+const samplingGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, max-content) minmax(76px, 120px) 76px',
+  columnGap: 12,
   alignItems: 'center',
-  gap: 12,
+  maxWidth: 640,
+};
+
+const samplingRowStyle: React.CSSProperties = {
+  display: 'contents',
+};
+
+const samplingCellStyle: React.CSSProperties = {
   padding: '6px 0',
 };
 
+const samplingTotalCellStyle: React.CSSProperties = {
+  padding: '12px 0 6px',
+};
+
+// A full width rule above the totals; a border on each of the three cells would
+// break at the column gaps.
+const samplingRuleStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  borderTop: '1px solid #e4e7eb',
+  marginTop: 6,
+};
+
 const samplingPercentStyle: React.CSSProperties = {
-  width: 90,
+  padding: '6px 0',
   textAlign: 'right',
   fontVariantNumeric: 'tabular-nums',
 };

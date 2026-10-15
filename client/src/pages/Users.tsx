@@ -89,7 +89,7 @@ export function Users() {
         .form-field input[type="text"],
         .form-field input[type="password"],
         .form-field select {
-          width: 100%; padding: 9px 12px; border: 1px solid #dde1e6;
+          width: 100%; padding: 9px 28px 9px 12px; border: 1px solid #dde1e6;
           border-radius: 6px; font-size: 14px; box-sizing: border-box;
         }
         .form-actions { display: flex; gap: 8px; margin-top: 16px; }
@@ -313,7 +313,7 @@ export function Users() {
               </div>
             </div>
             <div className="user-card-badges">
-              {u.is_superuser && <span className="badge-superuser">Superuser</span>}
+              {u.is_superuser ? <span className="badge-superuser">Superuser</span> : null}
               <span className={`badge-active ${u.is_active ? 'yes' : 'no'}`}>
                 {u.is_active ? 'Active' : 'Inactive'}
               </span>

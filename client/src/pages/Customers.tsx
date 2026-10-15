@@ -189,13 +189,13 @@ export function Customers() {
             <p style={{ color: '#999', padding: 12 }}>No customers yet. Add one above.</p>
           ) : (
             <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-              {customers.map((c) => (
+              {customers.map((c, i) => (
                 <div
                   key={c.id}
                   onClick={() => selectCustomer(c.id)}
                   style={{
                     padding: '12px 14px',
-                    borderBottom: '1px solid #eee',
+                    borderBottom: i === customers.length - 1 ? 'none' : '1px solid #eee',
                     cursor: 'pointer',
                     background: selected?.id === c.id ? '#ebf5fb' : 'transparent',
                     opacity: c.is_active ? 1 : 0.5,
@@ -269,12 +269,12 @@ export function Customers() {
               {selected.sites.length === 0 ? (
                 <p style={{ color: '#999', padding: 12 }}>No sites yet. Add one above.</p>
               ) : (
-                selected.sites.map((s) => (
+                selected.sites.map((s, i) => (
                   <div
                     key={s.id}
                     style={{
                       padding: '10px 12px',
-                      borderBottom: '1px solid #eee',
+                      borderBottom: i === selected.sites.length - 1 ? 'none' : '1px solid #eee',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',

@@ -127,8 +127,10 @@ export function Reports() {
         }
         .filter-group select, .filter-group input {
           padding: 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
-          font-size: 14px; background: #fff; box-sizing: border-box;
+          font-size: 14px; background-color: #fff; box-sizing: border-box;
         }
+        /* Leave room for the caret the global select rule paints. */
+        .filter-group select { padding-right: 28px; }
 
         /* Desktop table */
         .report-table-wrap {
