@@ -16,8 +16,10 @@ export const SHEET_STYLES = `
   .sheet-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
   .sheet-controls select, .sheet-controls input {
     padding: 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
-    font-size: 14px; background: #fff; box-sizing: border-box;
+    font-size: 14px; background-color: #fff; box-sizing: border-box;
   }
+  /* Room for the caret the global select rule paints. */
+  .sheet-controls select { padding-right: 28px; }
   .btn-new {
     padding: 10px 22px; background: #27ae60; color: #fff; border: none;
     border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
@@ -40,6 +42,7 @@ export const SHEET_STYLES = `
     width: 100%; padding: 7px 8px; border: 1px solid #dde1e6; border-radius: 6px;
     font-size: 14px; box-sizing: border-box; min-width: 70px;
   }
+  .sheet-table select { padding-right: 26px; background-position: right 7px center; }
   .sheet-table .num { text-align: right; }
   .action-btn {
     padding: 4px 12px; border: 1px solid #ddd; border-radius: 4px;

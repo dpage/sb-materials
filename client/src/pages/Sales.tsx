@@ -81,8 +81,8 @@ export function Sales() {
           border-radius: 8px; font-size: 15px; min-width: 0;
         }
         .sales-filters select {
-          padding: 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
-          font-size: 14px; background: #fff;
+          padding: 9px 28px 9px 12px; border: 1px solid #dde1e6; border-radius: 6px;
+          font-size: 14px; background-color: #fff;
         }
         .sales-table-wrap {
           background: #fff; border-radius: 10px;
