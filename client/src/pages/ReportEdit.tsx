@@ -22,6 +22,9 @@ import { chunkBySizeAndCount } from '../utils/uploadChunks';
 import {
   SAMPLING_COMPONENTS,
   SAMPLING_PHOTO_LABEL,
+  SAMPLING_PROHIBITED_NOTE,
+  SAMPLING_RESULT_LABEL,
+  SAMPLING_RESULT_OPTIONS,
   formatSamplingPercent,
   samplingTotals,
   toWeight,
@@ -1681,6 +1684,7 @@ function SamplingSection({
                 style={inputStyle}
                 placeholder="What was found"
               />
+              <div style={{ fontSize: 13, color: '#c0392b', marginTop: 6 }}>{SAMPLING_PROHIBITED_NOTE}</div>
             </div>
             <div>
               <label style={labelStyle}>PERN/PRN % Claimed</label>
@@ -1758,6 +1762,15 @@ function SamplingSection({
                 />
               </label>
             </div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <label style={labelStyle}>{SAMPLING_RESULT_LABEL}</label>
+            <RadioGroup
+              options={SAMPLING_RESULT_OPTIONS}
+              value={sampling.result || ''}
+              onChange={(v) => update('result', v)}
+            />
           </div>
 
           <div style={{ marginTop: 14 }}>

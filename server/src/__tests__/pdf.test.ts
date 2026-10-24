@@ -1093,6 +1093,24 @@ describe('sampling section', () => {
     expect(text).not.toContain('Bale Split Results');
   });
 
+  it('prints the pass or fail verdict and the prohibited items note', async () => {
+    const text = extractPdfText(
+      await generatePdf(reportFor('sampling', { sampling: { ...sampling, result: 'FAIL' } }) as any, tmpDir),
+    );
+    expect(text).toContain('Sampling Result');
+    expect(text).toContain('FAIL');
+    expect(text).toContain('0% limit: if prohibited items are found, please call the trader.');
+  });
+
+  it('prints the prohibited items note even when none were found', async () => {
+    const text = extractPdfText(
+      await generatePdf(reportFor('sampling', { sampling: { ...sampling, prohibited_items: null } }) as any, tmpDir),
+    );
+    expect(text).toContain('Prohibited Items Found');
+    expect(text).toContain('None');
+    expect(text).toContain('0% limit: if prohibited items are found, please call the trader.');
+  });
+
   it('drops the results and follow-up boxes from the PERN audit, keeping the notes', async () => {
     const text = extractPdfText(
       await generatePdf(

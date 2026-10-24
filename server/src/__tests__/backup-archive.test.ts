@@ -229,6 +229,7 @@ describe('computeSchemaFingerprint', () => {
         'prohibited_items',
         'prohibited_kg',
         'report_id',
+        'result',
         'sample_size_kg',
       ],
       report_unwanted_materials: ['id', 'material', 'notes', 'report_id'],

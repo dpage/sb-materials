@@ -190,6 +190,8 @@ export interface ReportSampling {
   contamination_kg?: number | string | null;
   prohibited_kg?: number | string | null;
   prohibited_items?: string | null;
+  /** PASS or FAIL: the sampling sheet's own verdict on the load. */
+  result?: string | null;
   product_description?: string | null;
   product_grade?: string | null;
   pern_prn_claimed_percent?: number | string | null;

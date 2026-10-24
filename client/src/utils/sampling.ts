@@ -7,6 +7,11 @@
 
 export const SAMPLING_PHOTO_LABEL = 'Sampling';
 
+/** Shown beneath the prohibited items box, and printed under it on the PDF. */
+export const SAMPLING_PROHIBITED_NOTE = '0% limit: if prohibited items are found, please call the trader.';
+export const SAMPLING_RESULT_LABEL = 'Sampling Result';
+export const SAMPLING_RESULT_OPTIONS = ['PASS', 'FAIL'];
+
 export const SAMPLING_COMPONENTS = [
   { key: 'in_scope_kg', label: 'Post Consumer Packaging In Scope' },
   { key: 'out_of_scope_kg', label: 'Post Consumer Packaging NOT In Scope' },

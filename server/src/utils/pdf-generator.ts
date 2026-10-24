@@ -15,6 +15,8 @@ import {
   SAMPLING_PRODUCT_DESCRIPTION_LABEL,
   SAMPLING_PRODUCT_GRADE_LABEL,
   SAMPLING_PROHIBITED_ITEMS_LABEL,
+  SAMPLING_PROHIBITED_NOTE,
+  SAMPLING_RESULT_LABEL,
   SAMPLING_CLAIMED_LABEL,
   SAMPLING_LIMIT_LABEL,
   SAMPLING_COMMENTS_LABEL,
@@ -794,9 +796,10 @@ function appendSamplingSection(content: Content[], report: any, photoData: Map<s
   });
 
   const detailRows: TableCell[][] = [];
-  if (s.prohibited_items) {
-    detailRows.push(...fieldRow(SAMPLING_PROHIBITED_ITEMS_LABEL, s.prohibited_items));
-  }
+  detailRows.push(...fieldRow(SAMPLING_PROHIBITED_ITEMS_LABEL, s.prohibited_items || 'None'));
+  // The note prints whether or not anything was found, since it is the
+  // instruction rather than a comment on this particular sample.
+  detailRows.push([{ text: SAMPLING_PROHIBITED_NOTE, colSpan: 2, italics: true, fontSize: 9, color: '#555' }, {}]);
   const percent = (value: any) => {
     const num = toWeight(value);
     return num === null ? '-' : `${num}%`;
@@ -805,6 +808,9 @@ function appendSamplingSection(content: Content[], report: any, photoData: Map<s
     ...fieldRow(SAMPLING_CLAIMED_LABEL, percent(s.pern_prn_claimed_percent)),
     ...fieldRow(SAMPLING_LIMIT_LABEL, percent(s.contamination_limit_percent)),
   );
+  if (s.result) {
+    detailRows.push(...fieldRow(SAMPLING_RESULT_LABEL, s.result));
+  }
   if (s.comments) {
     detailRows.push(...fieldRow(SAMPLING_COMMENTS_LABEL, s.comments));
   }

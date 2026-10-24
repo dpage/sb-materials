@@ -16,6 +16,7 @@ export interface SamplingRow {
   contamination_kg?: number | null;
   prohibited_kg?: number | null;
   prohibited_items?: string | null;
+  result?: string | null;
   product_description?: string | null;
   product_grade?: string | null;
   pern_prn_claimed_percent?: number | null;
@@ -116,6 +117,7 @@ export function isSamplingEmpty(sampling: SamplingRow | null | undefined): boole
     'contamination_kg',
     'prohibited_kg',
     'prohibited_items',
+    'result',
     'product_description',
     'product_grade',
     'pern_prn_claimed_percent',
@@ -141,6 +143,13 @@ export const SAMPLING_TOTAL_LABEL = 'Total Accounted For';
 export const SAMPLING_PRODUCT_DESCRIPTION_LABEL = 'Product Description';
 export const SAMPLING_PRODUCT_GRADE_LABEL = 'Product Grade';
 export const SAMPLING_PROHIBITED_ITEMS_LABEL = 'Prohibited Items Found';
+/**
+ * Printed and shown beneath the prohibited items box, since the limit is nil
+ * and anything found is a phone call rather than a note on a form.
+ */
+export const SAMPLING_PROHIBITED_NOTE = '0% limit: if prohibited items are found, please call the trader.';
+export const SAMPLING_RESULT_LABEL = 'Sampling Result';
+export const SAMPLING_RESULT_OPTIONS = ['PASS', 'FAIL'] as const;
 export const SAMPLING_CLAIMED_LABEL = 'PERN/PRN % Claimed';
 export const SAMPLING_LIMIT_LABEL = 'Contamination Maximum Limit %';
 export const SAMPLING_COMMENTS_LABEL = 'Sampling Comments';

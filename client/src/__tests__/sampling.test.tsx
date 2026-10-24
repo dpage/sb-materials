@@ -194,6 +194,31 @@ describe('sampling section', () => {
     expect(screen.queryByLabelText('Sample Size (kg)')).not.toBeInTheDocument();
   });
 
+  it('takes a pass or fail verdict and sends it with the block', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    await screen.findByLabelText('Sample Size (kg)');
+
+    expect(screen.getByText('Sampling Result')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('FAIL'));
+
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: '1' } });
+    await waitFor(() => expect(api.getSites).toHaveBeenCalledWith(1));
+    fireEvent.change(document.querySelectorAll('select')[1], { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Save as Draft'));
+
+    await waitFor(() => expect(api.createReport).toHaveBeenCalled());
+    expect((api.createReport as any).mock.calls[0][0].sampling).toMatchObject({ result: 'FAIL' });
+  });
+
+  it('spells out the nil limit under the prohibited items box', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    await screen.findByLabelText('Sample Size (kg)');
+    expect(screen.getByText('0% limit: if prohibited items are found, please call the trader.')).toBeInTheDocument();
+  });
+
   it('sends the sampling block when the report is saved', async () => {
     renderNew();
     await screen.findByText('New Report');

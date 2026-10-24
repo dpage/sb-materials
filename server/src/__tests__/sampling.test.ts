@@ -85,6 +85,7 @@ describe('sampling arithmetic', () => {
     expect(isSamplingEmpty({ non_packaging_kg: 12 })).toBe(false);
     expect(isSamplingEmpty({ product_description: 'Mixed paper' })).toBe(false);
     expect(isSamplingEmpty({ product_grade: 'Grade A' })).toBe(false);
+    expect(isSamplingEmpty({ result: 'PASS' })).toBe(false);
   });
 
   it('recognises an empty block, and one that only says sampling was skipped', () => {
@@ -120,6 +121,7 @@ describe('sampling through the reports API', () => {
     contamination_kg: 25,
     prohibited_kg: 5,
     prohibited_items: 'Aerosol can',
+    result: 'FAIL',
     product_description: 'Mixed paper',
     product_grade: 'Grade A',
     pern_prn_claimed_percent: 95,
@@ -154,6 +156,7 @@ describe('sampling through the reports API', () => {
         product_description: 'Mixed paper',
         product_grade: 'Grade A',
         prohibited_items: 'Aerosol can',
+        result: 'FAIL',
         pern_prn_claimed_percent: 95,
         contamination_limit_percent: 4,
         comments: 'Bale broken in the yard',

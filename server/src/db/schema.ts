@@ -26,7 +26,7 @@ import { allocateLineReferences, takenLineReferences } from '../utils/collection
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 8;
+export const DB_SCHEMA_VERSION = 9;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -379,6 +379,7 @@ export function createSchema(db: Database.Database): void {
       product_description TEXT,
       product_grade TEXT,
       prohibited_items TEXT,
+      result TEXT,
       pern_prn_claimed_percent REAL,
       contamination_limit_percent REAL,
       comments TEXT
@@ -523,6 +524,7 @@ export function createSchema(db: Database.Database): void {
     { name: 'non_packaging_kg', type: 'REAL' },
     { name: 'product_description', type: 'TEXT' },
     { name: 'product_grade', type: 'TEXT' },
+    { name: 'result', type: 'TEXT' },
   ]);
 
   // The two fields the collection note carried under their original Word
