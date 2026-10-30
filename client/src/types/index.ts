@@ -194,6 +194,8 @@ export interface ReportSampling {
   result?: string | null;
   product_description?: string | null;
   product_grade?: string | null;
+  /** Only the standalone sampling report fills this in. */
+  loading_reference?: string | null;
   pern_prn_claimed_percent?: number | string | null;
   contamination_limit_percent?: number | string | null;
   comments?: string | null;

@@ -219,6 +219,7 @@ describe('computeSchemaFingerprint', () => {
         'contamination_limit_percent',
         'id',
         'in_scope_kg',
+        'loading_reference',
         'non_packaging_kg',
         'not_carried_out',
         'not_carried_out_reason',

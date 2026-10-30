@@ -548,6 +548,7 @@ export function ReportEdit() {
 
   // Which sections this report shows, rather than which type it is: the
   // combined Loading & Qtr PERN report shows both sets.
+  const isSampling = reportType === 'sampling';
   const isLoading = showsLoading(reportType);
   const isQuarterly = showsQuarterly(reportType);
   const isInspection = isLoading || isQuarterly;
@@ -712,7 +713,7 @@ export function ReportEdit() {
                 </select>
               </div>
             )}
-            {(isInspection || reportType === 'pern_audit') && (
+            {(isInspection || reportType === 'pern_audit' || isSampling) && (
               <div>
                 <label style={labelStyle}>On Behalf Of</label>
                 <div style={inputWithBtnRow}>
@@ -732,6 +733,16 @@ export function ReportEdit() {
                     +
                   </button>
                 </div>
+              </div>
+            )}
+            {isSampling && (
+              <div>
+                <label style={labelStyle}>Loading Reference Number</label>
+                <input
+                  value={sampling.loading_reference || ''}
+                  onChange={(e) => setSampling((p) => ({ ...p, loading_reference: e.target.value || null }))}
+                  style={inputStyle}
+                />
               </div>
             )}
             {isLoading && (

@@ -166,6 +166,14 @@ describe('ReportEdit - New Report', () => {
     expect(await screen.findByText('On Behalf Of')).toBeInTheDocument();
   });
 
+  it('shows the On Behalf Of dropdown and a loading reference on the Sampling form', async () => {
+    renderNew();
+    await screen.findByText('New Report');
+    fireEvent.click(screen.getByRole('button', { name: 'Sampling' }));
+    expect(await screen.findByText('On Behalf Of')).toBeInTheDocument();
+    expect(screen.getByText('Loading Reference Number')).toBeInTheDocument();
+  });
+
   it('should load sites when customer is selected', async () => {
     renderNew();
     await screen.findByText('New Report');

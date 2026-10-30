@@ -1186,6 +1186,27 @@ describe('sampling section', () => {
     expect(text).not.toContain('OCC exceeds 97.5%');
   });
 
+  it('prints the loading reference and the client on the standalone sampling report', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        reportFor('sampling', {
+          on_behalf_of: 'Visy',
+          sampling: { ...sampling, loading_reference: 'LOAD-123' },
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Loading Reference Number');
+    expect(text).toContain('LOAD-123');
+    expect(text).toContain('On Behalf Of');
+    expect(text).toContain('Visy');
+  });
+
+  it('leaves the loading reference out of the sampling header when there is none', async () => {
+    const text = extractPdfText(await generatePdf(reportFor('sampling') as any, tmpDir));
+    expect(text).not.toContain('Loading Reference Number');
+  });
+
   it('renders the standalone sampling report as the header, the block and the notes', async () => {
     const text = extractPdfText(
       await generatePdf(reportFor('sampling', { other_information: 'Yard was busy' }) as any, tmpDir),

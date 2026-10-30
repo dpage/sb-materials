@@ -846,6 +846,9 @@ function buildSamplingReport(content: Content[], report: any, uploadsDir: string
     ...fieldRow('Supplier Name', report.customer_name),
     ...fieldRow('Site Address', report.site_address),
     ...(report.on_behalf_of ? fieldRow('On Behalf Of', report.on_behalf_of) : []),
+    ...(report.sampling?.loading_reference
+      ? fieldRow('Loading Reference Number', report.sampling.loading_reference)
+      : []),
     ...fieldRow('Date of Sampling', report.inspection_date),
     ...fieldRow('Time Of Sampling', report.inspection_time || '-'),
     ...fieldRow('Inspector', report.inspector_name),

@@ -19,6 +19,8 @@ export interface SamplingRow {
   result?: string | null;
   product_description?: string | null;
   product_grade?: string | null;
+  /** Only the standalone sampling report fills this in; see schema.ts. */
+  loading_reference?: string | null;
   pern_prn_claimed_percent?: number | null;
   contamination_limit_percent?: number | null;
   comments?: string | null;
@@ -120,6 +122,7 @@ export function isSamplingEmpty(sampling: SamplingRow | null | undefined): boole
     'result',
     'product_description',
     'product_grade',
+    'loading_reference',
     'pern_prn_claimed_percent',
     'contamination_limit_percent',
     'comments',

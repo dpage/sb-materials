@@ -86,6 +86,7 @@ describe('sampling arithmetic', () => {
     expect(isSamplingEmpty({ product_description: 'Mixed paper' })).toBe(false);
     expect(isSamplingEmpty({ product_grade: 'Grade A' })).toBe(false);
     expect(isSamplingEmpty({ result: 'PASS' })).toBe(false);
+    expect(isSamplingEmpty({ loading_reference: 'LOAD-123' })).toBe(false);
   });
 
   it('recognises an empty block, and one that only says sampling was skipped', () => {
@@ -163,6 +164,26 @@ describe('sampling through the reports API', () => {
       });
     },
   );
+
+  it('stores the loading reference the standalone sampling report carries', async () => {
+    const created = await request(app)
+      .post('/api/reports')
+      .set('Cookie', cookie)
+      .send(reportBody('sampling', { sampling: { ...sampling, loading_reference: 'LOAD-123' } }));
+
+    const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie);
+    expect(fetched.body.sampling.loading_reference).toBe('LOAD-123');
+  });
+
+  it('keeps a sampling row for a reference entered on its own', async () => {
+    const created = await request(app)
+      .post('/api/reports')
+      .set('Cookie', cookie)
+      .send(reportBody('sampling', { sampling: { loading_reference: 'LOAD-456' } }));
+
+    const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie);
+    expect(fetched.body.sampling.loading_reference).toBe('LOAD-456');
+  });
 
   it('coerces the weights the form sends as strings, and stores nonsense as absent', async () => {
     const created = await request(app)

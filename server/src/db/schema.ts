@@ -26,7 +26,7 @@ import { allocateLineReferences, takenLineReferences } from '../utils/collection
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 9;
+export const DB_SCHEMA_VERSION = 10;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -380,6 +380,7 @@ export function createSchema(db: Database.Database): void {
       product_grade TEXT,
       prohibited_items TEXT,
       result TEXT,
+      loading_reference TEXT,
       pern_prn_claimed_percent REAL,
       contamination_limit_percent REAL,
       comments TEXT
@@ -525,6 +526,10 @@ export function createSchema(db: Database.Database): void {
     { name: 'product_description', type: 'TEXT' },
     { name: 'product_grade', type: 'TEXT' },
     { name: 'result', type: 'TEXT' },
+    // The standalone sampling report's own loading reference: the inspection
+    // types keep theirs in report_inspection_details, which that report has no
+    // row in.
+    { name: 'loading_reference', type: 'TEXT' },
   ]);
 
   // The two fields the collection note carried under their original Word
