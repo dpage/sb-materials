@@ -535,8 +535,12 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
       plastic_exceeds_97_5, material_originates_uk, supplier_aware_pern,
       supplier_controls_volume, volume_consistency_notes, site_buys_prebaled,
       prebaled_uk_assurance, site_aware_non_uk,
-      rejected_bales, bale_break, bale_break_results, packaging_thresholds
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      rejected_bales, bale_break, bale_break_results, packaging_thresholds,
+      staff_training_packaging, training_records_held, waste_transfer_notes_sampled,
+      volume_increase_significant, personnel_change_significant, last_inspection_date,
+      undercover_processing, undercover_storage, grades_segregated, good_housekeeping,
+      hs_policy_provided, felt_safe_on_site, environmental_policy_provided, site_assurance_hidden
+    ) VALUES (${Array(39).fill('?').join(', ')})`,
   ).run(
     reportId,
     d.product_description ?? null,
@@ -563,6 +567,20 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
     d.bale_break ?? null,
     d.bale_break_results ?? null,
     Array.isArray(d.packaging_thresholds) ? JSON.stringify(d.packaging_thresholds) : (d.packaging_thresholds ?? null),
+    d.staff_training_packaging ?? null,
+    d.training_records_held ?? null,
+    d.waste_transfer_notes_sampled ?? null,
+    d.volume_increase_significant ?? null,
+    d.personnel_change_significant ?? null,
+    d.last_inspection_date ?? null,
+    d.undercover_processing ?? null,
+    d.undercover_storage ?? null,
+    d.grades_segregated ?? null,
+    d.good_housekeeping ?? null,
+    d.hs_policy_provided ?? null,
+    d.felt_safe_on_site ?? null,
+    d.environmental_policy_provided ?? null,
+    d.site_assurance_hidden ? 1 : 0,
   );
 }
 
@@ -583,8 +601,11 @@ function savePernDetails(db: Database.Database, reportId: number, d: any): void 
       prn_claimed_once, training_types, training_scope,
       training_recording, training_review_frequency, training_records_inspected,
       workers_consistent, notes, intro_letter,
-      product_description, product_grade
-    ) VALUES (${Array(48).fill('?').join(', ')})`,
+      product_description, product_grade,
+      volume_increase_significant, personnel_change_significant, last_inspection_date,
+      undercover_processing, undercover_storage, grades_segregated, good_housekeeping,
+      hs_policy_provided, felt_safe_on_site, environmental_policy_provided
+    ) VALUES (${Array(58).fill('?').join(', ')})`,
   ).run(
     reportId,
     d.company_name_address ?? null,
@@ -638,5 +659,15 @@ function savePernDetails(db: Database.Database, reportId: number, d: any): void 
     d.intro_letter ?? null,
     d.product_description ?? null,
     d.product_grade ?? null,
+    d.volume_increase_significant ?? null,
+    d.personnel_change_significant ?? null,
+    d.last_inspection_date ?? null,
+    d.undercover_processing ?? null,
+    d.undercover_storage ?? null,
+    d.grades_segregated ?? null,
+    d.good_housekeeping ?? null,
+    d.hs_policy_provided ?? null,
+    d.felt_safe_on_site ?? null,
+    d.environmental_policy_provided ?? null,
   );
 }

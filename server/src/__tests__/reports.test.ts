@@ -491,6 +491,128 @@ describe('Report Routes', () => {
     });
   });
 
+  describe('Site assurance answers', () => {
+    it('round-trips the site assurance answers on a loading inspection', async () => {
+      const created = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'loading_inspection',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-11-02',
+          inspector_name: 'Test Inspector',
+          inspection_details: {
+            staff_training_packaging: 'YES',
+            training_records_held: 'N/A',
+            waste_transfer_notes_sampled: 'NO',
+            volume_increase_significant: 'NO',
+            personnel_change_significant: 'YES',
+            last_inspection_date: '2026-08-14',
+            undercover_processing: 'YES',
+            undercover_storage: 'NO',
+            grades_segregated: 'YES',
+            good_housekeeping: 'YES',
+            hs_policy_provided: 'N/A',
+            felt_safe_on_site: 'YES',
+            environmental_policy_provided: 'NO',
+            site_assurance_hidden: 0,
+          },
+        })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.inspection_details.staff_training_packaging).toBe('YES');
+      expect(fetched.body.inspection_details.training_records_held).toBe('N/A');
+      expect(fetched.body.inspection_details.last_inspection_date).toBe('2026-08-14');
+      expect(fetched.body.inspection_details.environmental_policy_provided).toBe('NO');
+      expect(fetched.body.inspection_details.site_assurance_hidden).toBe(0);
+    });
+
+    it('keeps stored answers when the block is hidden', async () => {
+      const created = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'loading_inspection',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-11-02',
+          inspector_name: 'Test Inspector',
+          inspection_details: { undercover_storage: 'YES', site_assurance_hidden: 0 },
+        })
+        .expect(200);
+
+      await request(app)
+        .put(`/api/reports/${created.body.id}`)
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'loading_inspection',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-11-02',
+          inspector_name: 'Test Inspector',
+          inspection_details: { undercover_storage: 'YES', site_assurance_hidden: 1 },
+        })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.inspection_details.site_assurance_hidden).toBe(1);
+      expect(fetched.body.inspection_details.undercover_storage).toBe('YES');
+    });
+
+    it('reads an old report whose site assurance columns are null', async () => {
+      const created = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'loading_inspection',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-11-02',
+          inspector_name: 'Test Inspector',
+          inspection_details: {},
+        })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.inspection_details.undercover_storage).toBeNull();
+    });
+
+    it('round-trips the ten added answers on a PERN audit', async () => {
+      const created = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'pern_audit',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-11-02',
+          inspector_name: 'Test Inspector',
+          pern_details: {
+            volume_increase_significant: 'YES',
+            personnel_change_significant: 'NO',
+            last_inspection_date: '2026-05-01',
+            undercover_processing: 'YES',
+            undercover_storage: 'YES',
+            grades_segregated: 'NO',
+            good_housekeeping: 'YES',
+            hs_policy_provided: 'YES',
+            felt_safe_on_site: 'YES',
+            environmental_policy_provided: 'N/A',
+          },
+        })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.pern_details.volume_increase_significant).toBe('YES');
+      expect(fetched.body.pern_details.environmental_policy_provided).toBe('N/A');
+      expect(fetched.body.pern_details.last_inspection_date).toBe('2026-05-01');
+      // The three the PERN audit already asks in its own words are not duplicated.
+      expect(fetched.body.pern_details.staff_training_packaging).toBeUndefined();
+    });
+  });
+
   describe('DELETE /api/reports/:id', () => {
     it('should delete a report', async () => {
       const createRes = await request(app).post('/api/reports').set('Cookie', cookie).send(createFibreReport());
