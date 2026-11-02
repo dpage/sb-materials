@@ -106,6 +106,31 @@ export function reportRoutes(db: Database.Database): Router {
     });
   });
 
+  // Pre-fills the "last inspection date" question. Declared before the '/:id'
+  // route, which would otherwise match this path and try to parse the literal
+  // string as a report id.
+  router.get('/last-inspection', (req, res) => {
+    const siteId = parseInt(String(req.query.site_id), 10);
+    if (!Number.isInteger(siteId)) {
+      res.status(400).json({ error: 'site_id required' });
+      return;
+    }
+    const excludeId = parseInt(String(req.query.exclude_report_id), 10);
+    const row = db
+      .prepare(
+        `SELECT inspection_date FROM reports
+          WHERE site_id = ?
+            AND status != 'draft'
+            AND (? IS NULL OR id != ?)
+          ORDER BY inspection_date DESC, id DESC
+          LIMIT 1`,
+      )
+      .get(siteId, Number.isInteger(excludeId) ? excludeId : null, Number.isInteger(excludeId) ? excludeId : -1) as
+      | { inspection_date: string }
+      | undefined;
+    res.json({ last_inspection_date: row?.inspection_date ?? null });
+  });
+
   // Get single report with all details
   router.get('/:id', (req, res) => {
     const report = loadReportWithDetails(db, parseInt(req.params.id, 10));

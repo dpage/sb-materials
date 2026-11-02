@@ -613,6 +613,77 @@ describe('Report Routes', () => {
     });
   });
 
+  describe('GET /api/reports/last-inspection', () => {
+    let otherSiteId: number;
+    let adminUserId: number;
+
+    beforeEach(() => {
+      otherSiteId = createTestCustomerAndSite(db).siteId;
+      adminUserId = (db.prepare("SELECT id FROM users WHERE username = 'admin'").get() as { id: number }).id;
+    });
+
+    function createReport(overrides: { site_id: number; inspection_date: string; status: string }): { id: number } {
+      const result = db
+        .prepare(
+          `INSERT INTO reports (report_type, customer_id, site_id, inspection_date, inspector_id, inspector_name, status)
+           VALUES ('loading_inspection', ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(customerId, overrides.site_id, overrides.inspection_date, adminUserId, 'Test Inspector', overrides.status);
+      return { id: result.lastInsertRowid as number };
+    }
+
+    it('returns the most recent non-draft report for the site', async () => {
+      createReport({ site_id: siteId, inspection_date: '2026-03-01', status: 'complete' });
+      createReport({ site_id: siteId, inspection_date: '2026-07-15', status: 'complete' });
+      const res = await request(app)
+        .get(`/api/reports/last-inspection?site_id=${siteId}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(res.body.last_inspection_date).toBe('2026-07-15');
+    });
+
+    it('ignores drafts', async () => {
+      createReport({ site_id: siteId, inspection_date: '2026-03-01', status: 'complete' });
+      createReport({ site_id: siteId, inspection_date: '2026-09-01', status: 'draft' });
+      const res = await request(app)
+        .get(`/api/reports/last-inspection?site_id=${siteId}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(res.body.last_inspection_date).toBe('2026-03-01');
+    });
+
+    it('ignores other sites', async () => {
+      createReport({ site_id: otherSiteId, inspection_date: '2026-09-01', status: 'complete' });
+      const res = await request(app)
+        .get(`/api/reports/last-inspection?site_id=${siteId}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(res.body.last_inspection_date).toBeNull();
+    });
+
+    it('excludes the report being edited', async () => {
+      const mine = createReport({ site_id: siteId, inspection_date: '2026-09-01', status: 'complete' });
+      createReport({ site_id: siteId, inspection_date: '2026-04-01', status: 'complete' });
+      const res = await request(app)
+        .get(`/api/reports/last-inspection?site_id=${siteId}&exclude_report_id=${mine.id}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(res.body.last_inspection_date).toBe('2026-04-01');
+    });
+
+    it('returns null when the site has no history', async () => {
+      const res = await request(app)
+        .get(`/api/reports/last-inspection?site_id=${siteId}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(res.body.last_inspection_date).toBeNull();
+    });
+
+    it('rejects a missing site_id', async () => {
+      await request(app).get('/api/reports/last-inspection').set('Cookie', cookie).expect(400);
+    });
+  });
+
   describe('DELETE /api/reports/:id', () => {
     it('should delete a report', async () => {
       const createRes = await request(app).post('/api/reports').set('Cookie', cookie).send(createFibreReport());
