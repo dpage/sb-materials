@@ -7,7 +7,14 @@ export function Customers() {
   const [selected, setSelected] = useState<(Customer & { sites: CustomerSite[] }) | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: '', contact_name: '', email: '', phone: '', address: '' });
+  const [form, setForm] = useState({
+    name: '',
+    contact_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    hide_site_assurance: 0,
+  });
   const [newSite, setNewSite] = useState('');
   const [editSiteId, setEditSiteId] = useState<number | null>(null);
   const [editSiteAddr, setEditSiteAddr] = useState('');
@@ -24,7 +31,7 @@ export function Customers() {
   };
 
   const resetForm = () => {
-    setForm({ name: '', contact_name: '', email: '', phone: '', address: '' });
+    setForm({ name: '', contact_name: '', email: '', phone: '', address: '', hide_site_assurance: 0 });
     setEditId(null);
     setShowForm(false);
   };
@@ -53,6 +60,7 @@ export function Customers() {
       email: c.email || '',
       phone: c.phone || '',
       address: c.address || '',
+      hide_site_assurance: c.hide_site_assurance ? 1 : 0,
     });
     setShowForm(true);
   };
@@ -167,6 +175,16 @@ export function Customers() {
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                 style={inputStyle}
               />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={!!form.hide_site_assurance}
+                  onChange={(e) => setForm((f) => ({ ...f, hide_site_assurance: e.target.checked ? 1 : 0 }))}
+                />
+                Hide site assurance questions
+              </label>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>

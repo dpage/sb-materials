@@ -1266,4 +1266,23 @@ describe('ReportEdit - Site Assurance', () => {
     );
     expect(api.getLastInspectionDate).not.toHaveBeenCalled();
   });
+
+  it('asks the ten added questions on a PERN audit', async () => {
+    await renderReportEdit({ reportType: 'pern_audit' });
+    expect(await screen.findByText('Undercover storage?')).toBeInTheDocument();
+    expect(screen.getByText('Any significant change in personnel?')).toBeInTheDocument();
+  });
+
+  it('does not duplicate the three the PERN audit already asks', async () => {
+    await renderReportEdit({ reportType: 'pern_audit' });
+    await screen.findByText('Undercover storage?');
+    expect(screen.queryByText('Records of training of staff?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sample waste transfer notes seen?')).not.toBeInTheDocument();
+  });
+
+  it('has no tick box on a PERN audit', async () => {
+    await renderReportEdit({ reportType: 'pern_audit' });
+    await screen.findByText('Undercover storage?');
+    expect(screen.queryByLabelText('Site assurance not required for this customer')).not.toBeInTheDocument();
+  });
 });

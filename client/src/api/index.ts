@@ -51,6 +51,7 @@ interface UpdateCustomerData {
   phone?: string;
   address?: string;
   is_active?: number;
+  hide_site_assurance?: number;
 }
 
 interface UpdateSiteData {
@@ -127,7 +128,16 @@ export const api = {
   getCustomers: (includeInactive = false) => request<Customer[]>(`/customers?includeInactive=${includeInactive}`),
   getCustomer: (id: number) => request<Customer & { sites: CustomerSite[] }>(`/customers/${id}`),
   createCustomer: (
-    data: { name: string; contact_name?: string; email?: string; phone?: string; address?: string } | string,
+    data:
+      | {
+          name: string;
+          contact_name?: string;
+          email?: string;
+          phone?: string;
+          address?: string;
+          hide_site_assurance?: number;
+        }
+      | string,
   ) => {
     const body = typeof data === 'string' ? { name: data } : data;
     return request<Customer>('/customers', { method: 'POST', body: JSON.stringify(body) });

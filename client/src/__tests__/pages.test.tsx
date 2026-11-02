@@ -834,6 +834,30 @@ describe('Customers Page', () => {
     expect(screen.getByText('Edit Customer')).toBeInTheDocument();
   });
 
+  it('lets a customer be marked as not needing site assurance', async () => {
+    (api.updateCustomer as any).mockResolvedValue({});
+    render(
+      <TestWrapper>
+        <Customers />
+      </TestWrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Customer A')).toBeInTheDocument();
+    });
+
+    const editBtns = screen.getAllByText('Edit');
+    fireEvent.click(editBtns[0]);
+
+    const box = await screen.findByLabelText('Hide site assurance questions');
+    await userEvent.click(box);
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(api.updateCustomer).toHaveBeenCalledWith(1, expect.objectContaining({ hide_site_assurance: 1 }));
+    });
+  });
+
   it('should cancel customer form', async () => {
     render(
       <TestWrapper>

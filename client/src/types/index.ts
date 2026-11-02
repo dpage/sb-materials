@@ -186,6 +186,16 @@ export interface PernDetails {
   intro_letter: string | null;
   product_description: string | null;
   product_grade: string | null;
+  volume_increase_significant: string | null;
+  personnel_change_significant: string | null;
+  last_inspection_date: string | null;
+  undercover_processing: string | null;
+  undercover_storage: string | null;
+  grades_segregated: string | null;
+  good_housekeeping: string | null;
+  hs_policy_provided: string | null;
+  felt_safe_on_site: string | null;
+  environmental_policy_provided: string | null;
 }
 
 /**

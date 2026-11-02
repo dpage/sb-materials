@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import { api } from '../api';
 import { QuickAddModal } from '../components/QuickAddModal';
-import { SiteAssuranceSection } from '../components/SiteAssuranceSection';
+import { SiteAssuranceSection, SITE_ASSURANCE_QUESTIONS } from '../components/SiteAssuranceSection';
 import { useAuth } from '../App';
 import type {
   Customer,
@@ -33,6 +33,24 @@ import {
 
 const YES_NO = ['YES', 'NO'];
 const YES_NO_NA = ['YES', 'NO', 'N/A'];
+// The PERN audit already asks staff_training_packaging, training_records_held
+// and waste_transfer_notes_sampled in its own words, so it gets only the
+// seven site-condition questions plus the two significant-change questions
+// (last_inspection_date is its own date input, not a yes/no question).
+const PERN_SITE_CONDITION_FIELDS = [
+  'undercover_processing',
+  'undercover_storage',
+  'grades_segregated',
+  'good_housekeeping',
+  'hs_policy_provided',
+  'felt_safe_on_site',
+  'environmental_policy_provided',
+];
+const PERN_THROUGHPUT_FIELDS = ['volume_increase_significant', 'personnel_change_significant'];
+const PERN_SITE_CONDITION_QUESTIONS = SITE_ASSURANCE_QUESTIONS.filter((q) =>
+  PERN_SITE_CONDITION_FIELDS.includes(q.field),
+);
+const PERN_THROUGHPUT_QUESTIONS = SITE_ASSURANCE_QUESTIONS.filter((q) => PERN_THROUGHPUT_FIELDS.includes(q.field));
 // Reserved photo_label used to group moisture-reading evidence photos
 const MOISTURE_PHOTO_LABEL = 'Moisture Readings';
 
@@ -2101,6 +2119,16 @@ function PernAuditSection({
               style={inputStyle}
             />
           </div>
+          {PERN_THROUGHPUT_QUESTIONS.map(({ field, label }) => (
+            <div key={field}>
+              <label style={labelStyle}>{label}</label>
+              <RadioGroup
+                options={YES_NO_NA}
+                value={(pern[field as keyof PernDetails] as string) || ''}
+                onChange={(v) => updateField(field as keyof PernDetails, v)}
+              />
+            </div>
+          ))}
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={labelStyle}>Process Flow Description</label>
             <textarea
@@ -2126,6 +2154,16 @@ function PernAuditSection({
               style={inputStyle}
             />
           </div>
+          {PERN_SITE_CONDITION_QUESTIONS.map(({ field, label }) => (
+            <div key={field}>
+              <label style={labelStyle}>{label}</label>
+              <RadioGroup
+                options={YES_NO_NA}
+                value={(pern[field as keyof PernDetails] as string) || ''}
+                onChange={(v) => updateField(field as keyof PernDetails, v)}
+              />
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -2316,6 +2354,16 @@ function PernAuditSection({
               options={['YES', 'NO']}
               value={pern.workers_consistent || ''}
               onChange={(v) => updateField('workers_consistent', v)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Last inspection date</label>
+            <input
+              type="date"
+              aria-label="Last inspection date"
+              value={pern.last_inspection_date || ''}
+              onChange={(e) => updateField('last_inspection_date', e.target.value || null)}
+              style={inputStyle}
             />
           </div>
         </div>
