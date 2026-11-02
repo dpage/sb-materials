@@ -536,10 +536,12 @@ describe('PDF Generator', () => {
 
     const buffer = await generatePdf(report as any, tmpDir);
 
-    // A page of report details, and then exactly one photo on each page that
-    // follows. A photo that could not be placed would show up here twice over:
-    // as a missing photo, and as a page carrying none.
-    expect(photosDrawnPerPage(buffer)).toEqual([0, ...shapes.map(() => 1)]);
+    // Two pages of report details - the Site Assurance block, printed by
+    // default, pushes the detail content past a single page now - and then
+    // exactly one photo on each page that follows. A photo that could not be
+    // placed would show up here twice over: as a missing photo, and as a page
+    // carrying none.
+    expect(photosDrawnPerPage(buffer)).toEqual([0, 0, ...shapes.map(() => 1)]);
 
     // The caption travels in the same unbreakable block as the photo, so a
     // dropped photo takes its label with it.
@@ -1218,5 +1220,81 @@ describe('sampling section', () => {
     expect(text).toContain('Signature');
     expect(text).not.toContain('Compliance');
     expect(text).not.toContain('Unwanted Materials');
+  });
+});
+
+describe('site assurance section', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-assurance-'));
+  });
+
+  function inspectionReport(details: Record<string, any>) {
+    return {
+      id: 10,
+      report_type: 'loading_inspection',
+      customer_name: 'Test Customer',
+      site_address: '1 Example Way',
+      inspection_date: '2026-07-15',
+      inspector_name: 'Insp',
+      inspection_details: details,
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [],
+    };
+  }
+
+  it('prints the site assurance block on a loading inspection', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        inspectionReport({
+          undercover_storage: 'YES',
+          felt_safe_on_site: 'NO',
+          last_inspection_date: '2026-07-15',
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).toContain('Site Assurance');
+    expect(text).toContain('Undercover storage?');
+    expect(text).toContain('2026-07-15');
+  });
+
+  it('omits the block entirely when hidden', async () => {
+    const text = extractPdfText(
+      await generatePdf(
+        inspectionReport({
+          undercover_storage: 'YES',
+          site_assurance_hidden: 1,
+        }) as any,
+        tmpDir,
+      ),
+    );
+    expect(text).not.toContain('Site Assurance');
+    expect(text).not.toContain('Undercover storage?');
+  });
+
+  it('prints the added questions on a PERN audit without the three it already asks', async () => {
+    const report = {
+      id: 11,
+      report_type: 'pern_audit',
+      customer_name: 'Test Customer',
+      site_address: '1 Example Way',
+      inspection_date: '2026-07-15',
+      inspector_name: 'Insp',
+      pern_details: {
+        undercover_storage: 'YES',
+        personnel_change_significant: 'NO',
+      },
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [],
+    };
+    const text = extractPdfText(await generatePdf(report as any, tmpDir));
+    expect(text).toContain('Undercover storage?');
+    expect(text).not.toContain('Records of training of staff?');
   });
 });

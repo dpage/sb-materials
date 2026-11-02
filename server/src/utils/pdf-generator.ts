@@ -33,6 +33,7 @@ import {
   QUALITY_SCORE_LABEL,
   VOLUME_CONSISTENCY_QUESTION,
   notifySiteLine,
+  SITE_ASSURANCE_QUESTIONS,
 } from './wording';
 
 const INSPECTION_TYPES = ['loading_inspection', 'quarterly_pern', 'loading_quarterly_pern'];
@@ -108,6 +109,12 @@ function fieldRow(label: string, value: any): TableCell[][] {
     ],
   ];
 }
+
+// Label lookup for the site assurance questions, used by the PERN audit
+// branch to fold a subset of them into its own existing sections.
+const SITE_ASSURANCE_LABELS: Record<string, string> = Object.fromEntries(
+  SITE_ASSURANCE_QUESTIONS.map((q) => [q.field, q.label]),
+);
 
 function yesNo(val: any): string {
   if (val === null || val === undefined) return '-';
@@ -397,6 +404,27 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     margin: [0, 0, 0, 10] as [number, number, number, number],
   });
 
+  // Site Assurance. Omitted wholesale when the customer does not need it,
+  // rather than printed as a "not applicable" note: VISY asked for the
+  // questions, not for a record that they were skipped.
+  if (!d.site_assurance_hidden) {
+    content.push({
+      text: 'Site Assurance',
+      style: 'subheader',
+      margin: [0, 10, 0, 5] as [number, number, number, number],
+    });
+    const assuranceRows: TableCell[][] = [];
+    for (const q of SITE_ASSURANCE_QUESTIONS) {
+      assuranceRows.push(...fieldRow(q.label, d[q.field]));
+    }
+    assuranceRows.push(...fieldRow('Last inspection date', d.last_inspection_date));
+    content.push({
+      table: { widths: [220, '*'], body: assuranceRows },
+      layout: 'lightHorizontalLines',
+      margin: [0, 0, 0, 10] as [number, number, number, number],
+    });
+  }
+
   // Quality score & pass/fail
   content.push({
     table: {
@@ -570,6 +598,7 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     ...fieldRow('Moisture Reading Low', p.moisture_reading_low),
     ...fieldRow('Moisture Reading High', p.moisture_reading_high),
     ...fieldRow('Inspector / Auditor', report.inspector_name),
+    ...fieldRow('Last inspection date', p.last_inspection_date),
   ];
 
   content.push({
@@ -595,6 +624,13 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     ...fieldRow('Throughput', p.throughput),
     ...fieldRow('Waste Sources', parseJsonField(p.waste_sources)),
     ...fieldRow('Transfer Notes Checked', p.transfer_notes_checked),
+    ...fieldRow(SITE_ASSURANCE_LABELS.volume_increase_significant, p.volume_increase_significant),
+    ...fieldRow(SITE_ASSURANCE_LABELS.personnel_change_significant, p.personnel_change_significant),
+    ...fieldRow(SITE_ASSURANCE_LABELS.undercover_processing, p.undercover_processing),
+    ...fieldRow(SITE_ASSURANCE_LABELS.undercover_storage, p.undercover_storage),
+    ...fieldRow(SITE_ASSURANCE_LABELS.grades_segregated, p.grades_segregated),
+    ...fieldRow(SITE_ASSURANCE_LABELS.good_housekeeping, p.good_housekeeping),
+    ...fieldRow(SITE_ASSURANCE_LABELS.environmental_policy_provided, p.environmental_policy_provided),
   ];
   content.push({
     table: { widths: [220, '*'], body: siteRows },
@@ -618,6 +654,8 @@ function buildPernAudit(content: Content[], report: any, uploadsDir: string, pho
     ...fieldRow('Accident Log', p.accident_log),
     ...fieldRow('Employer Liability Insurance', p.employer_liability),
     ...fieldRow('Public Liability Insurance', p.public_liability),
+    ...fieldRow(SITE_ASSURANCE_LABELS.hs_policy_provided, p.hs_policy_provided),
+    ...fieldRow(SITE_ASSURANCE_LABELS.felt_safe_on_site, p.felt_safe_on_site),
   ];
   content.push({
     table: { widths: [220, '*'], body: safetyRows },

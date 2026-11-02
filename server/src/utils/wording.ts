@@ -22,3 +22,23 @@ export const VOLUME_CONSISTENCY_QUESTION =
 export function notifySiteLine(onBehalfOf?: string | null): string {
   return `If yes, the site must notify ${onBehalfOf || 'the Trading Company'} immediately`;
 }
+
+// Mirrors SITE_ASSURANCE_QUESTIONS in the client. The two are kept in step by
+// hand, as the other form wording in this file already is.
+export const SITE_ASSURANCE_QUESTIONS: { field: string; label: string }[] = [
+  {
+    field: 'staff_training_packaging',
+    label: 'Training to staff on identifying packaging and non-packaging materials?',
+  },
+  { field: 'training_records_held', label: 'Records of training of staff?' },
+  { field: 'waste_transfer_notes_sampled', label: 'Sample waste transfer notes seen?' },
+  { field: 'volume_increase_significant', label: 'Any significant increase in volume processed by site?' },
+  { field: 'personnel_change_significant', label: 'Any significant change in personnel?' },
+  { field: 'undercover_processing', label: 'Undercover processing?' },
+  { field: 'undercover_storage', label: 'Undercover storage?' },
+  { field: 'grades_segregated', label: 'Grades clearly segregated?' },
+  { field: 'good_housekeeping', label: 'Good general housekeeping?' },
+  { field: 'hs_policy_provided', label: 'H&S policy provided?' },
+  { field: 'felt_safe_on_site', label: 'Did you feel safe on site?' },
+  { field: 'environmental_policy_provided', label: 'Environmental policy provided?' },
+];
