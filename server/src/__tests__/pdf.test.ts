@@ -1310,3 +1310,40 @@ describe('site assurance section', () => {
     expect(text).not.toContain('Records of training of staff?');
   });
 });
+
+describe('compliance section', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pdf-compliance-'));
+  });
+
+  function inspectionReport(details: Record<string, any>) {
+    return {
+      id: 12,
+      report_type: 'loading_inspection',
+      customer_name: 'Test Customer',
+      site_address: '1 Example Way',
+      inspection_date: '2026-07-15',
+      inspector_name: 'Insp',
+      inspection_details: details,
+      unwanted_materials: [],
+      contaminants: [],
+      containers: [],
+      photos: [],
+    };
+  }
+
+  it('prints the compliance block by default', async () => {
+    const text = extractPdfText(await generatePdf(inspectionReport({ material_originates_uk: 'YES' }) as any, tmpDir));
+    expect(text).toContain('Compliance');
+    expect(text).toContain('Does the material originate in the UK');
+  });
+
+  it('omits the compliance block when the check was not needed on this inspection', async () => {
+    const text = extractPdfText(
+      await generatePdf(inspectionReport({ material_originates_uk: 'YES', compliance_hidden: 1 }) as any, tmpDir),
+    );
+    expect(text).not.toContain('Does the material originate in the UK');
+  });
+});

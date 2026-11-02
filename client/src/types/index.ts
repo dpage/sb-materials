@@ -25,6 +25,7 @@ export interface Customer {
   address: string | null;
   is_active: number;
   hide_site_assurance?: number | null;
+  hide_compliance?: number | null;
   sites?: CustomerSite[];
 }
 
@@ -110,6 +111,7 @@ export interface InspectionDetails {
   environmental_policy_provided: string | null;
   last_inspection_date: string | null;
   site_assurance_hidden?: number | null;
+  compliance_hidden?: number | null;
 }
 
 export interface UnwantedMaterial {

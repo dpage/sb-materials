@@ -112,6 +112,19 @@ describe('Customer Routes', () => {
 
       const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
       expect(fetched.body.hide_site_assurance).toBe(0);
+      expect(fetched.body.hide_compliance).toBe(0);
+    });
+
+    it('stores and returns the compliance default on a customer', async () => {
+      const created = await request(app)
+        .post('/api/customers')
+        .set('Cookie', cookie)
+        .send({ name: 'Third Test Customer', hide_compliance: 1 })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.hide_compliance).toBe(1);
+      expect(fetched.body.hide_site_assurance).toBe(0);
     });
   });
 
@@ -163,6 +176,25 @@ describe('Customer Routes', () => {
         .expect(200);
 
       const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.hide_site_assurance).toBe(1);
+      expect(fetched.body.contact_name).toBe('Test Contact');
+    });
+
+    it('updates the compliance default without touching other fields', async () => {
+      const created = await request(app)
+        .post('/api/customers')
+        .set('Cookie', cookie)
+        .send({ name: 'Fourth Test Customer', contact_name: 'Test Contact', hide_site_assurance: 1 })
+        .expect(200);
+
+      await request(app)
+        .put(`/api/customers/${created.body.id}`)
+        .set('Cookie', cookie)
+        .send({ hide_compliance: 1 })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.hide_compliance).toBe(1);
       expect(fetched.body.hide_site_assurance).toBe(1);
       expect(fetched.body.contact_name).toBe('Test Contact');
     });

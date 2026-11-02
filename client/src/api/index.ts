@@ -52,6 +52,7 @@ interface UpdateCustomerData {
   address?: string;
   is_active?: number;
   hide_site_assurance?: number;
+  hide_compliance?: number;
 }
 
 interface UpdateSiteData {
@@ -136,6 +137,7 @@ export const api = {
           phone?: string;
           address?: string;
           hide_site_assurance?: number;
+          hide_compliance?: number;
         }
       | string,
   ) => {

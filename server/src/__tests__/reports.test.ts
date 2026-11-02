@@ -529,6 +529,25 @@ describe('Report Routes', () => {
       expect(fetched.body.inspection_details.site_assurance_hidden).toBe(0);
     });
 
+    it('round-trips the compliance hidden flag, keeping the answers behind it', async () => {
+      const created = await request(app)
+        .post('/api/reports')
+        .set('Cookie', cookie)
+        .send({
+          report_type: 'loading_inspection',
+          customer_id: customerId,
+          site_id: siteId,
+          inspection_date: '2026-11-02',
+          inspector_name: 'Test Inspector',
+          inspection_details: { material_originates_uk: 'YES', compliance_hidden: 1 },
+        })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/reports/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.inspection_details.compliance_hidden).toBe(1);
+      expect(fetched.body.inspection_details.material_originates_uk).toBe('YES');
+    });
+
     it('keeps stored answers when the block is hidden', async () => {
       const created = await request(app)
         .post('/api/reports')

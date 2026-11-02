@@ -26,7 +26,7 @@ import { allocateLineReferences, takenLineReferences } from '../utils/collection
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 11;
+export const DB_SCHEMA_VERSION = 12;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -322,6 +322,9 @@ export function createSchema(db: Database.Database): void {
   addColumns('report_inspection_details', [
     ...SITE_ASSURANCE_COLUMNS,
     { name: 'site_assurance_hidden', type: 'INTEGER DEFAULT 0' },
+    // The Compliance block hides the same way the Site Assurance one does,
+    // and for the same reason: not every customer needs that much detail.
+    { name: 'compliance_hidden', type: 'INTEGER DEFAULT 0' },
   ]);
 
   // The PERN audit already asks about training and transfer notes in its own
@@ -333,7 +336,10 @@ export function createSchema(db: Database.Database): void {
     ),
   );
 
-  addColumns('customers', [{ name: 'hide_site_assurance', type: 'INTEGER DEFAULT 0' }]);
+  addColumns('customers', [
+    { name: 'hide_site_assurance', type: 'INTEGER DEFAULT 0' },
+    { name: 'hide_compliance', type: 'INTEGER DEFAULT 0' },
+  ]);
 
   // ─── Collection notes ───
   // A collection note is a standalone document rather than a report: it is

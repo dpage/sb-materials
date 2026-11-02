@@ -1324,3 +1324,78 @@ describe('ReportEdit - Site Assurance', () => {
     expect(screen.queryByLabelText('Site assurance not required for this customer')).not.toBeInTheDocument();
   });
 });
+
+describe('ReportEdit - Compliance tick box', () => {
+  it('hides the compliance questions when ticked, without clearing the answers', async () => {
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    const tickBox = await screen.findByLabelText('Compliance check not needed on this inspection');
+    expect(screen.getByText('Does the material originate in the UK')).toBeInTheDocument();
+
+    await userEvent.click(tickBox);
+    expect(screen.queryByText('Does the material originate in the UK')).not.toBeInTheDocument();
+
+    await userEvent.click(tickBox);
+    expect(screen.getByText('Does the material originate in the UK')).toBeInTheDocument();
+  });
+
+  it('starts ticked for a customer whose default is to hide it', async () => {
+    (api.getCustomers as any).mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Customer A',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_compliance: 0,
+      },
+      {
+        id: 2,
+        name: 'Customer B',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_compliance: 1,
+      },
+    ]);
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '2');
+    expect(await screen.findByLabelText('Compliance check not needed on this inspection')).toBeChecked();
+  });
+
+  it('does not let a later customer change clobber a hand-ticked box', async () => {
+    (api.getCustomers as any).mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Customer A',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_compliance: 0,
+      },
+      {
+        id: 2,
+        name: 'Customer B',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_compliance: 0,
+      },
+    ]);
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '1');
+    const tickBox = await screen.findByLabelText('Compliance check not needed on this inspection');
+    await userEvent.click(tickBox);
+    expect(tickBox).toBeChecked();
+
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '2');
+    expect(tickBox).toBeChecked();
+  });
+});

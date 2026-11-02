@@ -14,6 +14,7 @@ export function Customers() {
     phone: '',
     address: '',
     hide_site_assurance: 0,
+    hide_compliance: 0,
   });
   const [newSite, setNewSite] = useState('');
   const [editSiteId, setEditSiteId] = useState<number | null>(null);
@@ -31,7 +32,15 @@ export function Customers() {
   };
 
   const resetForm = () => {
-    setForm({ name: '', contact_name: '', email: '', phone: '', address: '', hide_site_assurance: 0 });
+    setForm({
+      name: '',
+      contact_name: '',
+      email: '',
+      phone: '',
+      address: '',
+      hide_site_assurance: 0,
+      hide_compliance: 0,
+    });
     setEditId(null);
     setShowForm(false);
   };
@@ -61,6 +70,7 @@ export function Customers() {
       phone: c.phone || '',
       address: c.address || '',
       hide_site_assurance: c.hide_site_assurance ? 1 : 0,
+      hide_compliance: c.hide_compliance ? 1 : 0,
     });
     setShowForm(true);
   };
@@ -184,6 +194,16 @@ export function Customers() {
                   onChange={(e) => setForm((f) => ({ ...f, hide_site_assurance: e.target.checked ? 1 : 0 }))}
                 />
                 Hide site assurance questions
+              </label>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={!!form.hide_compliance}
+                  onChange={(e) => setForm((f) => ({ ...f, hide_compliance: e.target.checked ? 1 : 0 }))}
+                />
+                Hide compliance questions
               </label>
             </div>
           </div>

@@ -31,16 +31,24 @@ export function customerRoutes(db: Database.Database): Router {
 
   // Create customer
   router.post('/', (req, res) => {
-    const { name, contact_name, email, phone, address, hide_site_assurance } = req.body;
+    const { name, contact_name, email, phone, address, hide_site_assurance, hide_compliance } = req.body;
     if (!name) {
       res.status(400).json({ error: 'Name required' });
       return;
     }
     const result = db
       .prepare(
-        'INSERT INTO customers (name, contact_name, email, phone, address, hide_site_assurance) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO customers (name, contact_name, email, phone, address, hide_site_assurance, hide_compliance) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .run(name, contact_name || null, email || null, phone || null, address || null, hide_site_assurance ? 1 : 0);
+      .run(
+        name,
+        contact_name || null,
+        email || null,
+        phone || null,
+        address || null,
+        hide_site_assurance ? 1 : 0,
+        hide_compliance ? 1 : 0,
+      );
     recordAudit(db, req, {
       action: 'create',
       entityType: 'customer',
@@ -55,12 +63,13 @@ export function customerRoutes(db: Database.Database): Router {
       phone,
       address,
       hide_site_assurance: hide_site_assurance ? 1 : 0,
+      hide_compliance: hide_compliance ? 1 : 0,
     });
   });
 
   // Update customer
   router.put('/:id', (req, res) => {
-    const { name, contact_name, email, phone, address, is_active, hide_site_assurance } = req.body;
+    const { name, contact_name, email, phone, address, is_active, hide_site_assurance, hide_compliance } = req.body;
     // Build dynamic update to only touch fields that were sent
     const sets: string[] = [];
     const params: any[] = [];
@@ -92,6 +101,10 @@ export function customerRoutes(db: Database.Database): Router {
     if (hide_site_assurance !== undefined) {
       sets.push('hide_site_assurance = ?');
       params.push(hide_site_assurance ? 1 : 0);
+    }
+    if (hide_compliance !== undefined) {
+      sets.push('hide_compliance = ?');
+      params.push(hide_compliance ? 1 : 0);
     }
 
     if (sets.length === 0) {

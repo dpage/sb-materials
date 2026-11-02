@@ -151,6 +151,8 @@ export function ReportEdit() {
   // a later customer change can still apply that customer's own default but
   // must never clobber a tick the user already made on this report.
   const siteAssuranceHiddenTouched = useRef(false);
+  // Same again for the Compliance tick box.
+  const complianceHiddenTouched = useRef(false);
 
   // Unwanted materials & contaminants
   const [unwantedMaterials, setUnwantedMaterials] = useState<UnwantedMaterial[]>([]);
@@ -255,6 +257,10 @@ export function ReportEdit() {
         // overwritten by a later customer change either.
         if (!siteAssuranceHiddenTouched.current) {
           setDetails((d) => ({ ...d, site_assurance_hidden: cust.hide_site_assurance ? 1 : 0 }));
+        }
+        // The Compliance tick box works the same way.
+        if (!complianceHiddenTouched.current) {
+          setDetails((d) => ({ ...d, compliance_hidden: cust.hide_compliance ? 1 : 0 }));
         }
       }
     } else {
@@ -1074,70 +1080,87 @@ export function ReportEdit() {
 
             {/* Compliance Questions */}
             <Section title="Compliance">
-              <div style={formGrid}>
-                <div>
-                  <label style={labelStyle}>Does the material originate in the UK</label>
-                  <RadioGroup
-                    options={YES_NO}
-                    value={details.material_originates_uk || ''}
-                    onChange={(v) => setDetails((d) => ({ ...d, material_originates_uk: v }))}
-                  />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <input
+                  type="checkbox"
+                  aria-label="Compliance check not needed on this inspection"
+                  checked={!!details.compliance_hidden}
+                  onChange={(e) => {
+                    complianceHiddenTouched.current = true;
+                    setDetails((d) => ({ ...d, compliance_hidden: e.target.checked ? 1 : 0 }));
+                  }}
+                />
+                Compliance check not needed on this inspection
+              </label>
+
+              {!details.compliance_hidden && (
+                <div style={formGrid}>
+                  <div>
+                    <label style={labelStyle}>Does the material originate in the UK</label>
+                    <RadioGroup
+                      options={YES_NO}
+                      value={details.material_originates_uk || ''}
+                      onChange={(v) => setDetails((d) => ({ ...d, material_originates_uk: v }))}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>
+                      Is the supplier aware that the material purchase price quoted includes PERN revenue which is only
+                      eligible in UK?
+                    </label>
+                    <RadioGroup
+                      options={YES_NO}
+                      value={details.supplier_aware_pern || ''}
+                      onChange={(v) => setDetails((d) => ({ ...d, supplier_aware_pern: v }))}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>
+                      Does the supplier have control of all volume coming in to the site?
+                    </label>
+                    <RadioGroup
+                      options={YES_NO}
+                      value={details.supplier_controls_volume || ''}
+                      onChange={(v) => setDetails((d) => ({ ...d, supplier_controls_volume: v }))}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>{VOLUME_CONSISTENCY_QUESTION}</label>
+                    <input
+                      value={details.volume_consistency_notes || ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, volume_consistency_notes: e.target.value || null }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Does the site buy in pre-baled material?</label>
+                    <RadioGroup
+                      options={YES_NO_NA}
+                      value={details.site_buys_prebaled || ''}
+                      onChange={(v) => setDetails((d) => ({ ...d, site_buys_prebaled: v }))}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>If yes, how does the supplier ensure this is only UK packaging?</label>
+                    <input
+                      value={details.prebaled_uk_assurance || ''}
+                      onChange={(e) => setDetails((d) => ({ ...d, prebaled_uk_assurance: e.target.value || null }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>
+                      Is the site aware of any material that is not defined as UK post consumer packaging?
+                    </label>
+                    <div style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 6 }}>{notifySiteLine(onBehalfOf)}</div>
+                    <RadioGroup
+                      options={YES_NO}
+                      value={details.site_aware_non_uk || ''}
+                      onChange={(v) => setDetails((d) => ({ ...d, site_aware_non_uk: v }))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={labelStyle}>
-                    Is the supplier aware that the material purchase price quoted includes PERN revenue which is only
-                    eligible in UK?
-                  </label>
-                  <RadioGroup
-                    options={YES_NO}
-                    value={details.supplier_aware_pern || ''}
-                    onChange={(v) => setDetails((d) => ({ ...d, supplier_aware_pern: v }))}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Does the supplier have control of all volume coming in to the site?</label>
-                  <RadioGroup
-                    options={YES_NO}
-                    value={details.supplier_controls_volume || ''}
-                    onChange={(v) => setDetails((d) => ({ ...d, supplier_controls_volume: v }))}
-                  />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>{VOLUME_CONSISTENCY_QUESTION}</label>
-                  <input
-                    value={details.volume_consistency_notes || ''}
-                    onChange={(e) => setDetails((d) => ({ ...d, volume_consistency_notes: e.target.value || null }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Does the site buy in pre-baled material?</label>
-                  <RadioGroup
-                    options={YES_NO_NA}
-                    value={details.site_buys_prebaled || ''}
-                    onChange={(v) => setDetails((d) => ({ ...d, site_buys_prebaled: v }))}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>If yes, how does the supplier ensure this is only UK packaging?</label>
-                  <input
-                    value={details.prebaled_uk_assurance || ''}
-                    onChange={(e) => setDetails((d) => ({ ...d, prebaled_uk_assurance: e.target.value || null }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>
-                    Is the site aware of any material that is not defined as UK post consumer packaging?
-                  </label>
-                  <div style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 6 }}>{notifySiteLine(onBehalfOf)}</div>
-                  <RadioGroup
-                    options={YES_NO}
-                    value={details.site_aware_non_uk || ''}
-                    onChange={(v) => setDetails((d) => ({ ...d, site_aware_non_uk: v }))}
-                  />
-                </div>
-              </div>
+              )}
             </Section>
 
             <SiteAssuranceSection

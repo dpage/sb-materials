@@ -451,6 +451,11 @@ describe('site assurance columns', () => {
     expect(cols(freshDb(), 'customers')).toContain('hide_site_assurance');
   });
 
+  it('adds the compliance hide flags to both tables', () => {
+    expect(cols(freshDb(), 'report_inspection_details')).toContain('compliance_hidden');
+    expect(cols(freshDb(), 'customers')).toContain('hide_compliance');
+  });
+
   it('migrates a database created before the change', () => {
     const db = new Database(':memory:');
     db.exec(`

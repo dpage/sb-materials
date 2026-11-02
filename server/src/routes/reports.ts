@@ -564,8 +564,9 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
       staff_training_packaging, training_records_held, waste_transfer_notes_sampled,
       volume_increase_significant, personnel_change_significant, last_inspection_date,
       undercover_processing, undercover_storage, grades_segregated, good_housekeeping,
-      hs_policy_provided, felt_safe_on_site, environmental_policy_provided, site_assurance_hidden
-    ) VALUES (${Array(39).fill('?').join(', ')})`,
+      hs_policy_provided, felt_safe_on_site, environmental_policy_provided, site_assurance_hidden,
+      compliance_hidden
+    ) VALUES (${Array(40).fill('?').join(', ')})`,
   ).run(
     reportId,
     d.product_description ?? null,
@@ -606,6 +607,7 @@ function saveInspectionDetails(db: Database.Database, reportId: number, d: any):
     d.felt_safe_on_site ?? null,
     d.environmental_policy_provided ?? null,
     d.site_assurance_hidden ? 1 : 0,
+    d.compliance_hidden ? 1 : 0,
   );
 }
 

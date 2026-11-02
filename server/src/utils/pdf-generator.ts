@@ -390,28 +390,31 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
     content.push({ ul: items, margin: [20, 0, 0, 10] as [number, number, number, number] });
   }
 
-  // Compliance
-  content.push({ text: 'Compliance', style: 'subheader', margin: [0, 10, 0, 5] as [number, number, number, number] });
-  const complianceRows: TableCell[][] = [];
+  // Compliance. Omitted wholesale when the inspection did not need the
+  // compliance check, on the same terms as Site Assurance below.
+  if (!d.compliance_hidden) {
+    content.push({ text: 'Compliance', style: 'subheader', margin: [0, 10, 0, 5] as [number, number, number, number] });
+    const complianceRows: TableCell[][] = [];
 
-  complianceRows.push(
-    ...fieldRow('Does the material originate in the UK', d.material_originates_uk),
-    ...fieldRow(
-      'Is the supplier aware that the material purchase price quoted includes PERN revenue which is only eligible in UK?',
-      d.supplier_aware_pern,
-    ),
-    ...fieldRow('Does the supplier have control of all volume coming in to the site?', d.supplier_controls_volume),
-    ...fieldRow(VOLUME_CONSISTENCY_QUESTION, d.volume_consistency_notes),
-    ...fieldRow('Does the site buy in pre-baled material?', d.site_buys_prebaled),
-    ...fieldRow('If yes, how does the supplier ensure this is only UK packaging?', d.prebaled_uk_assurance),
-    ...fieldRow(`${POST_CONSUMER_QUESTION}\n${notifySiteLine(report.on_behalf_of)}`, d.site_aware_non_uk),
-  );
+    complianceRows.push(
+      ...fieldRow('Does the material originate in the UK', d.material_originates_uk),
+      ...fieldRow(
+        'Is the supplier aware that the material purchase price quoted includes PERN revenue which is only eligible in UK?',
+        d.supplier_aware_pern,
+      ),
+      ...fieldRow('Does the supplier have control of all volume coming in to the site?', d.supplier_controls_volume),
+      ...fieldRow(VOLUME_CONSISTENCY_QUESTION, d.volume_consistency_notes),
+      ...fieldRow('Does the site buy in pre-baled material?', d.site_buys_prebaled),
+      ...fieldRow('If yes, how does the supplier ensure this is only UK packaging?', d.prebaled_uk_assurance),
+      ...fieldRow(`${POST_CONSUMER_QUESTION}\n${notifySiteLine(report.on_behalf_of)}`, d.site_aware_non_uk),
+    );
 
-  content.push({
-    table: { widths: [220, '*'], body: complianceRows },
-    layout: 'lightHorizontalLines',
-    margin: [0, 0, 0, 10] as [number, number, number, number],
-  });
+    content.push({
+      table: { widths: [220, '*'], body: complianceRows },
+      layout: 'lightHorizontalLines',
+      margin: [0, 0, 0, 10] as [number, number, number, number],
+    });
+  }
 
   // Site Assurance. Omitted wholesale when the customer does not need it,
   // rather than printed as a "not applicable" note: VISY asked for the

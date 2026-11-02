@@ -98,7 +98,17 @@ describe('computeSchemaFingerprint', () => {
         'updated_at',
       ],
       customer_sites: ['address', 'customer_id', 'id', 'is_active'],
-      customers: ['address', 'contact_name', 'email', 'hide_site_assurance', 'id', 'is_active', 'name', 'phone'],
+      customers: [
+        'address',
+        'contact_name',
+        'email',
+        'hide_compliance',
+        'hide_site_assurance',
+        'id',
+        'is_active',
+        'name',
+        'phone',
+      ],
       expense_items: [
         'cost',
         'description',
@@ -132,6 +142,7 @@ describe('computeSchemaFingerprint', () => {
       report_inspection_details: [
         'bale_break',
         'bale_break_results',
+        'compliance_hidden',
         'environmental_policy_provided',
         'felt_safe_on_site',
         'good_housekeeping',
