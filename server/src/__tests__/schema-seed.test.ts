@@ -397,3 +397,71 @@ describe('collection note tables and settings', () => {
     expect(row.n).toBe(1);
   });
 });
+
+describe('site assurance columns', () => {
+  const SITE_ASSURANCE_FIELDS = [
+    'staff_training_packaging',
+    'training_records_held',
+    'waste_transfer_notes_sampled',
+    'volume_increase_significant',
+    'personnel_change_significant',
+    'last_inspection_date',
+    'undercover_processing',
+    'undercover_storage',
+    'grades_segregated',
+    'good_housekeeping',
+    'hs_policy_provided',
+    'felt_safe_on_site',
+    'environmental_policy_provided',
+  ];
+
+  const cols = (db: Database.Database, table: string) =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+
+  const freshDb = () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    createSchema(db);
+    return db;
+  };
+
+  it('adds every site assurance column to report_inspection_details', () => {
+    const db = freshDb();
+    const names = cols(db, 'report_inspection_details');
+    for (const field of SITE_ASSURANCE_FIELDS) {
+      expect(names).toContain(field);
+    }
+    expect(names).toContain('site_assurance_hidden');
+  });
+
+  it('adds only the ten the PERN audit lacks to report_pern_details', () => {
+    const db = freshDb();
+    const names = cols(db, 'report_pern_details');
+    for (const field of SITE_ASSURANCE_FIELDS.filter(
+      (f) => !['staff_training_packaging', 'training_records_held', 'waste_transfer_notes_sampled'].includes(f),
+    )) {
+      expect(names).toContain(field);
+    }
+    expect(names).not.toContain('staff_training_packaging');
+    expect(names).not.toContain('training_records_held');
+    expect(names).not.toContain('waste_transfer_notes_sampled');
+  });
+
+  it('adds hide_site_assurance to customers', () => {
+    expect(cols(freshDb(), 'customers')).toContain('hide_site_assurance');
+  });
+
+  it('migrates a database created before the change', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE report_inspection_details (id INTEGER PRIMARY KEY, report_id INTEGER);
+      CREATE TABLE report_pern_details (id INTEGER PRIMARY KEY, report_id INTEGER);
+      CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+    `);
+    db.prepare("INSERT INTO customers (name) VALUES ('Test Customer')").run();
+    createSchema(db);
+    expect(cols(db, 'report_inspection_details')).toContain('undercover_storage');
+    expect(cols(db, 'customers')).toContain('hide_site_assurance');
+    expect(db.prepare('SELECT name FROM customers').get()).toEqual({ name: 'Test Customer' });
+  });
+});

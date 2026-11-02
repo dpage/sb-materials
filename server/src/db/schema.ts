@@ -26,7 +26,7 @@ import { allocateLineReferences, takenLineReferences } from '../utils/collection
  * Write migrations that bring *any* older database forward, not just the one
  * you tested against.
  */
-export const DB_SCHEMA_VERSION = 10;
+export const DB_SCHEMA_VERSION = 11;
 
 export function createSchema(db: Database.Database): void {
   db.exec(`
@@ -298,6 +298,42 @@ export function createSchema(db: Database.Database): void {
     { name: 'weighbridge_ticket', type: 'TEXT' },
     { name: 'weight', type: 'TEXT' },
   ]);
+
+  // The VISY site-assurance questions. They live on both detail tables under
+  // the same names, as moisture_reading_low/high already do, so one component
+  // and one PDF renderer serve every report type regardless of which table the
+  // row came from.
+  const SITE_ASSURANCE_COLUMNS = [
+    { name: 'staff_training_packaging', type: 'TEXT' },
+    { name: 'training_records_held', type: 'TEXT' },
+    { name: 'waste_transfer_notes_sampled', type: 'TEXT' },
+    { name: 'volume_increase_significant', type: 'TEXT' },
+    { name: 'personnel_change_significant', type: 'TEXT' },
+    { name: 'last_inspection_date', type: 'TEXT' },
+    { name: 'undercover_processing', type: 'TEXT' },
+    { name: 'undercover_storage', type: 'TEXT' },
+    { name: 'grades_segregated', type: 'TEXT' },
+    { name: 'good_housekeeping', type: 'TEXT' },
+    { name: 'hs_policy_provided', type: 'TEXT' },
+    { name: 'felt_safe_on_site', type: 'TEXT' },
+    { name: 'environmental_policy_provided', type: 'TEXT' },
+  ];
+
+  addColumns('report_inspection_details', [
+    ...SITE_ASSURANCE_COLUMNS,
+    { name: 'site_assurance_hidden', type: 'INTEGER DEFAULT 0' },
+  ]);
+
+  // The PERN audit already asks about training and transfer notes in its own
+  // words, so it gets only what it lacks rather than the same question twice.
+  addColumns(
+    'report_pern_details',
+    SITE_ASSURANCE_COLUMNS.filter(
+      (c) => !['staff_training_packaging', 'training_records_held', 'waste_transfer_notes_sampled'].includes(c.name),
+    ),
+  );
+
+  addColumns('customers', [{ name: 'hide_site_assurance', type: 'INTEGER DEFAULT 0' }]);
 
   // ─── Collection notes ───
   // A collection note is a standalone document rather than a report: it is
