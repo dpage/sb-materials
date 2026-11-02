@@ -124,6 +124,11 @@ export function ReportEdit() {
   // Inspection details
   const [details, setDetails] = useState<Partial<InspectionDetails>>({});
   const nextTempId = useRef(-1);
+  // Tracks whether the user has typed into the Site Assurance "last
+  // inspection date" field by hand, so a later automatic site-change
+  // refetch can replace an earlier automatic fill but must never clobber
+  // something the user entered themselves.
+  const lastInspectionDateTouched = useRef(false);
 
   // Unwanted materials & contaminants
   const [unwantedMaterials, setUnwantedMaterials] = useState<UnwantedMaterial[]>([]);
@@ -233,14 +238,20 @@ export function ReportEdit() {
 
   // Pre-fill the last inspection date from the most recent non-draft report
   // against this site, on a NEW inspection-type report only: a saved report's
-  // own filed date stands, and is never recomputed just by opening it. Never
-  // overwrites a date already present, whether typed by the user or loaded
-  // with the report.
+  // own filed date stands, and is never recomputed just by opening it. Refetches
+  // on every site change so switching sites refreshes the date (clearing it when
+  // the new site has no history), but a date the user has typed by hand is never
+  // overwritten by a later automatic fill.
   useEffect(() => {
-    if (isEdit || !siteId || !INSPECTION_REPORT_TYPES.includes(reportType) || details.last_inspection_date) return;
+    if (isEdit || !siteId || !INSPECTION_REPORT_TYPES.includes(reportType)) return;
+    let cancelled = false;
     api.getLastInspectionDate(siteId as number).then(({ last_inspection_date }) => {
-      setDetails((d) => (d.last_inspection_date ? d : { ...d, last_inspection_date }));
+      if (cancelled || lastInspectionDateTouched.current) return;
+      setDetails((d) => ({ ...d, last_inspection_date }));
     });
+    return () => {
+      cancelled = true;
+    };
   }, [siteId, isEdit, reportType]);
 
   // Load global lookups once on mount
@@ -1105,7 +1116,15 @@ export function ReportEdit() {
 
             <SiteAssuranceSection
               details={details}
-              setDetails={setDetails}
+              setDetails={(fn) =>
+                setDetails((d) => {
+                  const next = fn(d);
+                  if (next.last_inspection_date !== d.last_inspection_date) {
+                    lastInspectionDateTouched.current = true;
+                  }
+                  return next;
+                })
+              }
               hidden={!!details.site_assurance_hidden}
               onHiddenChange={(v) => setDetails((d) => ({ ...d, site_assurance_hidden: v ? 1 : 0 }))}
             />

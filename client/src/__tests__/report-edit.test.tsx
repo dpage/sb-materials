@@ -1199,6 +1199,50 @@ describe('ReportEdit - Site Assurance', () => {
     );
   });
 
+  it('refreshes the last inspection date when the site is changed on a new report', async () => {
+    (api.getSites as any).mockResolvedValueOnce([
+      { id: 1, customer_id: 1, address: '123 Test St', is_active: 1 },
+      { id: 2, customer_id: 1, address: '456 Other St', is_active: 1 },
+    ]);
+    (api.getLastInspectionDate as any).mockImplementation((siteId: number) =>
+      Promise.resolve({ last_inspection_date: siteId === 1 ? '2026-07-15' : null }),
+    );
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '1');
+    await waitFor(() => expect(api.getSites).toHaveBeenCalledWith(1));
+    await userEvent.selectOptions(screen.getByLabelText('Site Address *'), '1');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Last inspection date') as HTMLInputElement).value).toBe('2026-07-15'),
+    );
+
+    // Switching to a site with no prior history clears the date rather than
+    // leaving the first site's date filed against the wrong site.
+    await userEvent.selectOptions(screen.getByLabelText('Site Address *'), '2');
+    await waitFor(() => expect(api.getLastInspectionDate).toHaveBeenCalledWith(2));
+    await waitFor(() => expect((screen.getByLabelText('Last inspection date') as HTMLInputElement).value).toBe(''));
+  });
+
+  it('does not let a site change clobber a hand-typed last inspection date', async () => {
+    (api.getSites as any).mockResolvedValueOnce([
+      { id: 1, customer_id: 1, address: '123 Test St', is_active: 1 },
+      { id: 2, customer_id: 1, address: '456 Other St', is_active: 1 },
+    ]);
+    (api.getLastInspectionDate as any).mockResolvedValue({ last_inspection_date: '2026-07-15' });
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '1');
+    await waitFor(() => expect(api.getSites).toHaveBeenCalledWith(1));
+    await userEvent.selectOptions(screen.getByLabelText('Site Address *'), '1');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Last inspection date') as HTMLInputElement).value).toBe('2026-07-15'),
+    );
+
+    fireEvent.change(screen.getByLabelText('Last inspection date'), { target: { value: '2026-09-01' } });
+
+    await userEvent.selectOptions(screen.getByLabelText('Site Address *'), '2');
+    await waitFor(() => expect(api.getLastInspectionDate).toHaveBeenCalledWith(2));
+    expect((screen.getByLabelText('Last inspection date') as HTMLInputElement).value).toBe('2026-09-01');
+  });
+
   it('does not overwrite the date on an existing report', async () => {
     (api.getReport as any).mockResolvedValueOnce({
       id: 42,
