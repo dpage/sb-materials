@@ -160,6 +160,11 @@ export const api = {
     return request<{ data: Report[]; total: number; page: number; limit: number }>(`/reports?${qs}`);
   },
   getReport: (id: number) => request<Report>(`/reports/${id}`),
+  getLastInspectionDate: (siteId: number, excludeReportId?: number) => {
+    const params = new URLSearchParams({ site_id: String(siteId) });
+    if (excludeReportId) params.set('exclude_report_id', String(excludeReportId));
+    return request<{ last_inspection_date: string | null }>(`/reports/last-inspection?${params}`);
+  },
   createReport: (data: ReportData) =>
     request<{ id: number; containerIds?: number[] }>('/reports', { method: 'POST', body: JSON.stringify(data) }),
   updateReport: (id: number, data: Partial<ReportData>) =>

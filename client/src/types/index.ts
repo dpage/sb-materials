@@ -24,6 +24,7 @@ export interface Customer {
   phone: string | null;
   address: string | null;
   is_active: number;
+  hide_site_assurance?: number | null;
   sites?: CustomerSite[];
 }
 

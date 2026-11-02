@@ -23,6 +23,7 @@ vi.mock('../api', () => ({
     getSites: vi.fn(),
     getLookups: vi.fn(),
     getReport: vi.fn(),
+    getLastInspectionDate: vi.fn(),
     getUsers: vi.fn(),
     submitReport: vi.fn(),
     createReport: vi.fn(),
@@ -71,6 +72,7 @@ beforeEach(() => {
   (api.getLookups as any).mockResolvedValue([]);
   (api.createReport as any).mockResolvedValue({ id: 1, containerIds: [] });
   (api.getUsers as any).mockResolvedValue([]);
+  (api.getLastInspectionDate as any).mockResolvedValue({ last_inspection_date: null });
 });
 
 describe('sampling arithmetic (client copy)', () => {

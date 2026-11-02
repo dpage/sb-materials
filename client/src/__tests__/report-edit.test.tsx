@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { HelpProvider } from '../components/HelpContext';
@@ -24,6 +25,7 @@ vi.mock('../api', () => ({
     getSites: vi.fn(),
     getLookups: vi.fn(),
     getReport: vi.fn(),
+    getLastInspectionDate: vi.fn(),
     getUsers: vi.fn(),
     submitReport: vi.fn(),
     createReport: vi.fn(),
@@ -51,6 +53,8 @@ vi.mock('../App', () => ({
 
 import { api } from '../api';
 import { ReportEdit } from '../pages/ReportEdit';
+import { REPORT_TYPE_LABELS } from '../types';
+import type { ReportType } from '../types';
 
 function renderNew() {
   return render(
@@ -80,6 +84,30 @@ function renderEdit() {
   );
 }
 
+// Renders a new report of the given type, or an existing report by id. The
+// default report type ('loading_inspection') needs no button click; any
+// other type is selected via the Report Type buttons once the form has
+// mounted.
+async function renderReportEdit(opts: { reportType?: ReportType; reportId?: number } = {}) {
+  const path = opts.reportId ? `/reports/${opts.reportId}` : '/reports/new';
+  const result = render(
+    <MemoryRouter initialEntries={[path]}>
+      <HelpProvider>
+        <Routes>
+          <Route path="/reports/new" element={<ReportEdit />} />
+          <Route path="/reports/:id" element={<ReportEdit />} />
+          <Route path="/" element={<div>Home</div>} />
+        </Routes>
+      </HelpProvider>
+    </MemoryRouter>,
+  );
+  await screen.findByText(opts.reportId ? 'Edit Report' : 'New Report');
+  if (opts.reportType && opts.reportType !== 'loading_inspection') {
+    await userEvent.click(screen.getAllByText(REPORT_TYPE_LABELS[opts.reportType])[0]);
+  }
+  return result;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   (api.getCustomers as any).mockResolvedValue([
@@ -101,6 +129,7 @@ beforeEach(() => {
   (api.uploadSignature as any).mockResolvedValue({});
   (api.getUsers as any).mockResolvedValue([]);
   (api.submitReport as any).mockResolvedValue({ ok: true });
+  (api.getLastInspectionDate as any).mockResolvedValue({ last_inspection_date: null });
 });
 
 describe('ReportEdit - New Report', () => {
@@ -1116,5 +1145,81 @@ describe('ReportEdit - large photo batches', () => {
       0,
     );
     expect(totalFiles).toBe(2);
+  });
+});
+
+describe('ReportEdit - Site Assurance', () => {
+  it('shows the Site Assurance section on a loading inspection', async () => {
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    expect(await screen.findByText('Site Assurance')).toBeInTheDocument();
+  });
+
+  it('does not show it on a sampling report', async () => {
+    await renderReportEdit({ reportType: 'sampling' });
+    await screen.findByLabelText('Sampling not carried out');
+    expect(screen.queryByText('Site Assurance')).not.toBeInTheDocument();
+  });
+
+  it('starts ticked for a customer whose default is to hide it', async () => {
+    (api.getCustomers as any).mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Customer A',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_site_assurance: 0,
+      },
+      {
+        id: 2,
+        name: 'Customer B',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_site_assurance: 1,
+      },
+    ]);
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '2');
+    expect(await screen.findByLabelText('Site assurance not required for this customer')).toBeChecked();
+  });
+
+  it('pre-fills the last inspection date from the previous report', async () => {
+    (api.getLastInspectionDate as any).mockResolvedValueOnce({ last_inspection_date: '2026-07-15' });
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '1');
+    await waitFor(() => expect(api.getSites).toHaveBeenCalledWith(1));
+    await userEvent.selectOptions(screen.getByLabelText('Site Address *'), '1');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Last inspection date') as HTMLInputElement).value).toBe('2026-07-15'),
+    );
+  });
+
+  it('does not overwrite the date on an existing report', async () => {
+    (api.getReport as any).mockResolvedValueOnce({
+      id: 42,
+      report_type: 'loading_inspection',
+      customer_id: 1,
+      site_id: 1,
+      inspection_date: '2026-10-01',
+      inspector_name: 'Inspector',
+      status: 'draft',
+      inspection_details: {
+        last_inspection_date: '2026-01-09',
+        site_assurance_hidden: 0,
+      },
+      unwanted_materials: [],
+      contaminants: [],
+      photos: [],
+    });
+    await renderReportEdit({ reportId: 42 });
+    await waitFor(() =>
+      expect((screen.getByLabelText('Last inspection date') as HTMLInputElement).value).toBe('2026-01-09'),
+    );
+    expect(api.getLastInspectionDate).not.toHaveBeenCalled();
   });
 });

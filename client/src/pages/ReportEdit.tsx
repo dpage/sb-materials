@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import { api } from '../api';
 import { QuickAddModal } from '../components/QuickAddModal';
+import { SiteAssuranceSection } from '../components/SiteAssuranceSection';
 import { useAuth } from '../App';
 import type {
   Customer,
@@ -220,11 +221,27 @@ export function ReportEdit() {
           email: p.email || cust.email || null,
           phone: p.phone || cust.phone || null,
         }));
+        // The Site Assurance tick box defaults from the customer, but is a
+        // per-report override from here on: a saved report's filed value
+        // always wins, so this only applies while there is no id yet.
+        setDetails((d) => ({ ...d, site_assurance_hidden: cust.hide_site_assurance ? 1 : 0 }));
       }
     } else {
       setSites([]);
     }
   }, [customerId, customers]);
+
+  // Pre-fill the last inspection date from the most recent non-draft report
+  // against this site, on a NEW inspection-type report only: a saved report's
+  // own filed date stands, and is never recomputed just by opening it. Never
+  // overwrites a date already present, whether typed by the user or loaded
+  // with the report.
+  useEffect(() => {
+    if (isEdit || !siteId || !INSPECTION_REPORT_TYPES.includes(reportType) || details.last_inspection_date) return;
+    api.getLastInspectionDate(siteId as number).then(({ last_inspection_date }) => {
+      setDetails((d) => (d.last_inspection_date ? d : { ...d, last_inspection_date }));
+    });
+  }, [siteId, isEdit, reportType]);
 
   // Load global lookups once on mount
   useEffect(() => {
@@ -609,9 +626,12 @@ export function ReportEdit() {
         <Section title="Inspection Details">
           <div style={formGrid}>
             <div>
-              <label style={labelStyle}>Customer *</label>
+              <label style={labelStyle} htmlFor="report-customer">
+                Customer *
+              </label>
               <div style={inputWithBtnRow}>
                 <select
+                  id="report-customer"
                   value={customerId}
                   onChange={(e) => {
                     setCustomerId(parseInt(e.target.value) || '');
@@ -632,9 +652,12 @@ export function ReportEdit() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Site Address *</label>
+              <label style={labelStyle} htmlFor="report-site">
+                Site Address *
+              </label>
               <div style={inputWithBtnRow}>
                 <select
+                  id="report-site"
                   value={siteId}
                   onChange={(e) => setSiteId(parseInt(e.target.value) || '')}
                   style={{ ...selectStyle, flex: 1, minWidth: 0 }}
@@ -1079,6 +1102,13 @@ export function ReportEdit() {
                 </div>
               </div>
             </Section>
+
+            <SiteAssuranceSection
+              details={details}
+              setDetails={setDetails}
+              hidden={!!details.site_assurance_hidden}
+              onHiddenChange={(v) => setDetails((d) => ({ ...d, site_assurance_hidden: v ? 1 : 0 }))}
+            />
 
             {/* Quality Score */}
             <Section title="Quality & Result">
