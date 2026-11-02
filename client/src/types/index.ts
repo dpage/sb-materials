@@ -95,6 +95,20 @@ export interface InspectionDetails {
   bale_break: number | null;
   bale_break_results: string | null;
   packaging_thresholds: string[] | string | null;
+  staff_training_packaging: string | null;
+  training_records_held: string | null;
+  waste_transfer_notes_sampled: string | null;
+  volume_increase_significant: string | null;
+  personnel_change_significant: string | null;
+  undercover_processing: string | null;
+  undercover_storage: string | null;
+  grades_segregated: string | null;
+  good_housekeeping: string | null;
+  hs_policy_provided: string | null;
+  felt_safe_on_site: string | null;
+  environmental_policy_provided: string | null;
+  last_inspection_date: string | null;
+  site_assurance_hidden?: number | null;
 }
 
 export interface UnwantedMaterial {
