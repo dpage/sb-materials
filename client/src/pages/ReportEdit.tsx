@@ -147,6 +147,10 @@ export function ReportEdit() {
   // refetch can replace an earlier automatic fill but must never clobber
   // something the user entered themselves.
   const lastInspectionDateTouched = useRef(false);
+  // Tracks whether the user has set the Site Assurance tick box by hand, so
+  // a later customer change can still apply that customer's own default but
+  // must never clobber a tick the user already made on this report.
+  const siteAssuranceHiddenTouched = useRef(false);
 
   // Unwanted materials & contaminants
   const [unwantedMaterials, setUnwantedMaterials] = useState<UnwantedMaterial[]>([]);
@@ -246,8 +250,12 @@ export function ReportEdit() {
         }));
         // The Site Assurance tick box defaults from the customer, but is a
         // per-report override from here on: a saved report's filed value
-        // always wins, so this only applies while there is no id yet.
-        setDetails((d) => ({ ...d, site_assurance_hidden: cust.hide_site_assurance ? 1 : 0 }));
+        // always wins, so this only applies while there is no id yet. And a
+        // tick the user has already made on this report, by hand, is never
+        // overwritten by a later customer change either.
+        if (!siteAssuranceHiddenTouched.current) {
+          setDetails((d) => ({ ...d, site_assurance_hidden: cust.hide_site_assurance ? 1 : 0 }));
+        }
       }
     } else {
       setSites([]);
@@ -1144,7 +1152,10 @@ export function ReportEdit() {
                 })
               }
               hidden={!!details.site_assurance_hidden}
-              onHiddenChange={(v) => setDetails((d) => ({ ...d, site_assurance_hidden: v ? 1 : 0 }))}
+              onHiddenChange={(v) => {
+                siteAssuranceHiddenTouched.current = true;
+                setDetails((d) => ({ ...d, site_assurance_hidden: v ? 1 : 0 }));
+              }}
             />
 
             {/* Quality Score */}

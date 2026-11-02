@@ -116,6 +116,15 @@ const SITE_ASSURANCE_LABELS: Record<string, string> = Object.fromEntries(
   SITE_ASSURANCE_QUESTIONS.map((q) => [q.field, q.label]),
 );
 
+// True when none of the thirteen site assurance fields (the twelve questions
+// plus the last inspection date) carry a value. Used to skip the whole block
+// on reports filed before this feature landed, where site_assurance_hidden
+// backfills to 0 rather than the customer's real default.
+function isSiteAssuranceEmpty(d: Record<string, any>): boolean {
+  const fields = [...SITE_ASSURANCE_QUESTIONS.map((q) => q.field), 'last_inspection_date'];
+  return fields.every((field) => d[field] === null || d[field] === undefined || d[field] === '');
+}
+
 function yesNo(val: any): string {
   if (val === null || val === undefined) return '-';
   if (val === 1 || val === true || val === 'YES') return 'YES';
@@ -406,8 +415,12 @@ function buildInspectionReport(content: Content[], report: any, uploadsDir: stri
 
   // Site Assurance. Omitted wholesale when the customer does not need it,
   // rather than printed as a "not applicable" note: VISY asked for the
-  // questions, not for a record that they were skipped.
-  if (!d.site_assurance_hidden) {
+  // questions, not for a record that they were skipped. Reports filed before
+  // this feature landed have site_assurance_hidden backfilled to 0 rather than
+  // the customer's actual default, so they'd otherwise print a heading over a
+  // block of nothing but "-"; treat a block with no answers at all the same
+  // as a hidden one and skip it silently.
+  if (!d.site_assurance_hidden && !isSiteAssuranceEmpty(d)) {
     content.push({
       text: 'Site Assurance',
       style: 'subheader',

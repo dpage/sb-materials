@@ -536,12 +536,11 @@ describe('PDF Generator', () => {
 
     const buffer = await generatePdf(report as any, tmpDir);
 
-    // Two pages of report details - the Site Assurance block, printed by
-    // default, pushes the detail content past a single page now - and then
-    // exactly one photo on each page that follows. A photo that could not be
-    // placed would show up here twice over: as a missing photo, and as a page
-    // carrying none.
-    expect(photosDrawnPerPage(buffer)).toEqual([0, 0, ...shapes.map(() => 1)]);
+    // One page of report details - this fixture has no Site Assurance
+    // answers, so that block is skipped - and then exactly one photo on each
+    // page that follows. A photo that could not be placed would show up here
+    // twice over: as a missing photo, and as a page carrying none.
+    expect(photosDrawnPerPage(buffer)).toEqual([0, ...shapes.map(() => 1)]);
 
     // The caption travels in the same unbreakable block as the photo, so a
     // dropped photo takes its label with it.
@@ -1274,6 +1273,19 @@ describe('site assurance section', () => {
     );
     expect(text).not.toContain('Site Assurance');
     expect(text).not.toContain('Undercover storage?');
+  });
+
+  it('omits the block silently on a report filed before the change, with no answers to show', async () => {
+    const text = extractPdfText(await generatePdf(inspectionReport({ product_grade: 'OCC' }) as any, tmpDir));
+    expect(text).not.toContain('Site Assurance');
+    expect(text).not.toContain('Undercover storage?');
+  });
+
+  it('still prints the block in full, with "-" rows, when the inspector answered at least one question', async () => {
+    const text = extractPdfText(await generatePdf(inspectionReport({ undercover_storage: 'YES' }) as any, tmpDir));
+    expect(text).toContain('Site Assurance');
+    expect(text).toContain('Undercover storage?');
+    expect(text).toContain('Records of training of staff?');
   });
 
   it('prints the added questions on a PERN audit without the three it already asks', async () => {

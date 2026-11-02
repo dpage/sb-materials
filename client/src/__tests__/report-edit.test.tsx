@@ -1188,6 +1188,44 @@ describe('ReportEdit - Site Assurance', () => {
     expect(await screen.findByLabelText('Site assurance not required for this customer')).toBeChecked();
   });
 
+  it('does not let a later customer change clobber a hand-ticked site assurance box', async () => {
+    (api.getCustomers as any).mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Customer A',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_site_assurance: 0,
+      },
+      {
+        id: 2,
+        name: 'Customer B',
+        is_active: 1,
+        contact_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        hide_site_assurance: 0,
+      },
+    ]);
+    await renderReportEdit({ reportType: 'loading_inspection' });
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '1');
+    const tickBox = await screen.findByLabelText('Site assurance not required for this customer');
+    expect(tickBox).not.toBeChecked();
+
+    await userEvent.click(tickBox);
+    expect(tickBox).toBeChecked();
+
+    // Switching customer, even to one whose own default is also unticked,
+    // must not re-run the automatic fill and silently untick a box the user
+    // just ticked by hand.
+    await userEvent.selectOptions(screen.getByLabelText('Customer *'), '2');
+    expect(tickBox).toBeChecked();
+  });
+
   it('pre-fills the last inspection date from the previous report', async () => {
     (api.getLastInspectionDate as any).mockResolvedValueOnce({ last_inspection_date: '2026-07-15' });
     await renderReportEdit({ reportType: 'loading_inspection' });
