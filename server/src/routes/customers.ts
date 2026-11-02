@@ -31,26 +31,36 @@ export function customerRoutes(db: Database.Database): Router {
 
   // Create customer
   router.post('/', (req, res) => {
-    const { name, contact_name, email, phone, address } = req.body;
+    const { name, contact_name, email, phone, address, hide_site_assurance } = req.body;
     if (!name) {
       res.status(400).json({ error: 'Name required' });
       return;
     }
     const result = db
-      .prepare('INSERT INTO customers (name, contact_name, email, phone, address) VALUES (?, ?, ?, ?, ?)')
-      .run(name, contact_name || null, email || null, phone || null, address || null);
+      .prepare(
+        'INSERT INTO customers (name, contact_name, email, phone, address, hide_site_assurance) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(name, contact_name || null, email || null, phone || null, address || null, hide_site_assurance ? 1 : 0);
     recordAudit(db, req, {
       action: 'create',
       entityType: 'customer',
       entityId: result.lastInsertRowid as number,
       summary: name,
     });
-    res.json({ id: result.lastInsertRowid, name, contact_name, email, phone, address });
+    res.json({
+      id: result.lastInsertRowid,
+      name,
+      contact_name,
+      email,
+      phone,
+      address,
+      hide_site_assurance: hide_site_assurance ? 1 : 0,
+    });
   });
 
   // Update customer
   router.put('/:id', (req, res) => {
-    const { name, contact_name, email, phone, address, is_active } = req.body;
+    const { name, contact_name, email, phone, address, is_active, hide_site_assurance } = req.body;
     // Build dynamic update to only touch fields that were sent
     const sets: string[] = [];
     const params: any[] = [];
@@ -78,6 +88,10 @@ export function customerRoutes(db: Database.Database): Router {
     if (is_active !== undefined) {
       sets.push('is_active = ?');
       params.push(is_active ? 1 : 0);
+    }
+    if (hide_site_assurance !== undefined) {
+      sets.push('hide_site_assurance = ?');
+      params.push(hide_site_assurance ? 1 : 0);
     }
 
     if (sets.length === 0) {

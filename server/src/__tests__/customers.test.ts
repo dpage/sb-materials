@@ -91,6 +91,28 @@ describe('Customer Routes', () => {
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('Name required');
     });
+
+    it('stores and returns the site assurance default on a customer', async () => {
+      const created = await request(app)
+        .post('/api/customers')
+        .set('Cookie', cookie)
+        .send({ name: 'Test Customer', hide_site_assurance: 1 })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.hide_site_assurance).toBe(1);
+    });
+
+    it('defaults the site assurance flag to off', async () => {
+      const created = await request(app)
+        .post('/api/customers')
+        .set('Cookie', cookie)
+        .send({ name: 'Another Test Customer' })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.hide_site_assurance).toBe(0);
+    });
   });
 
   describe('PUT /api/customers/:id', () => {
@@ -125,6 +147,24 @@ describe('Customer Routes', () => {
 
       const cust = db.prepare('SELECT is_active FROM customers WHERE id = ?').get(customerId) as any;
       expect(cust.is_active).toBe(0);
+    });
+
+    it('updates the site assurance default without touching other fields', async () => {
+      const created = await request(app)
+        .post('/api/customers')
+        .set('Cookie', cookie)
+        .send({ name: 'Test Customer', contact_name: 'Test Contact' })
+        .expect(200);
+
+      await request(app)
+        .put(`/api/customers/${created.body.id}`)
+        .set('Cookie', cookie)
+        .send({ hide_site_assurance: 1 })
+        .expect(200);
+
+      const fetched = await request(app).get(`/api/customers/${created.body.id}`).set('Cookie', cookie).expect(200);
+      expect(fetched.body.hide_site_assurance).toBe(1);
+      expect(fetched.body.contact_name).toBe('Test Contact');
     });
   });
 
