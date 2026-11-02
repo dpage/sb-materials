@@ -113,11 +113,11 @@ export function SiteAssuranceSection(props: {
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <input
           type="checkbox"
-          aria-label="Site assurance not required for this customer"
+          aria-label="Site assurance not required for this inspection"
           checked={hidden}
           onChange={(e) => onHiddenChange(e.target.checked)}
         />
-        Site assurance not required for this customer
+        Site assurance not required for this inspection
       </label>
 
       {!hidden && (

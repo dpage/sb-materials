@@ -1185,7 +1185,7 @@ describe('ReportEdit - Site Assurance', () => {
     ]);
     await renderReportEdit({ reportType: 'loading_inspection' });
     await userEvent.selectOptions(screen.getByLabelText('Customer *'), '2');
-    expect(await screen.findByLabelText('Site assurance not required for this customer')).toBeChecked();
+    expect(await screen.findByLabelText('Site assurance not required for this inspection')).toBeChecked();
   });
 
   it('does not let a later customer change clobber a hand-ticked site assurance box', async () => {
@@ -1213,7 +1213,7 @@ describe('ReportEdit - Site Assurance', () => {
     ]);
     await renderReportEdit({ reportType: 'loading_inspection' });
     await userEvent.selectOptions(screen.getByLabelText('Customer *'), '1');
-    const tickBox = await screen.findByLabelText('Site assurance not required for this customer');
+    const tickBox = await screen.findByLabelText('Site assurance not required for this inspection');
     expect(tickBox).not.toBeChecked();
 
     await userEvent.click(tickBox);
@@ -1321,7 +1321,7 @@ describe('ReportEdit - Site Assurance', () => {
   it('has no tick box on a PERN audit', async () => {
     await renderReportEdit({ reportType: 'pern_audit' });
     await screen.findByText('Undercover storage?');
-    expect(screen.queryByLabelText('Site assurance not required for this customer')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Site assurance not required for this inspection')).not.toBeInTheDocument();
   });
 });
 

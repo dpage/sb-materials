@@ -14,13 +14,13 @@ describe('SiteAssuranceSection', () => {
   it('hides the questions when the box is ticked', () => {
     render(<SiteAssuranceSection details={{}} setDetails={vi.fn()} hidden={true} onHiddenChange={vi.fn()} />);
     expect(screen.queryByText('Undercover storage?')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Site assurance not required for this customer')).toBeChecked();
+    expect(screen.getByLabelText('Site assurance not required for this inspection')).toBeChecked();
   });
 
   it('reports a tick back to the parent', async () => {
     const onHiddenChange = vi.fn();
     render(<SiteAssuranceSection details={{}} setDetails={vi.fn()} hidden={false} onHiddenChange={onHiddenChange} />);
-    await userEvent.click(screen.getByLabelText('Site assurance not required for this customer'));
+    await userEvent.click(screen.getByLabelText('Site assurance not required for this inspection'));
     expect(onHiddenChange).toHaveBeenCalledWith(true);
   });
 
